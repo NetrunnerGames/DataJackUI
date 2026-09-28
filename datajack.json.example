@@ -1,0 +1,26 @@
+{
+  "cloud": {
+    "enabled": true,
+    "library": "cloud_redirect.dll"
+  },
+  "lua": {
+    "enabled": true,
+    "paths": [
+      "config/stplug-in",
+      "config/lua",
+      "config/datalua"
+    ]
+  },
+  "manifests": {
+    "path": "depotcache"
+  },
+  "injection": {
+    "enabled": true,
+    "libraryX86": "",
+    "libraryX64": ""
+  },
+  "logging": {
+    "level": "debug",
+    "dir": "datajack"
+  }
+}

@@ -1,0 +1,7 @@
+name = "analytics"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+POSTHOG_HOST = "https://us.i.posthog.com"
+# Store POSTHOG_API_KEY using: npx wrangler secret put POSTHOG_API_KEY
