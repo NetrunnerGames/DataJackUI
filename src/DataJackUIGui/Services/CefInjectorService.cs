@@ -379,6 +379,8 @@ public class CefInjectorService : IHostedService
         {
             Path.Combine(appData, "DataJackUIGui", "plugin", "public", "datajackui.js"),
             Path.Combine(appData, "DataJackUIGui", "plugin", "datajackui.js"),
+            Path.Combine(AppContext.BaseDirectory, "src", "DataJackUIPlugin", "public", "datajackui.js"),
+            Path.Combine(AppContext.BaseDirectory, "public", "datajackui.js"),
         };
         foreach (var path in candidates)
             if (File.Exists(path)) return path;
