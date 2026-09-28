@@ -1,6 +1,6 @@
 # ====================================================================
 # DataJackUI Plugin Release Packaging Script
-# Packs src/DataJackUIPlugin into Releases/plugin.zip for NetrunnerGames/LTSP
+# Packs src/DataJackUIPlugin into Releases/plugin.zip for NetrunnerGames/Jack-in
 # ====================================================================
 
 $ErrorActionPreference = "Stop"

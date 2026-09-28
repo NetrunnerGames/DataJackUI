@@ -111,7 +111,7 @@ public static class AppConfig
     // `plugin.zip` (the frontend) + `winmm.dll` (the loader); the tag is the version (e.g. "v1.2").
     // Fetched + verified (by asset sha256 digest) through GithubProxy like everything else.
     public const string PluginReleasesOwner = "NetrunnerGames";
-    public const string PluginReleasesRepo = "LTSP";
+    public const string PluginReleasesRepo = "Jack-in";
 
     // ── GitHub proxy mirrors (for blocked/throttled regions, e.g. China) ──────────────
     // github.com / api.github.com are often unreachable in some countries. Any GitHub request is tried
