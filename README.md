@@ -1,95 +1,79 @@
 <div align="center">
 
-<img src="src/DataJackUIGui/icon.ico" width="128" height="128" alt="DataJackUI Logo" />
+<img src="src/DataJackUIGui/icon.ico" width="96" height="96" alt="DataJackUI Icon" />
 
-# DATAJACK UI
-### ⚡ NEXT-GEN CYBERPUNK MANIFEST & DEPLOYMENT INTERFACE ⚡
+# DataJackUI
 
-[![Version](https://img.shields.io/badge/VERSION-v2.00.0-06b6d4?style=for-the-badge&logo=github)](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0)
-[![Framework](https://img.shields.io/badge/.NET-8.0_WPF-7000ff?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
-[![License](https://img.shields.io/badge/LICENSE-MIT-10b981?style=for-the-badge)](LICENSE)
-[![Platform](https://img.shields.io/badge/PLATFORM-WINDOWS_10%2F11-0284c7?style=for-the-badge&logo=windows)](https://microsoft.com/windows)
+A modern desktop interface for Steam manifest management, native hook injection, and store plugin integration.
 
-*A high-performance, dark glass desktop client for game manifest deployment, native hooks, and Steam CEF integration.*
+[![Version](https://img.shields.io/github/v/release/NetrunnerGames/DataJackUI?color=06b6d4&label=release)](https://github.com/NetrunnerGames/DataJackUI/releases/latest)
+[![Framework](https://img.shields.io/badge/.NET-8.0_WPF-6b21a8)](https://dotnet.microsoft.com/)
+[![License](https://img.shields.io/badge/license-MIT-059669)](LICENSE)
 
-[📥 Download Release](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0) • [🧩 Get Steam Plugin](https://github.com/NetrunnerGames/Jack-in) • [📜 Documentation](#-core-protocols)
-
----
+[Download Setup](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0) • [Jack-in Steam Plugin](https://github.com/NetrunnerGames/Jack-in)
 
 </div>
 
-## 🌐 OVERVIEW
+---
 
-**DataJackUI** is a modernized, dark-tinted **Ambient Glass** GUI designed for seamless Steam manifest acquisition, Denuvo fix integration, native DLL hook management (`IceBreaker`), and direct CEF store plugin control. Built on **.NET 8 WPF** with hardware-accelerated Windows **Acrylic** transparency, DataJackUI brings a Cyberpunk grid interface to game library management.
+## Overview
+
+**DataJackUI** is a Windows desktop application built with .NET 8 WPF designed for game library management, Steam manifest retrieval, native DLL hook administration, and inline Steam client plugin communication. It features an Acrylic dark glass interface, integrated Denuvo fix routines, and configurable DNS-over-HTTPS fallback resolution.
 
 ---
 
-## ⚡ KEY FEATURES
+## Features
 
-| Feature | Description |
-| :--- | :--- |
-| 🪟 **Netrunner Ambient Glass** | Dark-tinted Windows 10/11 **Acrylic** glass backdrop (`#090a0f` deep dark cyan tint with 12px blur). |
-| 🎯 **Real-Time Store Strips** | Instant game-only Top Sellers and Popular New Releases fetched directly from Steam's storefront query engine. |
-| 🔌 **Jack-in CEF Plugin** | Embedded Steam store page injection allowing 1-click manifest adding straight from the Steam desktop app. |
-| 🧊 **IceBreaker Hook Suite** | Native `version.dll` hook manager and CloudRedirect integration for seamless manifest injection. |
-| 🛠️ **Denuvo Fixes Matrix** | Integrated fix repository and game repair routines with automated backups. |
-| 🌐 **Cloudflare DoH Guard** | Built-in **DNS over HTTPS** resolution (`https://1.1.1.1/dns-query`) to bypass ISP domain blocks & throttling. |
+- **Dark Acrylic Window Styling**: Native Windows 10/11 Acrylic backdrop support with a dark-tinted background container grid.
+- **Real-Time Store Strips**: Direct Steam storefront search queries filtered strictly for games to display Top Sellers and Popular New Releases.
+- **Jack-in Steam Plugin Integration**: Native RPC backend matching the `Jack-in` Steam CEF store plugin for adding manifests directly from the Steam client.
+- **IceBreaker Hook Management**: Interface for managing native `version.dll` hook binaries and CloudRedirect configurations.
+- **Fixes Repository**: Game repair utilities and Denuvo fix application with automated file backups.
+- **Cloudflare DoH Resolution**: Built-in DNS over HTTPS (`https://1.1.1.1/dns-query`) fallback mechanism for environments where standard DNS resolution is throttled or blocked.
 
 ---
 
-## 🚀 QUICK START
+## Releases & Installation
 
-### 1. Standalone Installer / Portable Build
-1. Download **`DataJackUI-win-Setup.exe`** or **`DataJackUI-win-Portable.zip`** from the [Latest Release](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0).
-2. Run the installer or extract the portable folder.
-3. Launch `DataJackUI.exe`.
-
-### 2. Steam Client Plugin Integration (Jack-in)
-1. Download **`plugin.zip`** from the [Jack-in Repository](https://github.com/NetrunnerGames/Jack-in/releases/tag/v1.0).
-2. Extract the `plugin` folder into your Steam desktop client's plugin directory.
-3. Restart Steam to access the inline DataJackUI store controls.
+- **Installer**: Download `DataJackUI-win-Setup.exe` from [Releases](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0) for standard installation.
+- **Portable**: Download `DataJackUI-win-Portable.zip` for a zero-installation package.
+- **Steam CEF Plugin**: Download `plugin.zip` from the [Jack-in Repository](https://github.com/NetrunnerGames/Jack-in/releases/tag/v1.0) and extract into your Steam client plugins folder.
 
 ---
 
-## ⚙️ BUILDING FROM SOURCE
+## Building from Source
 
-### Prerequisites
-* [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-* Windows 10/11 x64 OS
-* PowerShell 7+
+### Requirements
+- .NET 8.0 Desktop SDK
+- Windows 10 or 11 (x64)
 
-### Local Build & Run
+### Local Test Build
 ```powershell
-# Clone repository
 git clone https://github.com/NetrunnerGames/DataJackUI.git
 cd DataJackUI
 
-# Run framework-dependent local published build
+# Publishes and launches local framework-dependent binary
 .\run_local.ps1
 ```
 
-### Packaging 1-Click Release
+### Packaging Release Assets
 ```powershell
-# Build release binaries & Velopack setup packages
+# Compiles framework-dependent binaries and generates Velopack installer packages
 .\build_release.ps1 -d 2.00.0 -p 1.0
 ```
 
 ---
 
-## 🖤 CREDITS & ACKNOWLEDGMENTS
+## Acknowledgments
 
-DataJackUI is built on top of the open-source foundations and reverse-engineering milestones established by the community:
+DataJackUI is developed using concepts and architecture adapted from open-source projects:
 
-* **[LuaTools](https://github.com/madoiscool/LuaTools)** — Special thanks to **`madoiscool`** and the LuaTools contributors for the underlying architecture, manifest protocol concepts, and client groundwork.
-* **[Velopack](https://github.com/velopack/velopack)** — Next-generation cross-platform installer and auto-update framework.
-* **[WPF UI](https://github.com/lepoco/wpfui)** — Modern Fluent UI control library for Windows Presentation Foundation.
+- **[LuaTools](https://github.com/madoiscool/LuaTools)** — Created by **`madoiscool`** and contributors. The manifest handling logic, RPC handlers, and client architecture in this project are derived from LuaTools.
+- **[Velopack](https://github.com/velopack/velopack)** — Desktop installer and update framework.
+- **[WPF UI](https://github.com/lepoco/wpfui)** — Fluent design system controls for WPF.
 
 ---
 
-## ⚖️ LICENSE
+## License
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for complete details.
-
-<div align="center">
-  <sub>Engineered by <b>NetrunnerGames</b></sub>
-</div>
+This project is licensed under the [MIT License](LICENSE).
