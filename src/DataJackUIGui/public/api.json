@@ -1,0 +1,19 @@
+{
+  "api_list": [
+    {
+      "name": "Ryuu",
+      "url": "https://generator.ryuu.lol/<appid>",
+      "weight": 200
+    },
+    {
+      "name": "Ryuu Direct",
+      "url": "http://167.235.229.108/<appid>",
+      "weight": 200
+    },
+    {
+      "name": "Sushi",
+      "url": "https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/<appid>.zip",
+      "weight": 200
+    }
+  ]
+}

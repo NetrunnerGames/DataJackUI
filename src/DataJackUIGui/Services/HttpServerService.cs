@@ -49,10 +49,14 @@ public class HttpServerService : IHostedService
         if (_apiSourcesLoaded) return;
         _apiSourcesLoaded = true;
 
+        string appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui");
         string[] candidates =
         {
+            Path.Combine(appData, "api.json"),
+            Path.Combine(appData, "sources.json"),
             Path.Combine(AppContext.BaseDirectory, "public", "api.json"),
             Path.Combine(AppContext.BaseDirectory, "api.json"),
+            Path.Combine(AppContext.BaseDirectory, "sources.json"),
         };
         foreach (var path in candidates)
         {

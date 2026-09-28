@@ -1,4 +1,4 @@
-﻿<ui:FluentWindow
+<ui:FluentWindow
     x:Class="DataJackUIGui.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -16,7 +16,7 @@
     MinHeight="560"
     d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
     ExtendsContentIntoTitleBar="True"
-    WindowBackdropType="Mica"
+    WindowBackdropType="Acrylic"
     WindowCornerPreference="Round"
     WindowStartupLocation="CenterScreen"
     mc:Ignorable="d">

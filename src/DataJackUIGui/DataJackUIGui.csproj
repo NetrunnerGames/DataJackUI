@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -40,10 +40,11 @@
     <Resource Include="icon.ico" />
   </ItemGroup>
 
-  <!-- Nothing in public/ is bundled anymore. The frontend (datajackui.js) is fetched from GitHub releases
-       by PluginInstallerService into %AppData%\DataJackUIGui\plugin; the Millennium-aware polyfill is inline
-       (CefInjectorService.BuildInlinePolyfill); and the manifest-source list falls back to the hardcoded
-       defaults in HttpServerService when api.json is absent. -->
+  <ItemGroup>
+    <None Include="public\api.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
 
   <!-- Localization RESX. We hand-maintain Strings.Designer.cs (works under dotnet watch), so disable the

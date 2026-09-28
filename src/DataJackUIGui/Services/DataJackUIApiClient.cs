@@ -29,9 +29,6 @@ public class DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, Co
 
     public async Task<List<SteamSearchResult>> SearchAsync(string query, CancellationToken ct = default)
     {
-        // Only run store search if user provided a Steam Web API Key
-        if (string.IsNullOrEmpty(settings.SteamWebApiKey)) return [];
-
         var url = $"{AppConfig.SteamStoreSearchUrl}?term={Uri.EscapeDataString(query)}&l=english&cc=US";
         try
         {
@@ -51,9 +48,6 @@ public class DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, Co
     {
         try
         {
-            // External communication disabled: Steam Store featured categories HTTP GET commented out
-            return ([], []);
-            /*
             var res = await _http.GetAsync($"{AppConfig.SteamFeaturedUrl}?cc=us&l=english", ct);
             if (!res.IsSuccessStatusCode) return ([], []);
             var data = await ReadJsonAsync<SteamFeaturedResponse>(res, ct);
@@ -66,7 +60,6 @@ public class DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, Co
                     .ToList();
 
             return (Clean(data?.TopSellers), Clean(data?.NewReleases));
-            */
         }
         catch { return ([], []); }
     }
