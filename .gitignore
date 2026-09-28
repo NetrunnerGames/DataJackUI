@@ -34,7 +34,9 @@ docs/
 
 # Maintainer-only release tooling
 build-release.ps1
+build_plugin_release.ps1
 deploy_workers.ps1
+scratch/
 
 # Never commit
 *.lnk
