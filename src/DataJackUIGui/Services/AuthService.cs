@@ -325,9 +325,6 @@ public class AuthService
                 Encoding.UTF8, "application/json"),
         };
 
-        // External communication disabled: Bot code redeem POST request commented out
-        throw new AuthException(Resources.Strings.Settings_BotCode_ServerError);
-        /*
         var redeemRes = await _http.SendAsync(redeemReq, ct);
         string redeemBody = await redeemRes.Content.ReadAsStringAsync(ct);
         if (!redeemRes.IsSuccessStatusCode)
@@ -341,7 +338,6 @@ public class AuthService
         var session = await VerifyMagicTokenAsync(redeem.Token, ct);
         ApplySession(session);
         AuthStateChanged?.Invoke();
-        */
     }
 
     private async Task<SupabaseSession> VerifyMagicTokenAsync(string tokenHash, CancellationToken ct)
@@ -354,9 +350,6 @@ public class AuthService
         };
         req.Headers.Add("apikey", AppConfig.SupabaseAnonKey);
 
-        // External communication disabled: Supabase auth verify/token POST request commented out
-        throw new AuthException(Resources.Strings.Settings_BotCode_ServerError);
-        /*
         var res = await _http.SendAsync(req, ct);
         string body = await res.Content.ReadAsStringAsync(ct);
         if (!res.IsSuccessStatusCode)
@@ -364,7 +357,6 @@ public class AuthService
 
         return JsonSerializer.Deserialize<SupabaseSession>(body)
                ?? throw new AuthException(Resources.Strings.Settings_BotCode_ServerError);
-        */
     }
 
     private static async Task<string> WaitForCallbackAsync(HttpListener listener, CancellationToken ct)
@@ -418,9 +410,6 @@ public class AuthService
         };
         req.Headers.Add("apikey", AppConfig.SupabaseAnonKey);
 
-        // External communication disabled: Supabase auth verify/token POST request commented out
-        throw new AuthException(Resources.Strings.Settings_BotCode_ServerError);
-        /*
         var res = await _http.SendAsync(req, ct);
         string body = await res.Content.ReadAsStringAsync(ct);
         if (!res.IsSuccessStatusCode)
@@ -428,7 +417,6 @@ public class AuthService
 
         return JsonSerializer.Deserialize<SupabaseSession>(body)
                ?? throw new AuthException(Resources.Strings.Auth_Err_TokenExchangeEmpty);
-        */
     }
 
     // ── Token access / refresh ──────────────────────────────────────
@@ -464,9 +452,6 @@ public class AuthService
         };
         req.Headers.Add("apikey", AppConfig.SupabaseAnonKey);
 
-        // External communication disabled: Supabase refresh token POST request commented out
-        throw new AuthException("External communication disabled.");
-        /*
         var res = await _http.SendAsync(req);
         string body = await res.Content.ReadAsStringAsync();
         if (!res.IsSuccessStatusCode)
@@ -475,7 +460,6 @@ public class AuthService
         var session = JsonSerializer.Deserialize<SupabaseSession>(body)
                       ?? throw new AuthException(Resources.Strings.Auth_Err_RefreshEmpty);
         ApplySession(session);
-        */
     }
 
     /// <summary>Sign out of the account and return to guest browsing (app stays usable).</summary>

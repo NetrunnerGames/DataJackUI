@@ -18,24 +18,52 @@ public class ProxiedFileDownloader : IFileDownloader
         IDictionary<string, string>? headers = null, double timeout = 30, CancellationToken cancelToken = default)
     {
         Exception? last = null;
-        // External communication disabled: Velopack file download commented out
-        throw new Exception("External communication disabled.");
+        foreach (var candidate in GithubProxy.Candidates(url))
+        {
+            try
+            {
+                await _inner.DownloadFile(candidate, targetFile, progress, headers, timeout, cancelToken);
+                return;
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+            }
+        }
         throw last ?? new Exception($"Failed to download {url} from GitHub or any mirror.");
     }
 
     public async Task<byte[]> DownloadBytes(string url, IDictionary<string, string>? headers = null, double timeout = 30)
     {
         Exception? last = null;
-        // External communication disabled: Velopack bytes download commented out
-        throw new Exception("External communication disabled.");
+        foreach (var candidate in GithubProxy.Candidates(url))
+        {
+            try
+            {
+                return await _inner.DownloadBytes(candidate, headers, timeout);
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+            }
+        }
         throw last ?? new Exception($"Failed to download {url} from GitHub or any mirror.");
     }
 
     public async Task<string> DownloadString(string url, IDictionary<string, string>? headers = null, double timeout = 30)
     {
         Exception? last = null;
-        // External communication disabled: Velopack string download commented out
-        throw new Exception("External communication disabled.");
+        foreach (var candidate in GithubProxy.Candidates(url))
+        {
+            try
+            {
+                return await _inner.DownloadString(candidate, headers, timeout);
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+            }
+        }
         throw last ?? new Exception($"Failed to download {url} from GitHub or any mirror.");
     }
 }

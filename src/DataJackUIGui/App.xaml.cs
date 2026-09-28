@@ -476,20 +476,17 @@ public partial class App : Application
         // (--tray-locked). A manual / protocol / silent-install launch skips it, so the app never
         // auto-updates or restarts mid-manual-use. It only happens when Steam launches us. (Velopack only
         // updates to a STRICTLY HIGHER version, so every release must bump --packVersion.)
-        // External communication disabled: Auto-update flow disabled
-        // if (Program.SessionTrayLock)
-        //     _ = RunUpdateFlowAsync();
+        if (Program.SessionTrayLock)
+            _ = RunUpdateFlowAsync();
 
         // Background, non-blocking key donation (runs only when the setting is on; silent + deduped).
-        // External communication disabled: Key donation task commented out
-        // _ = _host.Services.GetRequiredService<DonateKeysService>().SendPendingKeysIfEnabledAsync();
+        _ = _host.Services.GetRequiredService<DonateKeysService>().SendPendingKeysIfEnabledAsync();
 
         // Anonymous app-launch ping (Cloudflare Worker -> PostHog). Fire-and-forget; never blocks.
         _ = _host.Services.GetRequiredService<AnalyticsService>().TrackAppLaunchAsync();
 
         // Warm the hardware-appid blacklist (refreshes from GitHub if the cache is stale). Fire-and-forget.
-        // External communication disabled: Hardware AppID update task commented out
-        // _ = _host.Services.GetRequiredService<HardwareAppIdService>().EnsureFreshAsync();
+        _ = _host.Services.GetRequiredService<HardwareAppIdService>().EnsureFreshAsync();
 
         // Rescue manifests this app used to write into config\depotcache, which Steam never reads. Silent,
         // idempotent, and costs nothing once the folder is gone. See DepotCacheMigrationService.

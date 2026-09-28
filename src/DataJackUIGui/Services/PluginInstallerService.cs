@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
@@ -236,15 +236,11 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
         string url = $"https://api.github.com/repos/{AppConfig.PluginReleasesOwner}/{AppConfig.PluginReleasesRepo}/releases/latest";
         try
         {
-            // External communication disabled: Store plugin release lookup commented out
-            return null;
-            /*
             using var res = await gh.SendAsync(url, ct);
             if (res is null || !res.IsSuccessStatusCode) return null;
             var rel = JsonSerializer.Deserialize<GithubRelease>(await res.Content.ReadAsStringAsync(ct), JsonOpts);
             if (rel is not null) _cachedLatest = rel;
             return rel;
-            */
         }
         catch { return null; }
     }
