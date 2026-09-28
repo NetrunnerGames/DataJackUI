@@ -6,7 +6,7 @@
 
 A modern desktop interface for Steam manifest management, native hook injection, and store plugin integration.
 
-[![Version](https://img.shields.io/badge/version-v2.00.0-06b6d4?labelColor=090a0f&color=06b6d4)](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0)
+[![Version](assets/version-badge.svg)](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0)
 [![Framework](https://img.shields.io/badge/framework-.NET_8.0_WPF-6b21a8)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-MIT-059669)](LICENSE)
 

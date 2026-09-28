@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="124" height="20" role="img" aria-label="version: v2.00.0">
+  <clipPath id="r">
+    <rect width="124" height="20" rx="3" fill="#fff"/>
+  </clipPath>
+  <g clip-path="url(#r)">
+    <rect width="54" height="20" fill="#090a0f"/>
+    <rect x="54" width="70" height="20" fill="#06b6d4"/>
+  </g>
+  <g text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
+    <text x="270" y="140" transform="scale(.1)" fill="#ffffff" textLength="420">version</text>
+    <text x="880" y="140" transform="scale(.1)" fill="#000000" font-weight="bold" textLength="500">v2.00.0</text>
+  </g>
+</svg>
