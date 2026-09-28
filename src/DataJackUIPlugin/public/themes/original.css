@@ -1,0 +1,50 @@
+:root {
+    --lt-bg-primary: #1b2838;
+    --lt-bg-secondary: #2a475e;
+    --lt-bg-tertiary: rgba(31, 57, 82, 0.86);
+    --lt-bg-hover: rgba(68, 112, 153, 0.86);
+    --lt-bg-container: rgba(24, 45, 63, 0.6);
+    --lt-bg-container-gradient: rgba(16, 41, 61, 0.85), #14344e;
+    --lt-accent: #06b6d4;
+    --lt-accent-light: #22d3ee;
+    --lt-accent-dark: #0891b2;
+    --lt-border: rgba(6, 182, 212, 0.3);
+    --lt-border-hover: rgba(6, 182, 212, 0.8);
+    --lt-text: #fff;
+    --lt-text-secondary: #c7d5e0;
+    --lt-gradient: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%);
+    --lt-gradient-light: linear-gradient(135deg, #22d3ee 0%, #67e8f9 100%);
+    --lt-shadow: rgba(6, 182, 212, 0.4);
+    --lt-shadow-hover: rgba(6, 182, 212, 0.6);
+    --lt-shadow-rgba: rgba(6, 182, 212, 0.3);
+    --lt-rgb: 6, 182, 212;
+}
+
+/* Select dropdown styling for original DataJackUI theme */
+select {
+    background-color: rgba(44, 79, 112, 0.86) !important;
+    color: #fff !important;
+    border: 1px solid rgba(6, 182, 212, 0.3) !important;
+    border-radius: 3px;
+}
+
+select option {
+    background-color: #1b2838;
+    color: #fff;
+}
+
+select option:checked {
+    background: linear-gradient(#06b6d4, #06b6d4);
+    background-color: #06b6d4 !important;
+    color: #1b2838 !important;
+}
+
+select:hover {
+    border-color: rgba(6, 182, 212, 0.8) !important;
+}
+
+select:focus {
+    outline: none;
+    border-color: #06b6d4 !important;
+    box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.3);
+}
