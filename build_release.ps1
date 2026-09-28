@@ -3,8 +3,42 @@ param(
     [string]$DataJackVersion = "1.0.0",
 
     [Alias("p")]
-    [string]$PluginVersion = "1.0.0"
+    [string]$PluginVersion = "1.0.0",
+
+    [Alias("h", "?")]
+    [switch]$Help
 )
+
+if ($Help) {
+    Write-Host @"
+====================================================================
+ DataJackUI Release Build & Packaging CLI
+====================================================================
+
+Usage:
+  .\build_release.ps1 [-d <version>] [-p <version>] [-h]
+
+Options:
+  -d, -DataJackVersion <VERSION>  Version string for the DataJackUI application
+                                  (e.g., '1.0.0'). Packages DataJackUI-win-Setup.exe
+                                  and Velopack delta packages for NetrunnerGames/DataJackUI.
+                                  [default: 1.0.0]
+
+  -p, -PluginVersion   <VERSION>  Version string for the Jack-in Steam plugin
+                                  (e.g., '1.0.0'). Updates plugin.json and packages
+                                  plugin.zip for NetrunnerGames/Jack-in.
+                                  [default: 1.0.0]
+
+  -h, -Help                       Display this help message and exit.
+
+Examples:
+  .\build_release.ps1 -d 1.0.0 -p 1.0.0
+  .\build_release.ps1 -d 1.0.1 -p 1.1.0
+  .\build_release.ps1 -h
+====================================================================
+"@ -ForegroundColor Cyan
+    exit 0
+}
 
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName "System.IO.Compression.FileSystem"
