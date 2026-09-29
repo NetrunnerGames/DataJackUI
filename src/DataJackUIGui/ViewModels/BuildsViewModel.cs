@@ -299,12 +299,10 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         try
         {
             string? dir = _steam.StPlugInDir;
-            if (dir is null || !Directory.Exists(dir))
+            if (dir is null)
             {
                 _allGames = [];
-                EmptyMessage = dir is null
-                    ? Resources.Strings.Manage_Empty_NoSteam
-                    : Resources.Strings.Manage_Empty_NoLuas;
+                EmptyMessage = Resources.Strings.Manage_Empty_NoSteam;
                 ApplyGameFilter();
                 return;
             }
@@ -328,8 +326,8 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
                 var installedDiskAppIds = _library.EnumerateInstalled().Select(g => g.AppId).ToHashSet();
                 var installed = LuaInstaller.EnumerateInstalled(_steam).ToDictionary(f => f.AppId, f => f.Path);
                 var appIds = new HashSet<long>(installed.Keys);
+                foreach (var appId in installedDiskAppIds) appIds.Add(appId);
                 foreach (var (appId, _, _) in _vault.EnumerateLooseBuildLuas()) appIds.Add(appId);
-                appIds.IntersectWith(installedDiskAppIds);
 
                 return appIds
                     .Select(appId =>

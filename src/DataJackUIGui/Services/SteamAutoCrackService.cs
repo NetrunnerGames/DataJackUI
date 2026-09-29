@@ -159,12 +159,18 @@ public class SteamAutoCrackService(
 
             Directory.CreateDirectory(ToolDir);
             string installer = Path.Combine(ToolDir, $"{runtime.Id}.exe");
-            // External communication disabled: Velopack runtime installer download commented out
-            return SacPrepareResult.RuntimeFailed;
-            // ct.ThrowIfCancellationRequested();
-            // var result = await runtime.InvokeInstaller(installer, false, null);
-            // try { File.Delete(installer); } catch { }
-            // return result switch { ... };
+            ct.ThrowIfCancellationRequested();
+            await runtime.DownloadToFile(installer, progress != null ? p => progress.Report((double)p / 100) : null);
+            ct.ThrowIfCancellationRequested();
+            var result = await runtime.InvokeInstaller(installer, false, null);
+            try { File.Delete(installer); } catch { }
+            return result switch
+            {
+                Runtimes.RuntimeInstallResult.InstallSuccess => SacPrepareResult.Ready,
+                Runtimes.RuntimeInstallResult.UserCancelled => SacPrepareResult.RuntimeDeclined,
+                Runtimes.RuntimeInstallResult.RestartRequired => SacPrepareResult.RuntimeNeedsRestart,
+                _ => SacPrepareResult.RuntimeFailed,
+            };
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)

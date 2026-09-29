@@ -505,6 +505,21 @@
                         FontSize="11.5"
                         Foreground="#6b7280"
                         Text="Used to fetch official Steam App info and cover art directly from https://api.steampowered.com." />
+                    <!-- Helper Tools Folder Location -->
+                    <Border Style="{StaticResource RowDivider}" Margin="0,14" />
+                    <TextBlock
+                        FontSize="13"
+                        FontWeight="Medium"
+                        Text="Helper Tools Folder Location" />
+                    <ui:TextBox
+                        Margin="0,6,0,0"
+                        PlaceholderText="Custom tools folder path (e.g. C:\Tools)"
+                        Text="{Binding ToolsPath, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        FontSize="11.5"
+                        Foreground="#6b7280"
+                        Text="Custom directory for helper executables like DepotDownloader, Steamless, and SteamAutoCrack." />
                 </StackPanel>
             </Border>
 

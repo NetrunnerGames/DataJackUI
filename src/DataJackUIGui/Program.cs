@@ -143,10 +143,7 @@ public static class Program
     // falls back to English. Keep in sync with the Settings language dropdown.
     private static readonly string[] SupportedLanguages =
     [
-        "en", "zh-Hans", "zh-Hant", "ja", "ko",
-        "es", "es-419", "pt-BR", "pt-PT", "fr", "de", "it", "nl", "pl",
-        "ru", "uk", "tr", "ar",
-        "cs", "hu", "ro", "el", "bg", "th", "vi", "id", "da", "fi", "nb", "sv",
+        "en",
     ];
 
     /// <summary>Resolve the UI language (saved setting → OS display language → English) and apply it to
@@ -197,19 +194,30 @@ public static class Program
         // 2. Chinese: script (Hans/Hant) matters more than region. zh-CN/zh-SG → Hans, zh-TW/HK/MO → Hant.
         if (two == "zh")
         {
-            if (os.Name.IndexOf("Hant", StringComparison.OrdinalIgnoreCase) >= 0) return "zh-Hant";
-            if (os.Name.IndexOf("Hans", StringComparison.OrdinalIgnoreCase) >= 0) return "zh-Hans";
-            return os.Name is "zh-TW" or "zh-HK" or "zh-MO" ? "zh-Hant" : "zh-Hans";
+            string candidate = os.Name.IndexOf("Hant", StringComparison.OrdinalIgnoreCase) >= 0 ? "zh-Hant"
+                : os.Name.IndexOf("Hans", StringComparison.OrdinalIgnoreCase) >= 0 ? "zh-Hans"
+                : os.Name is "zh-TW" or "zh-HK" or "zh-MO" ? "zh-Hant" : "zh-Hans";
+            if (IsSupported(candidate)) return candidate;
         }
 
         // 3. Portuguese: we ship pt-BR + pt-PT but no neutral "pt". Default neutral/unknown → pt-PT (European).
-        if (two == "pt") return "pt-PT";
+        if (two == "pt")
+        {
+            if (IsSupported("pt-PT")) return "pt-PT";
+        }
 
         // 4. Spanish: we ship neutral "es" (Spain) + "es-419" (Latin America). Map LatAm regions to es-419.
-        if (two == "es") return IsLatinAmericanSpanish(os.Name) ? "es-419" : "es";
+        if (two == "es")
+        {
+            string candidate = IsLatinAmericanSpanish(os.Name) ? "es-419" : "es";
+            if (IsSupported(candidate)) return candidate;
+        }
 
         // 5. Norwegian: Bokmål ("nb") and Nynorsk ("nn") both fall back to our "nb".
-        if (two is "nb" or "nn" or "no") return "nb";
+        if (two is "nb" or "nn" or "no")
+        {
+            if (IsSupported("nb")) return "nb";
+        }
 
         // 6. Generic: try the two-letter neutral parent (es-ES→es, fr-FR→fr, de-DE→de, ja-JP→ja, ...).
         if (IsSupported(two)) return two;
