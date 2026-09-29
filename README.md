@@ -6,17 +6,9 @@
 
 A modern desktop interface for Steam manifest management, native hook injection, and store plugin integration.
 
-<p align="center">
-  <a href="https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0">
-    <img src="https://img.shields.io/badge/version-v2.00.0-cyan?style=for-the-badge&amp;labelColor=090a0f&amp;logo=github&amp;logoColor=cyan" height="40" alt="Version" />
-  </a>
-  <a href="https://dotnet.microsoft.com/">
-    <img src="https://img.shields.io/badge/framework-.NET_8.0_WPF-7000ff?style=for-the-badge&amp;labelColor=090a0f&amp;logo=dotnet&amp;logoColor=white" height="40" alt="Framework" />
-  </a>
-  <a href="LICENSE">
-    <img src="https://img.shields.io/badge/license-MIT-10b981?style=for-the-badge&amp;labelColor=090a0f&amp;logo=open-source-initiative&amp;logoColor=white" height="40" alt="License" />
-  </a>
-</p>
+[![Version](https://img.shields.io/badge/version-v2.00.0-cyan?style=for-the-badge&labelColor=090a0f&logo=github&logoColor=cyan)](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0)
+[![Framework](https://img.shields.io/badge/framework-.NET_8.0_WPF-7000ff?style=for-the-badge&labelColor=090a0f&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![License](https://img.shields.io/badge/license-MIT-10b981?style=for-the-badge&labelColor=090a0f&logo=open-source-initiative&logoColor=white)](LICENSE)
 
 [Download Setup](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0) • [Jack-in Steam Plugin](https://github.com/NetrunnerGames/Jack-in)
 
