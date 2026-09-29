@@ -109,7 +109,6 @@ public partial class SteamLibraryService(SteamService steam)
         catch { return null; }
     }
 
-
     /// <summary>Every Steam library root (the main install plus any added libraries).</summary>
     private static IEnumerable<string> GetLibraryRoots(string steamRoot)
     {
