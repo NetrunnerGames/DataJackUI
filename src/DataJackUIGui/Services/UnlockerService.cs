@@ -193,9 +193,6 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         UnlockerMode mode, IProgress<double?>? progress = null, CancellationToken ct = default)
     {
         var def = Def(mode);
-
-        // Custom: selecting it is the whole operation. Nothing is downloaded, nothing is written to
-        // the Steam root, and whatever the user has installed is left exactly as it is.
         if (def.Kind == ModeKind.Manual)
         {
             settings.SelectedMode = mode.ToString();
@@ -206,137 +203,114 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         if (root is null || !steam.IsValid)
             return ModeInstallResult.Fail(Resources.Strings.Err_SteamNotFound);
 
-        // IceBreaker: native single-DLL hook (version.dll) copied from bundled resources.
         if (mode == UnlockerMode.IceBreaker)
-        {
-            string srcDll = Path.Combine(AppContext.BaseDirectory, "Resources", "version.dll");
-            if (!File.Exists(srcDll))
-                return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_DownloadMissingFiles, "Resources/version.dll"));
+            return InstallIceBreakerMode(root, mode);
 
-            string dest = Path.Combine(root, "version.dll");
-            try
-            {
-                File.Copy(srcDll, dest, overwrite: true);
-                StampNow(dest);
-                settings.SelectedMode = mode.ToString();
-                try { EnsureOpenSteamToolLuaPath(root); } catch { }
-                return ModeInstallResult.Ok();
-            }
-            catch
-            {
-                return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_WriteFailedFile, "version.dll"));
-            }
-        }
-
-        // Resolve the build to install: manifest-backed modes (BST) name their own version and payload
-        // hash; the rest use the same (cached) release the card's status was based on, so what installs
-        // matches what was shown.
-        GithubRelease? release = null;
-        UpdateManifest? manifest = null;
-        string? version;
-        if (def.UpdateManifestUrl is not null)
-        {
-            manifest = await FetchUpdateManifestAsync(def, forceRefresh: false, ct);
-            if (manifest is null)
-                return ModeInstallResult.Fail(Resources.Strings.Err_UpdateServerUnreachable);
-            version = manifest.Version;
-        }
-        else
-        {
-            release = await FetchReleaseAsync(def, forceRefresh: false, ct);
-            if (release is null)
-                return ModeInstallResult.Fail(Resources.Strings.Err_GithubUnreachable);
-            version = release.TagName;
-        }
+        var (version, zipUrl, zipName, wantedZipDigest, manifest) = await ResolveReleaseAsync(def, ct);
+        if (version is null)
+            return ModeInstallResult.Fail(zipUrl); // Error string passed through zipUrl on fail
 
         string staging = Path.Combine(Path.GetTempPath(), "DataJackUIGui", "mode", Guid.NewGuid().ToString("N"));
         try
         {
             Directory.CreateDirectory(staging);
 
-            // 1. Stage + verify into temp.
-            Dictionary<string, string> staged; // filename → staged path
-            string? zipDigest = null;
-            {
-                // Manifest modes build the asset URL from the reported version; release modes read it
-                // off the release. Either way we land on the same "<name>-<version>-Release.zip" shape.
-                string zipUrl, zipName;
-                string? wantedZipDigest = null;
-                if (manifest is not null)
-                {
-                    zipName = (def.ZipAssetPattern ?? "").Replace("{version}", manifest.Version);
-                    zipUrl = $"https://github.com/{def.Owner}/{def.Repo}/releases/download/{manifest.Version}/{zipName}";
-                }
-                else
-                {
-                    var asset = FindZipAsset(def, release!);
-                    if (asset is null) return ModeInstallResult.Fail(Resources.Strings.Err_ReleaseMissingDownload);
-                    zipName = asset.Name;
-                    zipUrl = asset.DownloadUrl;
-                    wantedZipDigest = AssetHash.ParseDigest(asset.Digest);
-                }
+            var (staged, zipDigest, err) = await StageAndVerifyFilesAsync(def, staging, zipUrl, zipName, wantedZipDigest, manifest, progress, ct);
+            if (err is not null) return ModeInstallResult.Fail(err);
 
-                string zipPath = Path.Combine(staging, zipName);
-                await DownloadToFileAsync(zipUrl, zipPath, progress, ct);
+            var failed = CopyToSteamRoot(root, def, staged!);
 
-                zipDigest = AssetHash.OfFile(zipPath);
-                if (wantedZipDigest is { } want && !zipDigest.Equals(want, StringComparison.OrdinalIgnoreCase))
-                    return ModeInstallResult.Fail(Resources.Strings.Err_VerifyFailed);
-
-                staged = ExtractWanted(zipPath, def.PlaceFiles, staging);
-                var missing = def.PlaceFiles.Where(f => !staged.ContainsKey(f)).ToList();
-                if (missing.Count > 0)
-                    return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_DownloadMissingFiles, string.Join(", ", missing)));
-
-                // Manifest modes don't publish a zip digest, so verify the payload file the manifest
-                // DOES vouch for, once it's out of the archive.
-                if (manifest is not null && staged.TryGetValue(manifest.File, out string? payload)
-                    && !AssetHash.OfFile(payload).Equals(manifest.Sha256, StringComparison.OrdinalIgnoreCase))
-                    return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_VerifyFailedFile, manifest.File));
-            }
-
-            // 2. Copy verified files into the Steam root (overwrite). Locked files → Failed (Steam running).
-            var failed = new List<string>();
-            foreach (string file in def.PlaceFiles)
-            {
-                try
-                {
-                    string dest = Path.Combine(root, file);
-                    File.Copy(staged[file], dest, overwrite: true);
-                    StampNow(dest);
-                }
-                catch
-                {
-                    failed.Add(file);
-                }
-            }
-
-            // 3. This mode is now the active one. (No cleanup of other modes' files. Just overwrite.)
             settings.SelectedMode = mode.ToString();
-
-            // Record the installed zip digest/version for reference (the up-to-date check uses per-DLL
-            // hashes, not this). Both remaining install modes are OpenSteamTool-derived, so both want
-            // their config pointed at stplug-in.
             cache.OpenSteamToolsInstalledZipDigest = zipDigest;
             cache.OpenSteamToolsInstalledVersion = version;
-            try { EnsureOpenSteamToolLuaPath(root); } catch { /* config tweak is best-effort */ }
+            try { EnsureOpenSteamToolLuaPath(root); } catch { }
 
             return failed.Count > 0
                 ? new ModeInstallResult(false, string.Format(Resources.Strings.Err_WriteFailedCount, failed.Count), failed)
                 : ModeInstallResult.Ok();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) { return ModeInstallResult.Fail(Resources.Strings.Err_Cancelled); }
+        catch (Exception ex) { return ModeInstallResult.Fail(ex.Message); }
+        finally { try { Directory.Delete(staging, recursive: true); } catch { } }
+    }
+
+    private ModeInstallResult InstallIceBreakerMode(string root, UnlockerMode mode)
+    {
+        string srcDll = Path.Combine(AppContext.BaseDirectory, "Resources", "version.dll");
+        if (!File.Exists(srcDll))
+            return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_DownloadMissingFiles, "Resources/version.dll"));
+
+        string dest = Path.Combine(root, "version.dll");
+        try
         {
-            return ModeInstallResult.Fail(Resources.Strings.Err_Cancelled);
+            File.Copy(srcDll, dest, overwrite: true);
+            StampNow(dest);
+            settings.SelectedMode = mode.ToString();
+            try { EnsureOpenSteamToolLuaPath(root); } catch { }
+            return ModeInstallResult.Ok();
         }
-        catch (Exception ex)
+        catch
         {
-            return ModeInstallResult.Fail(ex.Message);
+            return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_WriteFailedFile, "version.dll"));
         }
-        finally
+    }
+
+    private async Task<(string? version, string urlOrError, string zipName, string? wantedZipDigest, UpdateManifest? manifest)> ResolveReleaseAsync(ModeDef def, CancellationToken ct)
+    {
+        if (def.UpdateManifestUrl is not null)
         {
-            try { Directory.Delete(staging, recursive: true); } catch { /* best effort */ }
+            var manifest = await FetchUpdateManifestAsync(def, forceRefresh: false, ct);
+            if (manifest is null) return (null, Resources.Strings.Err_UpdateServerUnreachable, "", null, null);
+            string zipName = (def.ZipAssetPattern ?? "").Replace("{version}", manifest.Version);
+            string zipUrl = $"https://github.com/{def.Owner}/{def.Repo}/releases/download/{manifest.Version}/{zipName}";
+            return (manifest.Version, zipUrl, zipName, null, manifest);
         }
+        else
+        {
+            var release = await FetchReleaseAsync(def, forceRefresh: false, ct);
+            if (release is null) return (null, Resources.Strings.Err_GithubUnreachable, "", null, null);
+            var asset = FindZipAsset(def, release);
+            if (asset is null) return (null, Resources.Strings.Err_ReleaseMissingDownload, "", null, null);
+            return (release.TagName, asset.DownloadUrl, asset.Name, AssetHash.ParseDigest(asset.Digest), null);
+        }
+    }
+
+    private async Task<(Dictionary<string, string>? staged, string? zipDigest, string? err)> StageAndVerifyFilesAsync(
+        ModeDef def, string staging, string zipUrl, string zipName, string? wantedZipDigest, UpdateManifest? manifest, IProgress<double?>? progress, CancellationToken ct)
+    {
+        string zipPath = Path.Combine(staging, zipName);
+        await DownloadToFileAsync(zipUrl, zipPath, progress, ct);
+
+        string zipDigest = AssetHash.OfFile(zipPath);
+        if (wantedZipDigest is { } want && !zipDigest.Equals(want, StringComparison.OrdinalIgnoreCase))
+            return (null, null, Resources.Strings.Err_VerifyFailed);
+
+        var staged = ExtractWanted(zipPath, def.PlaceFiles, staging);
+        var missing = def.PlaceFiles.Where(f => !staged.ContainsKey(f)).ToList();
+        if (missing.Count > 0)
+            return (null, null, string.Format(Resources.Strings.Err_DownloadMissingFiles, string.Join(", ", missing)));
+
+        if (manifest is not null && staged.TryGetValue(manifest.File, out string? payload)
+            && !AssetHash.OfFile(payload).Equals(manifest.Sha256, StringComparison.OrdinalIgnoreCase))
+            return (null, null, string.Format(Resources.Strings.Err_VerifyFailedFile, manifest.File));
+
+        return (staged, zipDigest, null);
+    }
+
+    private List<string> CopyToSteamRoot(string root, ModeDef def, Dictionary<string, string> staged)
+    {
+        var failed = new List<string>();
+        foreach (string file in def.PlaceFiles)
+        {
+            try
+            {
+                string dest = Path.Combine(root, file);
+                File.Copy(staged[file], dest, overwrite: true);
+                StampNow(dest);
+            }
+            catch { failed.Add(file); }
+        }
+        return failed;
     }
 
     // ── First-run auto-detect ────────────────────────────────────────
@@ -362,47 +336,41 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         string? root = steam.EffectivePath;
         if (root is null || !steam.IsValid) return null;
 
-        UnlockerMode? detected = null;
-
-        // IceBreaker native hook check first
-        string versionDll = Path.Combine(root, "version.dll");
-        if (File.Exists(versionDll))
-        {
-            detected = UnlockerMode.IceBreaker;
-        }
-
-        // OpenSteamTool check
-        string ostDll = Path.Combine(root, "OpenSteamTool.dll");
-        if (detected is null && File.Exists(ostDll))
-        {
-            detected = UnlockerMode.Ost;
-        }
-
-        // Stable OST via the loose-DLL mirror. Both DLLs must be present and each must hash-match SOME
-        // ost- release. The two ship in SEPARATE releases, so they're matched independently.
-        if (detected is null)
-        {
-            string dwmapi = Path.Combine(root, "dwmapi.dll");
-            string xinput = Path.Combine(root, "xinput1_4.dll");
-            if (File.Exists(dwmapi) && File.Exists(xinput))
-            {
-                var mirror = await FetchAllReleasesAsync(MirrorRepoOwner, MirrorRepo, null, ct);
-                var tagged = mirror?
-                    .Where(r => r.TagName.StartsWith("ost-", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                if (tagged is { Count: > 0 })
-                {
-                    string dwmHash = AssetHash.OfFile(dwmapi);
-                    string xinHash = AssetHash.OfFile(xinput);
-                    if (tagged.Any(r => AssetDigest(r, "dwmapi.dll") == dwmHash)
-                        && tagged.Any(r => AssetDigest(r, "xinput1_4.dll") == xinHash))
-                        detected = UnlockerMode.Ost;
-                }
-            }
-        }
+        UnlockerMode? detected = await DetectIceBreaker(root)
+                              ?? DetectOst(root)
+                              ?? await DetectStableOst(root, ct);
 
         if (detected is { } m) settings.SelectedMode = m.ToString();
         return detected;
+    }
+
+    private Task<UnlockerMode?> DetectIceBreaker(string root)
+    {
+        return Task.FromResult(File.Exists(Path.Combine(root, "version.dll")) ? (UnlockerMode?)UnlockerMode.IceBreaker : null);
+    }
+
+    private UnlockerMode? DetectOst(string root)
+    {
+        return File.Exists(Path.Combine(root, "OpenSteamTool.dll")) ? UnlockerMode.Ost : null;
+    }
+
+    private async Task<UnlockerMode?> DetectStableOst(string root, CancellationToken ct)
+    {
+        string dwmapi = Path.Combine(root, "dwmapi.dll");
+        string xinput = Path.Combine(root, "xinput1_4.dll");
+        if (!File.Exists(dwmapi) || !File.Exists(xinput)) return null;
+
+        var mirror = await FetchAllReleasesAsync(MirrorRepoOwner, MirrorRepo, null, ct);
+        var tagged = mirror?.Where(r => r.TagName.StartsWith("ost-", StringComparison.OrdinalIgnoreCase)).ToList();
+        
+        if (tagged is { Count: > 0 })
+        {
+            string dwmHash = AssetHash.OfFile(dwmapi);
+            string xinHash = AssetHash.OfFile(xinput);
+            if (tagged.Any(r => AssetDigest(r, "dwmapi.dll") == dwmHash) && tagged.Any(r => AssetDigest(r, "xinput1_4.dll") == xinHash))
+                return UnlockerMode.Ost;
+        }
+        return null;
     }
 
     /// <summary>Digest (hex, no prefix) of a release's same-named asset, or null if absent.</summary>
@@ -453,8 +421,6 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         EnsureDataJackJsonLuaPath(steamRoot);
 
         string tomlPath = Path.Combine(steamRoot, "opensteamtool.toml");
-
-        // No file → create a minimal one.
         if (!File.Exists(tomlPath))
         {
             File.WriteAllText(tomlPath, $"[lua]\npaths = [\"{OstLuaPath}\"]\n");
@@ -462,12 +428,9 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         }
 
         var lines = File.ReadAllLines(tomlPath).ToList();
-
-        // Find the active (uncommented) [lua] section header and the bounds of that section.
         int luaHeader = lines.FindIndex(l => IsActiveTableHeader(l, "lua"));
         if (luaHeader < 0)
         {
-            // No active [lua] section → append one.
             if (lines.Count > 0 && lines[^1].Trim().Length > 0) lines.Add("");
             lines.Add("[lua]");
             lines.Add($"paths = [\"{OstLuaPath}\"]");
@@ -475,54 +438,45 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
             return;
         }
 
-        // Section runs until the next active table header (or EOF).
         int sectionEnd = lines.FindIndex(luaHeader + 1, IsActiveAnyTableHeader);
         if (sectionEnd < 0) sectionEnd = lines.Count;
 
-        // Look for an active `paths` key within the section. The array may span multiple lines.
-        int pathsStart = -1;
-        for (int i = luaHeader + 1; i < sectionEnd; i++)
-        {
-            string t = lines[i].TrimStart();
-            if (t.StartsWith('#')) continue;                       // commented → ignore
-            if (Regex.IsMatch(t, @"^paths\s*=")) { pathsStart = i; break; }
-        }
-
+        int pathsStart = FindPathsArray(lines, luaHeader, sectionEnd);
         if (pathsStart < 0)
         {
-            // [lua] exists but no active paths key → insert one right under the header.
             lines.Insert(luaHeader + 1, $"paths = [\"{OstLuaPath}\"]");
             File.WriteAllLines(tomlPath, lines);
             return;
         }
 
-        // Find where the array closes (']'), scanning from pathsStart (handles multi-line arrays).
         int pathsEnd = pathsStart;
         while (pathsEnd < sectionEnd && !lines[pathsEnd].Contains(']')) pathsEnd++;
-        if (pathsEnd >= sectionEnd) pathsEnd = sectionEnd - 1; // malformed/unclosed. Best effort
+        if (pathsEnd >= sectionEnd) pathsEnd = sectionEnd - 1;
 
         string block = string.Join("\n", lines.GetRange(pathsStart, pathsEnd - pathsStart + 1));
-
-        // Already present (compare the path token, slashes normalized)? Nothing to do.
-        if (Regex.IsMatch(block, @"[""']\s*" + Regex.Escape(OstLuaPath).Replace("/", @"[/\\]+") + @"\s*[""']",
-                RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(block, @"[\"']\s*" + Regex.Escape(OstLuaPath).Replace("/", @"[/\\]+") + @"\s*[\"']", RegexOptions.IgnoreCase))
             return;
 
-        // Insert our entry just before the closing ']' on the line that has it.
         int closeLine = pathsEnd;
         string line = lines[closeLine];
         int bracket = line.LastIndexOf(']');
-
-        // Insert our entry just before the ']'. Add a comma after existing content unless the array
-        // is empty (text before ']' ends right after the opening '[').
         string before = line[..bracket].TrimEnd();
         bool arrayEmpty = Regex.IsMatch(before, @"\[\s*$");
-        string newBefore = arrayEmpty
-            ? before + $" \"{OstLuaPath}\""
-            : before + $", \"{OstLuaPath}\"";
+        string newBefore = arrayEmpty ? before + $" \"{OstLuaPath}\"" : before + $", \"{OstLuaPath}\"";
         lines[closeLine] = newBefore + line[bracket..];
 
         File.WriteAllLines(tomlPath, lines);
+    }
+
+    private static int FindPathsArray(List<string> lines, int luaHeader, int sectionEnd)
+    {
+        for (int i = luaHeader + 1; i < sectionEnd; i++)
+        {
+            string t = lines[i].TrimStart();
+            if (t.StartsWith('#')) continue;
+            if (Regex.IsMatch(t, @"^paths\s*=")) return i;
+        }
+        return -1;
     }
 
     /// <summary>True if the line is an active (uncommented) [name] table header.</summary>
@@ -805,24 +759,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
 
             if (dict.TryGetValue("lua", out var rawLua) && rawLua is JsonElement el && el.ValueKind == JsonValueKind.Object)
             {
-                foreach (var prop in el.EnumerateObject())
-                {
-                    if (prop.NameEquals("paths") && prop.Value.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var item in prop.Value.EnumerateArray())
-                        {
-                            string s = item.GetString() ?? "";
-                            if (!string.IsNullOrEmpty(s) && !paths.Contains(s))
-                                paths.Add(s);
-                        }
-                    }
-                    else
-                    {
-                        luaSection[prop.Name] = prop.Value.ValueKind == JsonValueKind.True ? true :
-                                                prop.Value.ValueKind == JsonValueKind.False ? false :
-                                                prop.Value.ToString();
-                    }
-                }
+                EnsureJsonHasLuaPath(el, luaSection, paths);
             }
 
             luaSection["enabled"] = true;
@@ -833,6 +770,28 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
             File.WriteAllText(jsonPath, json);
         }
         catch { /* best effort */ }
+    }
+
+    private static void EnsureJsonHasLuaPath(JsonElement el, Dictionary<string, object> luaSection, List<string> paths)
+    {
+        foreach (var prop in el.EnumerateObject())
+        {
+            if (prop.NameEquals("paths") && prop.Value.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in prop.Value.EnumerateArray())
+                {
+                    string s = item.GetString() ?? "";
+                    if (!string.IsNullOrEmpty(s) && !paths.Contains(s))
+                        paths.Add(s);
+                }
+            }
+            else
+            {
+                luaSection[prop.Name] = prop.Value.ValueKind == JsonValueKind.True ? true :
+                                        prop.Value.ValueKind == JsonValueKind.False ? false :
+                                        prop.Value.ToString();
+            }
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
