@@ -36,6 +36,10 @@ AGENTS.md
 OpenSteamTool-releases/
 SteamTools-releases/
 
+# Plugin frontend source (managed in separate Jack-in repository)
+src/DataJackUIPlugin/
+
+
 # Maintainer-only scratch scripts, docs, and workflows
 tools/
 docs/
