@@ -10,6 +10,19 @@ namespace DataJackUIGui;
 
 public static class Program
 {
+    private static void SignalEvent(string name)
+    {
+        try
+        {
+            if (EventWaitHandle.TryOpenExisting(name, out var evt))
+            {
+                evt.Set();
+                evt.Dispose();
+            }
+        }
+        catch { }
+    }
+
     [STAThread]
     public static void Main(string[] args)
     {
@@ -63,47 +76,12 @@ public static class Program
             // Steam DLL hijack passes on every launch: steam.exe loads it into more than one
             // process/thread per boot, so DllMain and this whole Main() can legitimately run more
             // than once in the same Steam startup). Don't surface the window for that duplicate.
-            if (!startMinimized)
-            {
-                try
-                {
-                    if (EventWaitHandle.TryOpenExisting(ShowWindowEventName, out var signal))
-                    {
-                        signal.Set();
-                        signal.Dispose();
-                    }
-                }
-                catch { /* best effort. If signalling fails, just exit quietly */ }
-            }
+            if (!startMinimized) SignalEvent(ShowWindowEventName);
 
-            // A --tray-locked relaunch (the loader passes this) asks the live instance to switch close-to-tray
-            // on for the session. Otherwise, if the app was already open WITHOUT the flag when the loader
-            // ran, it would stay killable by a window close (this second process exits without the live one
-            // ever learning about the flag).
             if (trayLocked)
             {
-                try
-                {
-                    if (EventWaitHandle.TryOpenExisting(EnableTrayLockEventName, out var tl))
-                    {
-                        tl.Set();
-                        tl.Dispose();
-                    }
-                }
-                catch { /* best effort */ }
-
-                // A --tray-locked relaunch is the loader firing on Steam-open. Poke the live instance to
-                // re-run its update flow (app + plugin), so an already-running app still updates when the
-                // user opens Steam. Gated to --tray-locked so manual/protocol relaunches never trigger it.
-                try
-                {
-                    if (EventWaitHandle.TryOpenExisting(RecheckUpdatesEventName, out var ru))
-                    {
-                        ru.Set();
-                        ru.Dispose();
-                    }
-                }
-                catch { /* best effort */ }
+                SignalEvent(EnableTrayLockEventName);
+                SignalEvent(RecheckUpdatesEventName);
             }
             return;
         }
