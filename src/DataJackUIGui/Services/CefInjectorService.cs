@@ -137,7 +137,8 @@ public class CefInjectorService : IHostedService
         if (string.IsNullOrWhiteSpace(tabsJson)) return;
 
         var tabs = JsonSerializer.Deserialize<List<CefTabInfo>>(tabsJson, JsonOpts) ?? new();
-        var script = _polyfillJs + "\n" + _datajackuiJs;
+        var script = _polyfillJs + "
+" + _datajackuiJs;
         var live = new List<(string, string)>();
         var seen = new HashSet<string>();
 
@@ -159,31 +160,6 @@ public class CefInjectorService : IHostedService
 
         foreach (var stale in _sockets.Keys.Where(k => !seen.Contains(k)).ToList())
             EvictSocket(stale);
-    }
-
-                        }
-
-                        storeTabs = live;
-                        // Drop persistent sockets for tabs that have gone away.
-                        foreach (var stale in _sockets.Keys.Where(k => !seen.Contains(k)).ToList())
-                            EvictSocket(stale);
-                    }
-                }
-
-                // ── Fast cadence (every tick): drain pending CDP bridge requests ──
-                foreach (var (id, ws) in storeTabs)
-                    await ProcessSingleTab(id, ws, ct);
-
-                tick++;
-                await Task.Delay(TickMs, ct);
-            }
-            catch (OperationCanceledException) { break; }
-            catch (Exception ex)
-            {
-                _log.LogDebug("CEF cycle: {Message}", ex.Message);
-                try { await Task.Delay(1000, ct); } catch { break; }
-            }
-        }
     }
 
     private async Task ProcessSingleTab(string tabId, string wsUrl, CancellationToken ct)
