@@ -209,23 +209,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         // IceBreaker: native single-DLL hook (version.dll) copied from bundled resources.
         if (mode == UnlockerMode.IceBreaker)
         {
-            string srcDll = Path.Combine(AppContext.BaseDirectory, "Resources", "version.dll");
-            if (!File.Exists(srcDll))
-                return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_DownloadMissingFiles, "Resources/version.dll"));
-
-            string dest = Path.Combine(root, "version.dll");
-            try
-            {
-                File.Copy(srcDll, dest, overwrite: true);
-                StampNow(dest);
-                settings.SelectedMode = mode.ToString();
-                try { EnsureOpenSteamToolLuaPath(root); } catch { }
-                return ModeInstallResult.Ok();
-            }
-            catch
-            {
-                return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_WriteFailedFile, "version.dll"));
-            }
+            return InstallIceBreakerMode(root, mode);
         }
 
         // Resolve the build to install: manifest-backed modes (BST) name their own version and payload
@@ -336,6 +320,27 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         finally
         {
             try { Directory.Delete(staging, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    private ModeInstallResult InstallIceBreakerMode(string root, UnlockerMode mode)
+    {
+        string srcDll = Path.Combine(AppContext.BaseDirectory, "Resources", "version.dll");
+        if (!File.Exists(srcDll))
+            return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_DownloadMissingFiles, "Resources/version.dll"));
+
+        string dest = Path.Combine(root, "version.dll");
+        try
+        {
+            File.Copy(srcDll, dest, overwrite: true);
+            StampNow(dest);
+            settings.SelectedMode = mode.ToString();
+            try { EnsureOpenSteamToolLuaPath(root); } catch { }
+            return ModeInstallResult.Ok();
+        }
+        catch
+        {
+            return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_WriteFailedFile, "version.dll"));
         }
     }
 

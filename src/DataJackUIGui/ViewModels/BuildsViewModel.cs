@@ -908,94 +908,19 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
 
         foreach (var old in DepotPicks) old.PropertyChanged -= OnPickChanged;
 
-        // Read once per picker open rather than cached: Steam's language can change without this app
-        // restarting, and it is a single registry lookup.
         string? steamLanguage = SteamService.SteamLanguage;
-
-        // Read once, not per row: ResolveKeys parses the lua AND Steam's config.vdf on every call.
         var keys = _depotTool.ResolveKeys(game.AppId);
 
-        // DLC is included when it actually ships bytes. Excluding every r.IsDlc row was too broad: most
-        // DLC "depots" are 0-byte entitlement markers with nothing to fetch (American Truck Simulator has
-        // 54 of them), but a real chunk of them carry content — the same game has 19 holding 2.5 GB of
-        // map and truck DLC, all of them keyed by the lua, which the picker simply never offered.
-        // Size comes straight off the depot info, so this costs no extra lookups.
         var picks = _allInLua
             .Where(r => !r.IsDlc || r.Size > 0)
-            .Select(r =>
-            {
-                // An ACTIVE pin means the user deliberately locked this build, so it wins outright and
-                // must never be silently upgraded. Otherwise take the build Steam ships today: a
-                // commented-out pin means "Auto Update Apps" is on, i.e. the user wants to track latest,
-                // so downloading the build the lua originally shipped with would be the wrong version.
-                // The commented pin is a last resort only, for depots with no public manifest at all
-                // (beta-branch-only content), where it's the sole version we know of.
-                //
-                // Safe because depot decryption keys are per-DEPOT and stable across manifest versions:
-                // the key already in the lua decrypts the current manifest just as well as the old one.
-                string? mid = r.ManifestId ?? r.PublicManifestId ?? r.CommentedManifestId;
-                string? path = mid is null ? null : _depotTool.ResolveManifestPath(r.Id, mid);
-
-                // Size, best source first:
-                //  1. the manifest itself — authoritative, and describes the exact build being fetched;
-                //  2. the lua's setManifestid size, but ONLY when an active pin is what we're downloading,
-                //     because that figure belongs to the pinned build rather than the current one;
-                //  3. app info, which matches the public branch;
-                //  4. the lua's figure anyway, for a depot app info never listed (size would be 0).
-                long size =
-                    ManifestFile.TryRead(path) is { SizeOnDisk: > 0 } mf ? mf.SizeOnDisk
-                    : r.ManifestId is not null && r.LuaSize > 0 ? r.LuaSize
-                    : r.Size > 0 ? r.Size
-                    : r.LuaSize;
-
-                // All three checks are local — opening the picker costs zero API calls however many
-                // depots the game has. Only a depot with no declared version is unreachable outright;
-                // a missing manifest is now just a fetch, provided we're signed in to make it.
-                // A shared depot has no gid here by design — its manifest lives under the owning app and
-                // is resolved at download time, so a missing id is only fatal when there's nowhere to
-                // look it up. Both checks stay local; the picker still makes zero requests.
-                // The key check matters most for DLC: a DLC depot always has a public manifest id, so the
-                // manifest test can never catch one whose key the lua simply doesn't carry — it would be
-                // offered, ticked, and then abort the whole download at the first depot.
-                //
-                // Shared depots are NOT exempt, unlike the manifest test above them. A shared depot's
-                // *manifest* is resolved from the owning app at download time, but nothing ever resolves
-                // a *key* there — ResolveKeys reads this game's lua and config.vdf and that is all the
-                // downloader will ever get. Exempting them here would only move the failure later.
-                string? blocked =
-                    mid is null && r.FromAppId is null ? Resources.Strings.Builds_Select_NoManifest
-                    : !keys.ContainsKey(r.Id) ? Resources.Strings.Builds_Select_NoKey
-                    : path is null && !_depotTool.CanFetchManifests ? Resources.Strings.Builds_Select_SignIn
-                    : null;
-
-                var pick = new DepotPickRow
-                {
-                    DepotId = r.Id,
-                    Title = r.Title,
-                    Meta = r.Meta,
-                    Size = size,
-                    ManifestId = mid,
-                    ManifestPath = path,
-                    Os = r.Os,
-                    Language = r.Language,
-                    IsDlc = r.IsDlc,
-                    FromAppId = r.FromAppId,
-                    BlockReason = blocked,
-                };
-                pick.IsSelected = pick.CanDownload && !pick.IsOtherPlatform && !pick.IsShared
-                                  && WantedLanguage(pick.Language, steamLanguage);
-                return pick;
-            })
+            .Select(r => CreateDepotPickRow(r, keys, steamLanguage))
             .ToList();
 
-        // Whole-set decision, so it can only run once every row exists. Subscribing afterwards keeps it
-        // from firing OnPickChanged (and the space recalculation) once per row it flips.
         ApplyNoLanguageMatchFallback(picks);
 
         foreach (var p in picks) p.PropertyChanged += OnPickChanged;
         DepotPicks = picks;
 
-        // Seed the destination (and with it the free-space read) before the bar first renders.
         string defaultRoot = Path.Combine(
             DownloadsFolder(), "DataJackUI Depots", game.AppId.ToString());
         try { Directory.CreateDirectory(defaultRoot); } catch { /* the Change picker still opens */ }
@@ -1005,6 +930,42 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         OnPropertyChanged(nameof(DownloadConfirmLabel));
         OnPropertyChanged(nameof(HasDepotSelection));
         RaiseSpaceProps();
+    }
+
+    private DepotPickRow CreateDepotPickRow(DepotRow r, IReadOnlyDictionary<long, string> keys, string? steamLanguage)
+    {
+        string? mid = r.ManifestId ?? r.PublicManifestId ?? r.CommentedManifestId;
+        string? path = mid is null ? null : _depotTool.ResolveManifestPath(r.Id, mid);
+
+        long size =
+            ManifestFile.TryRead(path) is { SizeOnDisk: > 0 } mf ? mf.SizeOnDisk
+            : r.ManifestId is not null && r.LuaSize > 0 ? r.LuaSize
+            : r.Size > 0 ? r.Size
+            : r.LuaSize;
+
+        string? blocked =
+            mid is null && r.FromAppId is null ? Resources.Strings.Builds_Select_NoManifest
+            : !keys.ContainsKey(r.Id) ? Resources.Strings.Builds_Select_NoKey
+            : path is null && !_depotTool.CanFetchManifests ? Resources.Strings.Builds_Select_SignIn
+            : null;
+
+        var pick = new DepotPickRow
+        {
+            DepotId = r.Id,
+            Title = r.Title,
+            Meta = r.Meta,
+            Size = size,
+            ManifestId = mid,
+            ManifestPath = path,
+            Os = r.Os,
+            Language = r.Language,
+            IsDlc = r.IsDlc,
+            FromAppId = r.FromAppId,
+            BlockReason = blocked,
+        };
+        pick.IsSelected = pick.CanDownload && !pick.IsOtherPlatform && !pick.IsShared
+                          && WantedLanguage(pick.Language, steamLanguage);
+        return pick;
     }
 
     [RelayCommand]
@@ -1546,8 +1507,6 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         var luaNames = declared.Where(kv => kv.Value.Comment is not null)
             .ToDictionary(kv => kv.Key, kv => kv.Value.Comment!);
 
-        // Unified comparison set: every real depot + every declared DLC that has no depot of its own
-        // (store-only entitlements). Without the latter, keyless entitlement DLC would vanish.
         var items = new List<ContentDepot>(info.Depots);
         var depotDlcIds = info.Depots.Where(d => d.DlcAppId is not null).Select(d => d.DlcAppId!.Value).ToHashSet();
         foreach (long dlcId in info.DlcIds)
@@ -1559,61 +1518,60 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         bool DlcNameKnown(long dlcId) =>
             _appList.GetName(dlcId) is not null || _appInfo.GetCached(dlcId)?.Name is not null || luaNames.ContainsKey(dlcId);
 
-        DepotRow Row(ContentDepot d)
-        {
-            // Prefer a real Steam name; fall back to the lua comment (e.g. "VC 2022 Redist").
-            string? steamName = d.DlcAppId is { } dlcId ? (_appList.GetName(dlcId) ?? _appInfo.GetCached(dlcId)?.Name) : null;
-            string title =
-                steamName
-                ?? luaNames.GetValueOrDefault(d.Id)
-                ?? (d.IsDlc ? string.Format(Resources.Strings.Manage_DlcName, d.DlcAppId)
-                    : d.IsShared ? Resources.Strings.Manage_SharedDepot : Resources.Strings.Manage_Depot);
-
-            var meta = new List<string> { d.Id.ToString() };
-            if (d.Size > 0) meta.Add(FormatSize(d.Size));
-            if (!string.IsNullOrWhiteSpace(d.Os)) meta.Add(PrettyOs(d.Os));
-            if (!string.IsNullOrWhiteSpace(d.Language)) meta.Add(d.Language!);
-
-            string url = d.DlcAppId is { } dlc
-                ? $"https://steamdb.info/app/{dlc}/"
-                : $"https://steamdb.info/depot/{d.Id}/";
-
-            // The switches act on the id the lua actually DECLARES. For a DLC that's the DLC app id, not
-            // the depot id. Toggling the depot id would rewrite a line that doesn't exist.
-            long declId = declared.ContainsKey(d.Id) ? d.Id : d.DlcAppId ?? d.Id;
-            declared.TryGetValue(declId, out var entry);
-            bool inLua = entry is not null;
-
-            return new DepotRow(d.Id, title, string.Join("  ·  ", meta), d.IsDlc, d.IsShared, url,
-                entry?.ManifestId, entry?.CommentedManifestId, d.PublicManifestId,
-                IsInLua: inLua,
-                IsEnabled: active.Contains(declId),
-                CanToggle: inLua,   // anything the lua declares can be switched, in any variant
-                IsBaseApp: declId == baseAppId)
-            {
-                ToggleId = declId,
-                Size = d.Size,
-                Os = d.Os,
-                Language = d.Language,
-                FromAppId = d.FromAppId,
-                LuaSize = entry?.SizeOnDisk ?? 0,
-            };
-        }
-
-        // In lua = the lua declares this id (a keyed depot OR a keyless DLC entitlement) or its DLC app
-        // id, including declarations the user has switched off, so they can switch them back on.
         bool IsInLua(ContentDepot d) => declared.ContainsKey(d.Id) || (d.DlcAppId is { } a && declared.ContainsKey(a));
 
-        // Unknown = noise to tuck away: shared redists, unnamed DLC, or 0-byte/broken depots.
         bool IsUnknown(ContentDepot d) =>
             d.IsShared
             || (d.IsDlc && !DlcNameKnown(d.DlcAppId!.Value))
             || (!d.IsDlc && d.Size == 0);
 
-        _allInLua = items.Where(IsInLua).Select(Row).ToList();
-        _allMissing = items.Where(d => !IsInLua(d) && !IsUnknown(d)).Select(Row).ToList();
-        _allUnknown = items.Where(d => !IsInLua(d) && IsUnknown(d)).Select(Row).ToList();
+        _allInLua = items.Where(IsInLua).Select(d => BuildDepotRow(d, declared, active, baseAppId, luaNames)).ToList();
+        _allMissing = items.Where(d => !IsInLua(d) && !IsUnknown(d)).Select(d => BuildDepotRow(d, declared, active, baseAppId, luaNames)).ToList();
+        _allUnknown = items.Where(d => !IsInLua(d) && IsUnknown(d)).Select(d => BuildDepotRow(d, declared, active, baseAppId, luaNames)).ToList();
         ApplyDepotFilter();
+    }
+
+    private DepotRow BuildDepotRow(
+        ContentDepot d,
+        Dictionary<long, LuaEntry> declared,
+        HashSet<long> active,
+        long baseAppId,
+        Dictionary<long, string> luaNames)
+    {
+        string? steamName = d.DlcAppId is { } dlcId ? (_appList.GetName(dlcId) ?? _appInfo.GetCached(dlcId)?.Name) : null;
+        string title =
+            steamName
+            ?? luaNames.GetValueOrDefault(d.Id)
+            ?? (d.IsDlc ? string.Format(Resources.Strings.Manage_DlcName, d.DlcAppId)
+                : d.IsShared ? Resources.Strings.Manage_SharedDepot : Resources.Strings.Manage_Depot);
+
+        var meta = new List<string> { d.Id.ToString() };
+        if (d.Size > 0) meta.Add(FormatSize(d.Size));
+        if (!string.IsNullOrWhiteSpace(d.Os)) meta.Add(PrettyOs(d.Os));
+        if (!string.IsNullOrWhiteSpace(d.Language)) meta.Add(d.Language!);
+
+        string url = d.DlcAppId is { } dlc
+            ? $"https://steamdb.info/app/{dlc}/"
+            : $"https://steamdb.info/depot/{d.Id}/";
+
+        long declId = declared.ContainsKey(d.Id) ? d.Id : d.DlcAppId ?? d.Id;
+        declared.TryGetValue(declId, out var entry);
+        bool inLua = entry is not null;
+
+        return new DepotRow(d.Id, title, string.Join("  ·  ", meta), d.IsDlc, d.IsShared, url,
+            entry?.ManifestId, entry?.CommentedManifestId, d.PublicManifestId,
+            IsInLua: inLua,
+            IsEnabled: active.Contains(declId),
+            CanToggle: inLua,
+            IsBaseApp: declId == baseAppId)
+        {
+            ToggleId = declId,
+            Size = d.Size,
+            Os = d.Os,
+            Language = d.Language,
+            FromAppId = d.FromAppId,
+            LuaSize = entry?.SizeOnDisk ?? 0,
+        };
     }
 
     private static string PrettyOs(string os) => os switch
