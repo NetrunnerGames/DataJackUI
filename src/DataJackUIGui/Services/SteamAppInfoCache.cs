@@ -136,15 +136,12 @@ public class SteamAppInfoCache
     /// failure. Pulls the FULL appdetails payload and caches the whole blob (for filters). Name/header
     /// are derived from it, so each app is only ever fetched once.</summary>
     public async Task<SteamAppInfo?> ResolveAsync(long appid, CancellationToken ct = default)
+    public async Task<SteamAppInfo?> GetDetailsAsync(long appid, CancellationToken ct = default)
     {
-        if (_cache.TryGetValue(appid, out var cached)) return cached;
+        if (_cache.TryGetValue(appid, out var hit)) return hit;
 
-        // cc=us so region-blocked games (e.g. titles banned in the user's country) still resolve.
-        // This is metadata only, not purchasing, so a neutral region is correct.
         var url = $"https://store.steampowered.com/api/appdetails?appids={appid}&cc=us&l=english";
-
-        const int maxAttempts = 3; // initial + 2 retries
-        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        for (int attempt = 0; attempt < 3; attempt++)
         {
             await ThrottleAsync(ct);
             try
@@ -152,35 +149,16 @@ public class SteamAppInfoCache
                 using var res = await _http.GetAsync(url, ct);
                 if (res.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.Forbidden)
                 {
-                    if (attempt < maxAttempts - 1) { await Task.Delay(TimeSpan.FromSeconds(4 * (attempt + 1)), ct); continue; }
+                    if (attempt < 2) { await Task.Delay(TimeSpan.FromSeconds(4 * (attempt + 1)), ct); continue; }
                     return null;
                 }
                 if (!res.IsSuccessStatusCode) return null;
 
                 using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
-                var entry = doc.RootElement.GetProperty(appid.ToString());
-                if (!entry.GetProperty("success").GetBoolean())
-                {
-                    // Delisted/unavailable → no details to cache for filters; mark so backfill skips it.
-                    _ = SaveFullDetailsAsync(appid, "{}");
-                    return null;
-                }
-
-                var data = entry.GetProperty("data");
-                string? name = data.GetProperty("name").GetString();
-                if (string.IsNullOrWhiteSpace(name)) return null;
-
-                string? image = data.TryGetProperty("header_image", out var img) ? img.GetString() : null;
-                var info = new SteamAppInfo(name, image);
-                _cache[appid] = info; // warm the session RAM index
-
-                // Persist the whole 'data' blob (this is the full payload). The single on-disk source of
-                // truth; name + header image are re-derived from it (no separate appinfo.json).
-                _ = SaveFullDetailsAsync(appid, data.GetRawText());
-                return info;
+                return await ParseAndCacheDetailsAsync(doc, appid);
             }
             catch (OperationCanceledException) { return null; }
-            catch { return null; } // offline / unknown appid / parse error
+            catch { return null; }
         }
         return null;
     }
@@ -367,30 +345,34 @@ public class SteamAppInfoCache
             string? name = d.TryGetProperty("name", out var n) ? n.GetString() : null;
             if (string.IsNullOrWhiteSpace(name)) return null;
 
-            var genres = new List<string>();
-            if (d.TryGetProperty("genres", out var g) && g.ValueKind == JsonValueKind.Array)
-                foreach (var it in g.EnumerateArray())
-                    if (it.TryGetProperty("description", out var de) && de.GetString() is { } s) genres.Add(s);
-
-            // For DLC, Steam returns the parent game under "fullgame" (appid may be string or number).
-            string? baseApp = null;
-            if (d.TryGetProperty("fullgame", out var fg) && fg.ValueKind == JsonValueKind.Object
-                && fg.TryGetProperty("appid", out var fa))
-                baseApp = fa.ValueKind == JsonValueKind.String ? fa.GetString() : fa.GetRawText();
-
             return new GameDetails
             {
                 Name = name,
                 AppId = d.TryGetProperty("steam_appid", out var sa) && sa.TryGetInt64(out var said) ? said : appid,
                 Type = d.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "",
-                BaseAppId = baseApp,
-                Genres = genres,
+                BaseAppId = ExtractBaseAppId(d),
+                Genres = ExtractGenres(d),
                 HeaderImage = d.TryGetProperty("header_image", out var hi) ? hi.GetString() : null,
-                ReleaseDate = d.TryGetProperty("release_date", out var rd)
-                    && rd.TryGetProperty("date", out var dt) ? dt.GetString() : null,
+                ReleaseDate = d.TryGetProperty("release_date", out var rd) && rd.TryGetProperty("date", out var dt) ? dt.GetString() : null,
             };
         }
         catch { return null; }
+    }
+
+    private static List<string> ExtractGenres(System.Text.Json.JsonElement d)
+    {
+        var genres = new List<string>();
+        if (d.TryGetProperty("genres", out var g) && g.ValueKind == JsonValueKind.Array)
+            foreach (var it in g.EnumerateArray())
+                if (it.TryGetProperty("description", out var de) && de.GetString() is { } s) genres.Add(s);
+        return genres;
+    }
+
+    private static string? ExtractBaseAppId(System.Text.Json.JsonElement d)
+    {
+        if (d.TryGetProperty("fullgame", out var fg) && fg.ValueKind == JsonValueKind.Object && fg.TryGetProperty("appid", out var fa))
+            return fa.ValueKind == JsonValueKind.String ? fa.GetString() : fa.GetRawText();
+        return null;
     }
 
     /// <summary>
@@ -401,12 +383,9 @@ public class SteamAppInfoCache
     public async Task<bool> EnsureFullDetailsAsync(long appid, CancellationToken ct = default, bool background = false)
     {
         if (HasFullDetails(appid)) return true;
-
-        // cc=us so region-blocked games (e.g. titles banned in the user's country) still resolve.
-        // This is metadata only, not purchasing, so a neutral region is correct.
         var url = $"https://store.steampowered.com/api/appdetails?appids={appid}&cc=us&l=english";
-        const int maxAttempts = 3;
-        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        
+        for (int attempt = 0; attempt < 3; attempt++)
         {
             await ThrottleAsync(ct, background);
             try
@@ -414,36 +393,38 @@ public class SteamAppInfoCache
                 using var res = await _http.GetAsync(url, ct);
                 if (res.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.Forbidden)
                 {
-                    if (attempt < maxAttempts - 1) { await Task.Delay(TimeSpan.FromSeconds(4 * (attempt + 1)), ct); continue; }
+                    if (attempt < 2) { await Task.Delay(TimeSpan.FromSeconds(4 * (attempt + 1)), ct); continue; }
                     return false;
                 }
                 if (!res.IsSuccessStatusCode) return false;
 
                 using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
-                var entry = doc.RootElement.GetProperty(appid.ToString());
-                if (!entry.GetProperty("success").GetBoolean())
-                {
-                    // Delisted / unavailable even in a neutral region → won't ever resolve. Cache an
-                    // empty marker so backfill stops retrying and it's not counted as "still fetching".
-                    await SaveFullDetailsAsync(appid, "{}");
-                    return true;
-                }
-
-                var data = entry.GetProperty("data");
-                await SaveFullDetailsAsync(appid, data.GetRawText());
-
-                // Opportunistically warm the session RAM index too if it's missing.
-                if (!_cache.ContainsKey(appid) && data.TryGetProperty("name", out var n) && n.GetString() is { } nm && nm.Length > 0)
-                {
-                    string? image = data.TryGetProperty("header_image", out var img) ? img.GetString() : null;
-                    _cache[appid] = new SteamAppInfo(nm, image);
-                }
-                return true;
+                return await ParseAndCacheFullDetailsAsync(doc, appid);
             }
             catch (OperationCanceledException) { return false; }
             catch { return false; }
         }
         return false;
+    }
+
+    private async Task<bool> ParseAndCacheFullDetailsAsync(JsonDocument doc, long appid)
+    {
+        var entry = doc.RootElement.GetProperty(appid.ToString());
+        if (!entry.GetProperty("success").GetBoolean())
+        {
+            await SaveFullDetailsAsync(appid, "{}");
+            return true;
+        }
+
+        var data = entry.GetProperty("data");
+        await SaveFullDetailsAsync(appid, data.GetRawText());
+
+        if (!_cache.ContainsKey(appid) && data.TryGetProperty("name", out var n) && n.GetString() is { } nm && nm.Length > 0)
+        {
+            string? image = data.TryGetProperty("header_image", out var img) ? img.GetString() : null;
+            _cache[appid] = new SteamAppInfo(nm, image);
+        }
+        return true;
     }
 
     /// <summary>
