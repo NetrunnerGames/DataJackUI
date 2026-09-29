@@ -306,6 +306,7 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
         var zipAsset = FindAsset(latest, PluginZipAsset);
         if (zipAsset is null)
             return (false, string.Format(Resources.Strings.Plugin_Err_MissingAssets, latest.TagName, PluginZipAsset, Slots[0].DllAsset));
+        
         var slotAssets = new Dictionary<LoaderSlot, GithubAsset>();
         foreach (var slot in Slots)
         {
@@ -319,105 +320,97 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
         Dictionary<string, List<string>>? disabledMillenniumEntries = null;
         try
         {
-            string zipPath = Path.Combine(tmp, PluginZipAsset);
-            await gh.DownloadAsync(zipAsset.DownloadUrl, zipPath, progress, ct);
-            var slotDlPaths = new Dictionary<LoaderSlot, string>();
-            foreach (var (slot, asset) in slotAssets)
-            {
-                string p = Path.Combine(tmp, slot.DllAsset);
-                await gh.DownloadAsync(asset.DownloadUrl, p, progress, ct);
-                slotDlPaths[slot] = p;
-            }
+            var (dlOk, dlErr, zipSha, slotShas, slotDlPaths, zipPath) = await DownloadAndVerifyAssetsAsync(tmp, latest, zipAsset, slotAssets, progress, ct);
+            if (!dlOk) return (false, dlErr);
 
-            // Verify each against its release asset digest before touching anything on disk.
-            string zipSha = AssetHash.OfFile(zipPath);
-            if (AssetDigest(latest, PluginZipAsset) is { } zd && zipSha != zd)
-                return (false, string.Format(Resources.Strings.Plugin_Err_VerifyFailed, PluginZipAsset));
-            var slotShas = new Dictionary<LoaderSlot, string>();
-            foreach (var (slot, p) in slotDlPaths)
-            {
-                string sha = AssetHash.OfFile(p);
-                slotShas[slot] = sha;
-                if (AssetDigest(latest, slot.DllAsset) is { } dd && sha != dd)
-                    return (false, string.Format(Resources.Strings.Plugin_Err_VerifyFailed, slot.DllAsset));
-            }
-
-            // 1) Frontend → %AppData%\DataJackUIGui\plugin (fresh).
             if (Directory.Exists(FrontendDir)) Directory.Delete(FrontendDir, recursive: true);
             Directory.CreateDirectory(FrontendDir);
-            ZipFile.ExtractToDirectory(zipPath, FrontendDir);
+            ZipFile.ExtractToDirectory(zipPath!, FrontendDir);
             NormalizeFrontendLayout();
             if (!File.Exists(DataJackUIJsPath))
                 return (false, Resources.Strings.Plugin_Err_NoDataJackUIJs);
 
-            // Get the frontend live in THIS running process immediately. Don't wait on the Steam restart
-            // below. A relaunched DataJackUI.exe would hit the single-instance mutex against this very
-            // process (the one the user is using right now to click Install) and exit quietly without ever
-            // taking over, so nothing would otherwise pick up the new file until a manual app restart.
             await injector.ReloadPluginFilesAsync();
 
-            // 2) Loader DLLs → Steam root, but ONLY when at least one slot actually changed, OR a legacy
-            //    slot is still present and must be removed. Both slots are always installed/updated
-            //    together (never partially out of date relative to each other). The DLLs are locked while
-            //    Steam runs, so either condition means stopping+restarting Steam; a frontend-only update
-            //    (the common case) skips all of that and applies with zero Steam disruption.
-            // Testing switch: when `.datajackui-dll-update-disabled` is present, never touch any on-disk DLL
-            // (so hand-placed test builds aren't clobbered), and thus never stop/restart Steam for it either.
             bool legacyPresent = LegacyDllPaths.Any(File.Exists);
             bool anySlotNeedsUpdate = Slots.Any(slot =>
-                SlotPath(slot) is not { } cur || !File.Exists(cur) || AssetHash.OfFile(cur) != slotShas[slot]);
-            bool dllNeedsUpdate = !DllUpdateDisabled && (anySlotNeedsUpdate || legacyPresent);
-            if (dllNeedsUpdate)
+                SlotPath(slot) is not { } cur || !File.Exists(cur) || AssetHash.OfFile(cur) != slotShas![slot]);
+            
+            if (!DllUpdateDisabled && (anySlotNeedsUpdate || legacyPresent))
             {
-                bool wasRunning = Process.GetProcessesByName("steam").Length > 0;
-                steam.StopSteam();
-                await Task.Delay(1200, ct); // let file handles on the loader DLLs release after the kill
-
-                foreach (var slot in Slots)
-                {
-                    File.Copy(slotDlPaths[slot], Path.Combine(steamDir, slot.DllAsset), overwrite: true);
-                    // Each proxy forwards to <name>_real.dll. A copy of the machine's own matching
-                    // System32 file. Refresh it on every DLL update so it always matches the current OS build.
-                    if (SlotRealPath(slot) is { } real && File.Exists(slot.SystemSourcePath))
-                        File.Copy(slot.SystemSourcePath, real, overwrite: true);
-                }
-                // Remove any legacy slot (psapi/dbghelp + their _real). Leaving one would run the loader
-                // payload an extra time (double DataJackUI launch / CDP hook).
-                foreach (var legacy in LegacyDllPaths)
-                    if (File.Exists(legacy)) { try { File.Delete(legacy); } catch { /* locked/again next time */ } }
-
-                // 3) A live Millennium datajackui plugin would inject the frontend redundantly. Disable it in
-                //    Millennium's config (reversibly) so LuaLoader is the sole injector (leaves the Millennium
-                //    mod itself alone). Steam is stopped here, so the edit can't be clobbered and takes effect
-                //    on the restart below. Also migrate away any leftover folder-rename from older builds.
-                if (MillenniumPresent)
-                {
-                    RestoreMillenniumPluginFolder(steamDir);
-                    disabledMillenniumEntries = SetMillenniumDataJackUIEnabled(enable: false);
-                }
-
-                if (wasRunning) steam.StartSteam();
+                disabledMillenniumEntries = await UpdateLoaderDllsAsync(steamDir, slotDlPaths!, ct);
             }
 
-            // Ensure the CDP marker junction exists: independent of whether the DLL itself changed (a
-            // filesystem-only op, doesn't need Steam stopped). Needed here for the very first install (before
-            // any GetStatusAsync call would see `loader` true); GetStatusAsync's own check is what keeps this
-            // self-healing on every subsequent Steam-open, not just at install/update time. See its
-            // declaration above for why this MUST be a junction, not a file.
             if (CdpMarkerPath is { } markerPath)
                 CreateCdpMarkerJunction(markerPath);
 
             WriteManifest(new Manifest
             {
                 Tag = latest.TagName,
-                DllShas = slotShas.ToDictionary(kv => kv.Key.DllAsset, kv => kv.Value),
-                ZipSha = zipSha,
+                DllShas = slotShas!.ToDictionary(kv => kv.Key.DllAsset, kv => kv.Value),
+                ZipSha = zipSha!,
                 DisabledMillenniumEntries = disabledMillenniumEntries,
             });
             return (true, null);
         }
         catch (Exception ex) { return (false, ex.Message); }
         finally { try { Directory.Delete(tmp, recursive: true); } catch { /* temp cleanup */ } }
+    }
+
+    private async Task<(bool ok, string? error, string? zipSha, Dictionary<LoaderSlot, string>? slotShas, Dictionary<LoaderSlot, string>? slotDlPaths, string? zipPath)> DownloadAndVerifyAssetsAsync(
+        string tmp, GithubRelease latest, GithubAsset zipAsset, Dictionary<LoaderSlot, GithubAsset> slotAssets, IProgress<double?>? progress, CancellationToken ct)
+    {
+        string zipPath = Path.Combine(tmp, PluginZipAsset);
+        await gh.DownloadAsync(zipAsset.DownloadUrl, zipPath, progress, ct);
+        
+        var slotDlPaths = new Dictionary<LoaderSlot, string>();
+        foreach (var (slot, asset) in slotAssets)
+        {
+            string p = Path.Combine(tmp, slot.DllAsset);
+            await gh.DownloadAsync(asset.DownloadUrl, p, progress, ct);
+            slotDlPaths[slot] = p;
+        }
+
+        string zipSha = AssetHash.OfFile(zipPath);
+        if (AssetDigest(latest, PluginZipAsset) is { } zd && zipSha != zd)
+            return (false, string.Format(Resources.Strings.Plugin_Err_VerifyFailed, PluginZipAsset), null, null, null, null);
+        
+        var slotShas = new Dictionary<LoaderSlot, string>();
+        foreach (var (slot, p) in slotDlPaths)
+        {
+            string sha = AssetHash.OfFile(p);
+            slotShas[slot] = sha;
+            if (AssetDigest(latest, slot.DllAsset) is { } dd && sha != dd)
+                return (false, string.Format(Resources.Strings.Plugin_Err_VerifyFailed, slot.DllAsset), null, null, null, null);
+        }
+        return (true, null, zipSha, slotShas, slotDlPaths, zipPath);
+    }
+
+    private async Task<Dictionary<string, List<string>>?> UpdateLoaderDllsAsync(string steamDir, Dictionary<LoaderSlot, string> slotDlPaths, CancellationToken ct)
+    {
+        bool wasRunning = Process.GetProcessesByName("steam").Length > 0;
+        steam.StopSteam();
+        await Task.Delay(1200, ct);
+
+        foreach (var slot in Slots)
+        {
+            File.Copy(slotDlPaths[slot], Path.Combine(steamDir, slot.DllAsset), overwrite: true);
+            if (SlotRealPath(slot) is { } real && File.Exists(slot.SystemSourcePath))
+                File.Copy(slot.SystemSourcePath, real, overwrite: true);
+        }
+        
+        foreach (var legacy in LegacyDllPaths)
+            if (File.Exists(legacy)) { try { File.Delete(legacy); } catch { /* locked/again next time */ } }
+
+        Dictionary<string, List<string>>? disabledMillenniumEntries = null;
+        if (MillenniumPresent)
+        {
+            RestoreMillenniumPluginFolder(steamDir);
+            disabledMillenniumEntries = SetMillenniumDataJackUIEnabled(enable: false);
+        }
+
+        if (wasRunning) steam.StartSteam();
+        return disabledMillenniumEntries;
     }
 
     /// <summary>Silent auto-update: if an update is available for an already-installed plugin, apply it
@@ -536,52 +529,72 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
             {
                 if (!File.Exists(path)) continue;
                 if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject root) continue;
-                bool changed = false;
 
+                bool changed = false;
                 if (!enable)
                 {
-                    // Record only the nested (real) array's removals for restore; the flat dotted key is a
-                    // stray duplicate some builds write. Scrub it, but never restore into it.
-                    var removed = new List<string>();
-                    if (NestedEnabled(root) is { } nested)
-                        for (int i = nested.Count - 1; i >= 0; i--)
-                            if (nested[i]?.GetValue<string>() is { } v && IsDataJackUIEntry(v))
-                            {
-                                removed.Add(v);
-                                nested.RemoveAt(i);
-                                changed = true;
-                            }
-                    if (FlatEnabled(root) is { } flat)
-                        for (int i = flat.Count - 1; i >= 0; i--)
-                            if (flat[i]?.GetValue<string>() is { } v && IsDataJackUIEntry(v))
-                            {
-                                flat.RemoveAt(i);
-                                changed = true;
-                            }
+                    var removed = RemoveDataJackUIEntries(root, out bool c);
                     if (removed.Count > 0)
                     {
-                        removed.Reverse(); // preserve original order
+                        removed.Reverse();
                         removedMap[path] = removed;
+                        changed = c;
                     }
                 }
                 else
                 {
-                    var arr = NestedEnabled(root); // restore only into the real nested array
-                    if (arr is not null && !arr.Any(n => n?.GetValue<string>() is { } v && IsDataJackUIEntry(v)))
-                    {
-                        var toAdd = restore is not null && restore.TryGetValue(path, out var r) && r.Count > 0
-                            ? r
-                            : new List<string> { MillenniumPluginName };
-                        foreach (string e in toAdd) arr.Add(e);
-                        changed = true;
-                    }
+                    changed = RestoreDataJackUIEntries(root, path, restore);
                 }
 
                 if (changed) File.WriteAllText(path, root.ToJsonString(ConfigWriteOpts));
             }
-            catch { /* best effort per file. A locked/invalid config must not fail install/uninstall */ }
+            catch { /* best effort per file */ }
         }
         return removedMap;
+    }
+
+    private List<string> RemoveDataJackUIEntries(JsonObject root, out bool changed)
+    {
+        changed = false;
+        var removed = new List<string>();
+        if (NestedEnabled(root) is { } nested)
+        {
+            for (int i = nested.Count - 1; i >= 0; i--)
+            {
+                if (nested[i]?.GetValue<string>() is { } v && IsDataJackUIEntry(v))
+                {
+                    removed.Add(v);
+                    nested.RemoveAt(i);
+                    changed = true;
+                }
+            }
+        }
+        if (FlatEnabled(root) is { } flat)
+        {
+            for (int i = flat.Count - 1; i >= 0; i--)
+            {
+                if (flat[i]?.GetValue<string>() is { } v && IsDataJackUIEntry(v))
+                {
+                    flat.RemoveAt(i);
+                    changed = true;
+                }
+            }
+        }
+        return removed;
+    }
+
+    private bool RestoreDataJackUIEntries(JsonObject root, string path, IReadOnlyDictionary<string, List<string>>? restore)
+    {
+        var arr = NestedEnabled(root);
+        if (arr is not null && !arr.Any(n => n?.GetValue<string>() is { } v && IsDataJackUIEntry(v)))
+        {
+            var toAdd = restore is not null && restore.TryGetValue(path, out var r) && r.Count > 0
+                ? r
+                : new List<string> { MillenniumPluginName };
+            foreach (string e in toAdd) arr.Add(e);
+            return true;
+        }
+        return false;
     }
 
     /// <summary>Undo the previous folder-rename approach: bring <c>plugins\datajackui</c> back to a normal
