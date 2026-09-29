@@ -1278,33 +1278,18 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         bool editingLive = SelectionDescribesLive;
         var target = SelectedVariant?.Variant;
 
-        string before = editingLive || target is null
-            ? _vault.ReadLiveText(game.AppId)
-            : _vault.ReadText(game.AppId, target.Hash);
+        string before = editingLive || target is null ? _vault.ReadLiveText(game.AppId) : _vault.ReadText(game.AppId, target.Hash);
         if (string.IsNullOrEmpty(before)) return;
 
         string after = edit(before);
-        if (after == before) return; // already in that state. Don't churn the file or the UI
+        if (after == before) return;
 
-        // Suppress from BEFORE the write: both write paths raise VaultChanged, whose handler refreshes
-        // the variants and reselects, which would fire its own spinner-showing reload before we got to
-        // guard it. Only the redundant depot reloads are held off; one quiet pass runs at the end.
+        _suppressDepotReload = true;
         bool ok;
         string? newHash = null;
-        _suppressDepotReload = true;
         try
         {
-            if (editingLive || target is null)
-            {
-                RememberEditBase(game.AppId);
-                ok = _vault.WriteLive(game.AppId, after);
-            }
-            else
-            {
-                var updated = _vault.UpdateVariant(game.AppId, target.Hash, after);
-                ok = updated is not null;
-                newHash = updated?.Hash; // content-addressed: editing renames the stored file
-            }
+            (ok, newHash) = ApplyEdit(game.AppId, editingLive, target, after);
             if (ok) RefreshVariants();
         }
         finally { _suppressDepotReload = false; }
@@ -1315,12 +1300,22 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
             return;
         }
 
-        // Follow the edited variant to its new hash, or the switcher would snap back to the active build
-        // and the user would watch their selection jump away mid-edit.
-        if (newHash is not null)
-            SelectedVariant = Variants.FirstOrDefault(v => v.Hash == newHash) ?? SelectedVariant;
-
+        if (newHash is not null) SelectedVariant = Variants.FirstOrDefault(v => v.Hash == newHash) ?? SelectedVariant;
         _ = LoadDepotsAsync(quiet: true);
+    }
+
+    private (bool ok, string? newHash) ApplyEdit(long appId, bool editingLive, LuaVariant? target, string after)
+    {
+        if (editingLive || target is null)
+        {
+            RememberEditBase(appId);
+            return (_vault.WriteLive(appId, after), null);
+        }
+        else
+        {
+            var updated = _vault.UpdateVariant(appId, target.Hash, after);
+            return (updated is not null, updated?.Hash);
+        }
     }
 
     /// <summary>
@@ -1355,61 +1350,47 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
     private async Task LoadDepotsAsync(bool quiet = false)
     {
         long token = ++_depotLoadToken;
-        if (ActiveGame is not { } game)
-        {
-            // Clear the unfiltered rows too: leaving them would let a later filter pass resurrect the
-            // previous game's depots.
-            _allInLua = []; _allMissing = []; _allUnknown = [];
-            InLua = []; Missing = []; Unknown = []; DepotError = null; IsLoadingDepots = false;
-            return;
-        }
+        if (ActiveGame is not { } game) { ClearRows(); return; }
 
         DepotError = null;
-        if (!quiet)
-        {
-            IsLoadingDepots = true;
-            _allInLua = []; _allMissing = []; _allUnknown = [];
-            InLua = []; Missing = []; Unknown = [];
-            LatestBuildLabel = null;
-        }
+        if (!quiet) { ResetForLoading(); }
 
         long appId = game.AppId;
-
-        // Every variant is editable: the live one via the live lua, any other one in place. Only the
-        // ROUTE differs (see EditLive), so this just drives the explanatory note.
         bool editingLive = SelectionDescribesLive;
         EditingInactiveBuild = !editingLive;
 
-        // Read from wherever the edits GO. For a preset that isn't applied that's its stored copy. The
-        // point of the switcher, inspecting one before committing to it. For the live row it must be the
-        // live file: mid-edit the stored copy is the PRE-edit bytes, and describing those put the switches
-        // back the way they were before the user touched them (see SelectionDescribesLive).
         string? storedHash = editingLive ? null : SelectedVariant!.Hash;
-
-        var lua = await Task.Run(() => storedHash is not null
-            ? ParseVariant(appId, storedHash)
-            : _vault.LivePath(appId) is { } live ? LuaFileParser.Parse(live, appId) : null);
-
-        if (token != _depotLoadToken) return; // user moved on
-
-        var info = await _depotInfo.GetAsync(game.AppId);
+        var lua = await Task.Run(() => storedHash is not null ? ParseVariant(appId, storedHash) : _vault.LivePath(appId) is { } live ? LuaFileParser.Parse(live, appId) : null);
         if (token != _depotLoadToken) return;
 
-        if (info is null)
-        {
-            DepotError = Resources.Strings.Manage_DepotError;
-            IsLoadingDepots = false;
-            return;
-        }
+        var info = await _depotInfo.GetAsync(appId);
+        if (token != _depotLoadToken) return;
 
-        if (info.PublicBuildId is not null)
-            LatestBuildLabel = string.Format(Resources.Strings.Builds_LatestBuild, info.PublicBuildId);
+        if (info is null) { DepotError = Resources.Strings.Manage_DepotError; IsLoadingDepots = false; return; }
+        if (info.PublicBuildId is not null) LatestBuildLabel = string.Format(Resources.Strings.Builds_LatestBuild, info.PublicBuildId);
 
         BuildRows(info, lua);
         IsLoadingDepots = false;
 
-        // Lazily resolve any DLC still showing "DLC <id>" via appdetails (throttled, persisted), then
-        // rebuild rows. Covers both depot-backed DLC and store-only DLC from listofdlc.
+        await ResolveMissingDlcNamesAsync(info, lua, token);
+    }
+
+    private void ClearRows()
+    {
+        _allInLua = []; _allMissing = []; _allUnknown = [];
+        InLua = []; Missing = []; Unknown = []; DepotError = null; IsLoadingDepots = false;
+    }
+
+    private void ResetForLoading()
+    {
+        IsLoadingDepots = true;
+        _allInLua = []; _allMissing = []; _allUnknown = [];
+        InLua = []; Missing = []; Unknown = [];
+        LatestBuildLabel = null;
+    }
+
+    private async Task ResolveMissingDlcNamesAsync(AppDepotInfo info, LuaContents? lua, long token)
+    {
         var named = Declarations(lua).Where(e => e.Value.Comment is not null).Select(e => e.Key).ToHashSet();
         var unnamedDlc = info.Depots.Where(d => d.DlcAppId is not null).Select(d => d.DlcAppId!.Value)
             .Concat(info.DlcIds).Distinct()
@@ -1418,9 +1399,8 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
 
         if (unnamedDlc.Count > 0)
         {
-            await Parallel.ForEachAsync(unnamedDlc, new ParallelOptions { MaxDegreeOfParallelism = 4 },
-                async (id, _) => await _appInfo.ResolveAsync(id));
-            if (token == _depotLoadToken) BuildRows(info, lua); // caches now populated
+            await Parallel.ForEachAsync(unnamedDlc, new ParallelOptions { MaxDegreeOfParallelism = 4 }, async (id, _) => await _appInfo.ResolveAsync(id));
+            if (token == _depotLoadToken) BuildRows(info, lua);
         }
     }
 
@@ -1543,77 +1523,46 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         var declared = Declarations(lua);
         var active = lua?.Entries.Select(e => e.Id).ToHashSet() ?? [];
         long baseAppId = lua?.BaseAppId ?? info.AppId;
-        var luaNames = declared.Where(kv => kv.Value.Comment is not null)
-            .ToDictionary(kv => kv.Key, kv => kv.Value.Comment!);
+        var luaNames = declared.Where(kv => kv.Value.Comment is not null).ToDictionary(kv => kv.Key, kv => kv.Value.Comment!);
 
-        // Unified comparison set: every real depot + every declared DLC that has no depot of its own
-        // (store-only entitlements). Without the latter, keyless entitlement DLC would vanish.
         var items = new List<ContentDepot>(info.Depots);
         var depotDlcIds = info.Depots.Where(d => d.DlcAppId is not null).Select(d => d.DlcAppId!.Value).ToHashSet();
         foreach (long dlcId in info.DlcIds)
-            if (!depotDlcIds.Contains(dlcId))
-                items.Add(new ContentDepot(dlcId, 0, dlcId, IsShared: false, Os: null, Language: null));
+            if (!depotDlcIds.Contains(dlcId)) items.Add(new ContentDepot(dlcId, 0, dlcId, IsShared: false, Os: null, Language: null));
 
         AddDeclaredButUnlisted(items, declared, baseAppId, depotDlcIds);
 
-        bool DlcNameKnown(long dlcId) =>
-            _appList.GetName(dlcId) is not null || _appInfo.GetCached(dlcId)?.Name is not null || luaNames.ContainsKey(dlcId);
-
-        DepotRow Row(ContentDepot d)
-        {
-            // Prefer a real Steam name; fall back to the lua comment (e.g. "VC 2022 Redist").
-            string? steamName = d.DlcAppId is { } dlcId ? (_appList.GetName(dlcId) ?? _appInfo.GetCached(dlcId)?.Name) : null;
-            string title =
-                steamName
-                ?? luaNames.GetValueOrDefault(d.Id)
-                ?? (d.IsDlc ? string.Format(Resources.Strings.Manage_DlcName, d.DlcAppId)
-                    : d.IsShared ? Resources.Strings.Manage_SharedDepot : Resources.Strings.Manage_Depot);
-
-            var meta = new List<string> { d.Id.ToString() };
-            if (d.Size > 0) meta.Add(FormatSize(d.Size));
-            if (!string.IsNullOrWhiteSpace(d.Os)) meta.Add(PrettyOs(d.Os));
-            if (!string.IsNullOrWhiteSpace(d.Language)) meta.Add(d.Language!);
-
-            string url = d.DlcAppId is { } dlc
-                ? $"https://steamdb.info/app/{dlc}/"
-                : $"https://steamdb.info/depot/{d.Id}/";
-
-            // The switches act on the id the lua actually DECLARES. For a DLC that's the DLC app id, not
-            // the depot id. Toggling the depot id would rewrite a line that doesn't exist.
-            long declId = declared.ContainsKey(d.Id) ? d.Id : d.DlcAppId ?? d.Id;
-            declared.TryGetValue(declId, out var entry);
-            bool inLua = entry is not null;
-
-            return new DepotRow(d.Id, title, string.Join("  ·  ", meta), d.IsDlc, d.IsShared, url,
-                entry?.ManifestId, entry?.CommentedManifestId, d.PublicManifestId,
-                IsInLua: inLua,
-                IsEnabled: active.Contains(declId),
-                CanToggle: inLua,   // anything the lua declares can be switched, in any variant
-                IsBaseApp: declId == baseAppId)
-            {
-                ToggleId = declId,
-                Size = d.Size,
-                Os = d.Os,
-                Language = d.Language,
-                FromAppId = d.FromAppId,
-                LuaSize = entry?.SizeOnDisk ?? 0,
-            };
-        }
-
-        // In lua = the lua declares this id (a keyed depot OR a keyless DLC entitlement) or its DLC app
-        // id, including declarations the user has switched off, so they can switch them back on.
+        bool DlcNameKnown(long dlcId) => _appList.GetName(dlcId) is not null || _appInfo.GetCached(dlcId)?.Name is not null || luaNames.ContainsKey(dlcId);
         bool IsInLua(ContentDepot d) => declared.ContainsKey(d.Id) || (d.DlcAppId is { } a && declared.ContainsKey(a));
+        bool IsUnknown(ContentDepot d) => d.IsShared || (d.IsDlc && !DlcNameKnown(d.DlcAppId!.Value)) || (!d.IsDlc && d.Size == 0);
 
-        // Unknown = noise to tuck away: shared redists, unnamed DLC, or 0-byte/broken depots.
-        bool IsUnknown(ContentDepot d) =>
-            d.IsShared
-            || (d.IsDlc && !DlcNameKnown(d.DlcAppId!.Value))
-            || (!d.IsDlc && d.Size == 0);
-
-        _allInLua = items.Where(IsInLua).Select(Row).ToList();
-        _allMissing = items.Where(d => !IsInLua(d) && !IsUnknown(d)).Select(Row).ToList();
-        _allUnknown = items.Where(d => !IsInLua(d) && IsUnknown(d)).Select(Row).ToList();
+        _allInLua = items.Where(IsInLua).Select(d => CreateDepotRow(d, declared, active, baseAppId, luaNames)).ToList();
+        _allMissing = items.Where(d => !IsInLua(d) && !IsUnknown(d)).Select(d => CreateDepotRow(d, declared, active, baseAppId, luaNames)).ToList();
+        _allUnknown = items.Where(d => !IsInLua(d) && IsUnknown(d)).Select(d => CreateDepotRow(d, declared, active, baseAppId, luaNames)).ToList();
         ApplyDepotFilter();
+    }
+
+    private DepotRow CreateDepotRow(ContentDepot d, Dictionary<long, LuaEntry> declared, HashSet<long> active, long baseAppId, Dictionary<long, string> luaNames)
+    {
+        string? steamName = d.DlcAppId is { } dlcId ? (_appList.GetName(dlcId) ?? _appInfo.GetCached(dlcId)?.Name) : null;
+        string title = steamName ?? luaNames.GetValueOrDefault(d.Id) ?? (d.IsDlc ? string.Format(Resources.Strings.Manage_DlcName, d.DlcAppId) : d.IsShared ? Resources.Strings.Manage_SharedDepot : Resources.Strings.Manage_Depot);
+        
+        var meta = new List<string> { d.Id.ToString() };
+        if (d.Size > 0) meta.Add(FormatSize(d.Size));
+        if (!string.IsNullOrWhiteSpace(d.Os)) meta.Add(PrettyOs(d.Os));
+        if (!string.IsNullOrWhiteSpace(d.Language)) meta.Add(d.Language!);
+
+        string url = d.DlcAppId is { } dlc ? $"https://steamdb.info/app/{dlc}/" : $"https://steamdb.info/depot/{d.Id}/";
+        long declId = declared.ContainsKey(d.Id) ? d.Id : d.DlcAppId ?? d.Id;
+        declared.TryGetValue(declId, out var entry);
+        bool inLua = entry is not null;
+
+        return new DepotRow(d.Id, title, string.Join("  ·  ", meta), d.IsDlc, d.IsShared, url,
+            entry?.ManifestId, entry?.CommentedManifestId, d.PublicManifestId,
+            IsInLua: inLua, IsEnabled: active.Contains(declId), CanToggle: inLua, IsBaseApp: declId == baseAppId)
+        {
+            ToggleId = declId, Size = d.Size, Os = d.Os, Language = d.Language, FromAppId = d.FromAppId, LuaSize = entry?.SizeOnDisk ?? 0,
+        };
     }
 
     private static string PrettyOs(string os) => os switch
