@@ -58,36 +58,13 @@ public class HttpServerService : IHostedService
             Path.Combine(AppContext.BaseDirectory, "api.json"),
             Path.Combine(AppContext.BaseDirectory, "sources.json"),
         };
+
         foreach (var path in candidates)
         {
-            if (File.Exists(path))
-            {
-                try
-                {
-                    var json = File.ReadAllText(path);
-                    using var doc = JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("api_list", out var list))
-                    {
-                        _apiSources = new();
-                        foreach (var entry in list.EnumerateArray())
-                        {
-                            var name = entry.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
-                            var url = entry.TryGetProperty("url", out var u) ? u.GetString() ?? "" : "";
-                            var successCode = entry.TryGetProperty("success_code", out var sc) ? sc.GetInt32() : 200;
-                            var enabled = !entry.TryGetProperty("enabled", out var en) || en.GetBoolean();
-                            if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(url) && enabled)
-                                _apiSources.Add(new ApiSource(name, url, successCode));
-                        }
-                    }
-                    _log.LogInformation("Loaded {Count} API sources from api.json", _apiSources.Count);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    _log.LogWarning("Failed to parse api.json: {Message}", ex.Message);
-                }
-            }
+            if (!File.Exists(path)) continue;
+            if (TryLoadSourcesFromFile(path)) return;
         }
+
         _log.LogWarning("api.json not found, using fallback sources");
         _apiSources = new()
         {
@@ -95,6 +72,34 @@ public class HttpServerService : IHostedService
             new("Ryuu Direct", "http://167.235.229.108/<appid>", 200),
             new("Sushi", "https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/<appid>.zip", 200),
         };
+    }
+
+    private bool TryLoadSourcesFromFile(string path)
+    {
+        try
+        {
+            var json = File.ReadAllText(path);
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("api_list", out var list)) return false;
+
+            _apiSources = new();
+            foreach (var entry in list.EnumerateArray())
+            {
+                var name = entry.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+                var url = entry.TryGetProperty("url", out var u) ? u.GetString() ?? "" : "";
+                var successCode = entry.TryGetProperty("success_code", out var sc) ? sc.GetInt32() : 200;
+                var enabled = !entry.TryGetProperty("enabled", out var en) || en.GetBoolean();
+                if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(url) && enabled)
+                    _apiSources.Add(new ApiSource(name, url, successCode));
+            }
+            _log.LogInformation("Loaded {Count} API sources from api.json", _apiSources.Count);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning("Failed to parse api.json: {Message}", ex.Message);
+            return false;
+        }
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -155,44 +160,16 @@ public class HttpServerService : IHostedService
     {
         var req = ctx.Request;
         var resp = ctx.Response;
-
         SetCors(resp);
         resp.ContentType = "application/json; charset=utf-8";
 
         try
         {
             string? path = req.Url?.AbsolutePath.TrimEnd('/');
-            // Log everything except the noisy status poll.
             if (path is not null && !path.StartsWith("/add-status/") && !path.StartsWith("/has/"))
                 PluginLog.Log($"HTTP {req.HttpMethod} {path}");
-            (int status, string body) = path switch
-            {
-                // Answer CORS preflight FIRST. Otherwise it matches a POST route (the
-                // matchers ignore method) and returns non-2xx, so the browser blocks the
-                // real request (this is why JSON POSTs like /add-source did nothing).
-                _ when req.HttpMethod == "OPTIONS" => (204, ""),
-                var p when MatchGet(p, "/has/{appid}", out var id) => await HandleHas(long.Parse(id)),
-                // Steam-plugin headless add: reflects the app's real DownloadViewModel.
-                var p when MatchPost(p, "/add/{appid}", out var id) => await HandleAdd(long.Parse(id), req),
-                var p when MatchGet(p, "/add-status/{appid}", out var id) => HandleAddStatus(long.Parse(id)),
-                var p when MatchPost(p, "/add-source/{appid}", out var id) => await HandleAddSource(long.Parse(id), req),
-                var p when MatchPost(p, "/check-sources/{appid}", out var id) => await HandleCheckSources(long.Parse(id)),
-                var p when MatchPost(p, "/download/{appid}", out var id) => await HandleDownload(long.Parse(id), req),
-                var p when MatchGet(p, "/download-status/{appid}", out var id) => HandleStatus(long.Parse(id)),
-                var p when MatchPost(p, "/cancel/{appid}", out var id) => HandleCancel(long.Parse(id)),
-                var p when MatchPost(p, "/remove/{appid}", out var id) => HandleRemove(long.Parse(id)),
-                var p when MatchPost(p, "/open/fix/{appid}", out var id) => HandleOpenFix(long.Parse(id)),
-                "/open/settings" when req.HttpMethod == "POST" => HandleOpenSettings(),
-                "/open-url" when req.HttpMethod == "POST" => await HandleOpenUrl(req),
-                "/restart-steam" when req.HttpMethod == "POST" => HandleRestartSteam(),
-                "/check-updates" when req.HttpMethod == "POST" => await HandleCheckUpdates(),
-                "/loaded-apps" when req.HttpMethod == "GET" => await HandleReadLoadedApps(),
-                "/loaded-apps" when req.HttpMethod == "POST" => HandleDismissLoadedApps(),
-                "/api-list" when req.HttpMethod == "GET" => HandleApiList(),
-                "/icon" when req.HttpMethod == "GET" => HandleIcon(),
-                _ => (404, JsonErr("Not found")),
-            };
 
+            var (status, body) = await RouteRequestAsync(req, path);
             resp.StatusCode = status;
             var bytes = Encoding.UTF8.GetBytes(body);
             await resp.OutputStream.WriteAsync(bytes);
@@ -200,13 +177,49 @@ public class HttpServerService : IHostedService
         catch (Exception ex)
         {
             resp.StatusCode = 500;
-            var body = Encoding.UTF8.GetBytes(JsonErr(ex.Message));
-            await resp.OutputStream.WriteAsync(body);
+            await resp.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonErr(ex.Message)));
         }
-        finally
-        {
-            resp.Close();
-        }
+        finally { resp.Close(); }
+    }
+
+    private async Task<(int status, string body)> RouteRequestAsync(HttpListenerRequest req, string? path)
+    {
+        if (req.HttpMethod == "OPTIONS") return (204, "");
+        if (path is null) return (404, JsonErr("Not found"));
+
+        if (req.HttpMethod == "POST") return await RoutePostAsync(req, path);
+        if (req.HttpMethod == "GET") return await RouteGetAsync(path);
+        return (404, JsonErr("Not found"));
+    }
+
+    private async Task<(int, string)> RouteGetAsync(string path)
+    {
+        if (MatchGet(path, "/has/{appid}", out var id1)) return await HandleHas(long.Parse(id1));
+        if (MatchGet(path, "/add-status/{appid}", out var id2)) return HandleAddStatus(long.Parse(id2));
+        if (MatchGet(path, "/download-status/{appid}", out var id3)) return HandleStatus(long.Parse(id3));
+        if (path == "/loaded-apps") return await HandleReadLoadedApps();
+        if (path == "/api-list") return HandleApiList();
+        if (path == "/icon") return HandleIcon();
+        return (404, JsonErr("Not found"));
+    }
+
+    private async Task<(int, string)> RoutePostAsync(HttpListenerRequest req, string path)
+    {
+        if (MatchPost(path, "/add/{appid}", out var id1)) return await HandleAdd(long.Parse(id1), req);
+        if (MatchPost(path, "/add-source/{appid}", out var id2)) return await HandleAddSource(long.Parse(id2), req);
+        if (MatchPost(path, "/check-sources/{appid}", out var id3)) return await HandleCheckSources(long.Parse(id3));
+        if (MatchPost(path, "/download/{appid}", out var id4)) return await HandleDownload(long.Parse(id4), req);
+        if (MatchPost(path, "/cancel/{appid}", out var id5)) return HandleCancel(long.Parse(id5));
+        if (MatchPost(path, "/remove/{appid}", out var id6)) return HandleRemove(long.Parse(id6));
+        if (MatchPost(path, "/open/fix/{appid}", out var id7)) return HandleOpenFix(long.Parse(id7));
+        
+        if (path == "/open/settings") return HandleOpenSettings();
+        if (path == "/open-url") return await HandleOpenUrl(req);
+        if (path == "/restart-steam") return HandleRestartSteam();
+        if (path == "/check-updates") return await HandleCheckUpdates();
+        if (path == "/loaded-apps") return HandleDismissLoadedApps();
+        
+        return (404, JsonErr("Not found"));
     }
 
     private static bool MatchGet(string? path, string pattern, out string id)
