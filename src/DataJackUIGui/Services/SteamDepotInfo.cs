@@ -101,69 +101,59 @@ public class SteamDepotInfo
             if (!res.IsSuccessStatusCode) return Cache(appId, null);
 
             using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
-            if (!doc.RootElement.TryGetProperty("data", out var data) ||
-                !data.TryGetProperty(appId.ToString(), out var app))
+            if (!doc.RootElement.TryGetProperty("data", out var data) || !data.TryGetProperty(appId.ToString(), out var app))
                 return Cache(appId, null);
 
-            var depots = new List<ContentDepot>();
-            if (app.TryGetProperty("depots", out var depotMap) && depotMap.ValueKind == JsonValueKind.Object)
-            {
-                foreach (var entry in depotMap.EnumerateObject())
-                {
-                    if (!long.TryParse(entry.Name, out long depotId)) continue;   // skip branches/baselanguages/etc.
-                    if (entry.Value.ValueKind != JsonValueKind.Object) continue;
-                    var v = entry.Value;
-
-                    // Shared redistributable (VC++, DirectX, …). Belongs to another app. Keep it, flagged,
-                    // AND keep the owning app id — the manifest can only be resolved from there.
-                    bool isShared = v.TryGetProperty("depotfromapp", out var fromEl);
-                    long? fromAppId = isShared && long.TryParse(fromEl.GetString(), out long fa) ? fa : null;
-
-                    long? dlcAppId = v.TryGetProperty("dlcappid", out var dlcEl) && long.TryParse(dlcEl.GetString(), out long dlc)
-                        ? dlc : null;
-
-                    string? os = null, lang = null;
-                    if (v.TryGetProperty("config", out var cfg) && cfg.ValueKind == JsonValueKind.Object)
-                    {
-                        if (cfg.TryGetProperty("oslist", out var osEl)) os = osEl.GetString();
-                        if (cfg.TryGetProperty("dlclanguage", out var lEl)) lang = lEl.GetString();
-                        else if (cfg.TryGetProperty("language", out var l2)) lang = l2.GetString();
-                    }
-
-                    depots.Add(new ContentDepot(depotId, ReadPublicSize(v), dlcAppId, isShared, os, lang,
-                        ReadPublicManifestId(v))
-                    { FromAppId = fromAppId });
-                }
-            }
-
-            // The public branch's current build id lives alongside the numeric depot entries, under the
-            // non-numeric "branches" key the depot loop above skips.
-            string? publicBuildId = null;
-            if (app.TryGetProperty("depots", out var dm) && dm.ValueKind == JsonValueKind.Object &&
-                dm.TryGetProperty("branches", out var branches) &&
-                branches.TryGetProperty("public", out var pubBranch) &&
-                pubBranch.TryGetProperty("buildid", out var buildEl))
-                publicBuildId = buildEl.ValueKind == JsonValueKind.String
-                    ? buildEl.GetString()
-                    : buildEl.ToString();
-
-            // Full declared DLC list: includes store-only DLC with no depot of their own.
-            var dlcIds = new List<long>();
-            if (app.TryGetProperty("extended", out var ext) &&
-                ext.TryGetProperty("listofdlc", out var listEl) &&
-                listEl.GetString() is { } csv)
-            {
-                foreach (var part in csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                    if (long.TryParse(part, out long id)) dlcIds.Add(id);
-            }
-
-            var launchExes = ParseLaunchExes(app);
-
-            return Cache(appId, new AppDepotInfo(appId, depots, dlcIds, launchExes, publicBuildId));
+            return Cache(appId, ParseDepotResponse(appId, app));
         }
-        catch (OperationCanceledException) { return null; } // don't poison the cache on cancel
+        catch (OperationCanceledException) { return null; }
         catch { return Cache(appId, null); }
         finally { _inFlight.TryRemove(appId, out _); }
+    }
+
+    private AppDepotInfo ParseDepotResponse(long appId, System.Text.Json.JsonElement app)
+    {
+        var depots = new List<ContentDepot>();
+        if (app.TryGetProperty("depots", out var depotMap) && depotMap.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var entry in depotMap.EnumerateObject())
+            {
+                if (!long.TryParse(entry.Name, out long depotId)) continue;
+                if (entry.Value.ValueKind != JsonValueKind.Object) continue;
+                var v = entry.Value;
+
+                bool isShared = v.TryGetProperty("depotfromapp", out var fromEl);
+                long? fromAppId = isShared && long.TryParse(fromEl.GetString(), out long fa) ? fa : null;
+                long? dlcAppId = v.TryGetProperty("dlcappid", out var dlcEl) && long.TryParse(dlcEl.GetString(), out long dlc) ? dlc : null;
+
+                string? os = null, lang = null;
+                if (v.TryGetProperty("config", out var cfg) && cfg.ValueKind == JsonValueKind.Object)
+                {
+                    if (cfg.TryGetProperty("oslist", out var osEl)) os = osEl.GetString();
+                    if (cfg.TryGetProperty("dlclanguage", out var lEl)) lang = lEl.GetString();
+                    else if (cfg.TryGetProperty("language", out var l2)) lang = l2.GetString();
+                }
+
+                depots.Add(new ContentDepot(depotId, ReadPublicSize(v), dlcAppId, isShared, os, lang, ReadPublicManifestId(v)) { FromAppId = fromAppId });
+            }
+        }
+
+        string? publicBuildId = null;
+        if (app.TryGetProperty("depots", out var dm) && dm.ValueKind == JsonValueKind.Object &&
+            dm.TryGetProperty("branches", out var branches) && branches.TryGetProperty("public", out var pubBranch) &&
+            pubBranch.TryGetProperty("buildid", out var buildEl))
+        {
+            publicBuildId = buildEl.ValueKind == JsonValueKind.String ? buildEl.GetString() : buildEl.ToString();
+        }
+
+        var dlcIds = new List<long>();
+        if (app.TryGetProperty("extended", out var ext) && ext.TryGetProperty("listofdlc", out var listEl) && listEl.GetString() is { } csv)
+        {
+            foreach (var part in csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                if (long.TryParse(part, out long id)) dlcIds.Add(id);
+        }
+
+        return new AppDepotInfo(appId, depots, dlcIds, ParseLaunchExes(app), publicBuildId);
     }
 
     /// <summary>The manifest id (gid) the public branch currently ships for this depot, or null.</summary>
