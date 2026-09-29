@@ -447,58 +447,64 @@ public partial class App : Application
         if (action is null) return;
 
         var window = _host.Services.GetRequiredService<MainWindow>();
-        var auth = _host.Services.GetRequiredService<AuthService>();
-        var download = _host.Services.GetRequiredService<DownloadViewModel>();
-        var manage = _host.Services.GetRequiredService<ManageViewModel>();
-        var fixes = _host.Services.GetRequiredService<FixesViewModel>();
 
         switch (action)
         {
             case "oauth":
             case "auth":
                 if (!string.IsNullOrEmpty(code))
-                {
-                    _ = auth.ExchangeCodeForSessionAsync(code);
-                }
+                    _ = _host.Services.GetRequiredService<AuthService>().ExchangeCodeForSessionAsync(code);
                 break;
             case "game":
-                if (!appId.HasValue) return;
-                window.NavigateToAdd();
-                download.SeedSearch(appId.Value);
+                if (appId.HasValue) HandleGameProtocol(appId.Value, window);
                 break;
             case "install":
-                if (!appId.HasValue) return;
-                if (silent)
-                {
-                    // Headless: don't navigate or surface; install in the background, then a tray balloon.
-                    _ = download.ProtocolInstall(appId.Value,
-                        (msg, error) => Dispatcher.Invoke(() =>
-                        {
-                            window.ShowInstallNotification(msg, error);
-                            // Cold launch + no tray app wanted → exit once the balloon has had time to show.
-                            // ProtocolInstall already awaited this item's completion, but the user (or the
-                            // store plugin) may have queued more; exiting now would cancel them mid-flight.
-                            var queue = _host.Services.GetRequiredService<Services.Downloads.DownloadQueue>();
-                            if (_exitAfterSilentInstall && queue.ActiveCount == 0)
-                                _ = Task.Delay(6000).ContinueWith(_ => Dispatcher.Invoke(Shutdown));
-                        }));
-                }
-                else
-                {
-                    window.NavigateToAdd();
-                    _ = download.ProtocolInstall(appId.Value);
-                }
+                if (appId.HasValue) HandleInstallProtocol(appId.Value, silent, window);
                 break;
             case "manage":
-                if (!appId.HasValue) return;
-                window.NavigateToManage();
-                _ = manage.OpenDetailForAppIdAsync(appId.Value);
+                if (appId.HasValue) HandleManageProtocol(appId.Value, window);
                 break;
             case "fix":
-                if (!appId.HasValue) return;
-                window.NavigateToFixes();
-                _ = fixes.OpenForAppIdAsync(appId.Value);
+                if (appId.HasValue) HandleFixProtocol(appId.Value, window);
                 break;
         }
+    }
+
+    private void HandleGameProtocol(long appId, MainWindow window)
+    {
+        window.NavigateToAdd();
+        _host.Services.GetRequiredService<DownloadViewModel>().SeedSearch(appId);
+    }
+
+    private void HandleInstallProtocol(long appId, bool silent, MainWindow window)
+    {
+        var download = _host.Services.GetRequiredService<DownloadViewModel>();
+        if (silent)
+        {
+            _ = download.ProtocolInstall(appId, (msg, error) => Dispatcher.Invoke(() =>
+            {
+                window.ShowInstallNotification(msg, error);
+                var queue = _host.Services.GetRequiredService<Services.Downloads.DownloadQueue>();
+                if (_exitAfterSilentInstall && queue.ActiveCount == 0)
+                    _ = Task.Delay(6000).ContinueWith(_ => Dispatcher.Invoke(Shutdown));
+            }));
+        }
+        else
+        {
+            window.NavigateToAdd();
+            _ = download.ProtocolInstall(appId);
+        }
+    }
+
+    private void HandleManageProtocol(long appId, MainWindow window)
+    {
+        window.NavigateToManage();
+        _ = _host.Services.GetRequiredService<ManageViewModel>().OpenDetailForAppIdAsync(appId);
+    }
+
+    private void HandleFixProtocol(long appId, MainWindow window)
+    {
+        window.NavigateToFixes();
+        _ = _host.Services.GetRequiredService<FixesViewModel>().OpenForAppIdAsync(appId);
     }
 }
