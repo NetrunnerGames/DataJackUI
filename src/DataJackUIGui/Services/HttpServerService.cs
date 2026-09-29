@@ -218,7 +218,7 @@ public class HttpServerService : IHostedService
         if (parts.Length != pathParts.Length) return false;
         for (int i = 0; i < parts.Length; i++)
         {
-            if (parts[i].StartsWith("{")) { id = pathParts[i]; continue; }
+            if (parts[i].StartsWith('{')) { id = pathParts[i]; continue; }
             if (!string.Equals(parts[i], pathParts[i], StringComparison.OrdinalIgnoreCase)) return false;
         }
         return !string.IsNullOrEmpty(id);
