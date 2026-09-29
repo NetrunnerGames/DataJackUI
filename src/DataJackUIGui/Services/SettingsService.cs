@@ -223,41 +223,38 @@ public class SettingsService
         set { _settings.DnsMode = string.IsNullOrWhiteSpace(value) ? null : value; Save(); }
     }
 
+    private static bool IsEmpty(AppSettings s)
+    {
+        if (s.SteamPathOverride is not null) return false;
+        if (s.SelectedMode is not null) return false;
+        if (s.AutoUpdateApps is not null) return false;
+        if (s.DonateKeys is not null) return false;
+        if (s.ManagePageSize is not null) return false;
+        if (s.FixesPageSize is not null) return false;
+        if (s.BuildsPageSize is not null) return false;
+        if (s.Language is not null) return false;
+        if (s.HubcapApiKey is not null) return false;
+        if (s.StartWithWindows is not null) return false;
+        if (s.MinimizeToTray is not null) return false;
+        if (s.FastFetch is not null) return false;
+        if (s.DnsMode is not null) return false;
+        return true;
+    }
+
     private void Save()
     {
-        // Nothing worth persisting → don't leave a settings file behind.
-        // Every persisted field must be listed here. A field left out is treated as "nothing worth
-        // keeping", so a user whose ONLY change was that setting gets the file deleted and the setting
-        // silently lost on the next save. (FixesPageSize was missing.)
-        bool empty = _settings.SteamPathOverride is null
-            && _settings.SelectedMode is null
-            && _settings.AutoUpdateApps is null
-            && _settings.DonateKeys is null
-            && _settings.ManagePageSize is null
-            && _settings.FixesPageSize is null
-            && _settings.BuildsPageSize is null
-            && _settings.Language is null
-            && _settings.HubcapApiKey is null
-            && _settings.StartWithWindows is null
-            && _settings.MinimizeToTray is null
-            && _settings.FastFetch is null
-            && _settings.DnsMode is null;
-        if (empty)
+        if (IsEmpty(_settings))
         {
             foreach (var p in new[] { FilePath, BakPath, TmpPath })
-                try { if (File.Exists(p)) File.Delete(p); } catch { /* best effort */ }
+                try { if (File.Exists(p)) File.Delete(p); } catch { }
             return;
         }
 
         Directory.CreateDirectory(Dir);
         string json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
 
-        // Atomic write: fill a temp file, then rename it over the target. A crash/kill mid-write can only
-        // ever truncate the .tmp. The live settings.json is replaced by an atomic move (same-volume rename)
-        // and is therefore never left half-written. (This class of loss is exactly what a forced kill during
-        // a plain WriteAllText caused.) A .bak of the last good file is kept as a second recovery source.
         File.WriteAllText(TmpPath, json);
-        try { if (File.Exists(FilePath)) File.Copy(FilePath, BakPath, overwrite: true); } catch { /* best effort */ }
+        try { if (File.Exists(FilePath)) File.Copy(FilePath, BakPath, overwrite: true); } catch { }
         File.Move(TmpPath, FilePath, overwrite: true);
     }
 }
