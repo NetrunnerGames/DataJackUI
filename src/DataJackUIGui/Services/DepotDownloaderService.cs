@@ -202,83 +202,81 @@ public partial class DepotDownloaderService(
         try
         {
             have = File.Exists(ExePath);
-            if (have && CheckedRecently(cache.DepotDownloaderCheckedAtMs)) return ExePath; // won the race
+            if (have && CheckedRecently(cache.DepotDownloaderCheckedAtMs)) return ExePath;
 
-            // A failed lookup still counts as "we looked". Without this the throttle only advances on
-            // success, and since RunAsync calls this once PER DEPOT, an offline 10-depot game would make
-            // ten lookups — each walking every GithubProxy mirror — where the old File.Exists check made
-            // none. Backing off costs at most one interval of update latency.
-            void RecordAttempt() =>
-                cache.DepotDownloaderCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-            string url = $"https://api.github.com/repos/{AppConfig.DepotDownloaderRepo}/releases/latest";
-            using var res = await gh.SendAsync(url, ct);
-            if (res is null || !res.IsSuccessStatusCode)
-            {
-                log.LogDebug("DepotDownloader release lookup failed: {Status}", res?.StatusCode);
-                if (have) RecordAttempt();
-                return have ? ExePath : null;
-            }
-
-            var release = JsonSerializer.Deserialize<GithubRelease>(await res.Content.ReadAsStringAsync(ct), JsonOpts);
-            var asset = release?.Assets.FirstOrDefault(a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+            var (release, asset) = await FetchLatestReleaseAsync(ct);
             if (asset is null)
             {
-                log.LogDebug("DepotDownloader release has no .zip asset");
                 if (have) RecordAttempt();
                 return have ? ExePath : null;
             }
 
-            // Already on the published build: record that we looked and skip the ~37 MB download.
-            if (have && !string.IsNullOrEmpty(release!.TagName)
-                     && string.Equals(release.TagName, cache.DepotDownloaderVersion, StringComparison.Ordinal))
+            if (have && !string.IsNullOrEmpty(release!.TagName) &&
+                string.Equals(release.TagName, cache.DepotDownloaderVersion, StringComparison.Ordinal))
             {
-                cache.DepotDownloaderCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                RecordAttempt();
                 return ExePath;
             }
 
-            Directory.CreateDirectory(ToolDir);
-            string zipPath = Path.Combine(ToolDir, "depotdownloader.zip");
-            // GithubProxy only reports a 0..1 fraction; the release tells us the real size, so convert
-            // here rather than making the caller show a meaningless "45 of 100".
-            var sink = progress is null ? null : new ProgressRelay<double?>(f =>
-                progress.Report(new DownloadProgress(
-                    (long)((f ?? 0) * asset.Size), asset.Size > 0 ? asset.Size : null)));
-            await gh.DownloadAsync(asset.DownloadUrl, zipPath, sink, ct);
-
-            // Verify before extracting over a working install: this is an executable we then run, and
-            // both UnlockerService and PluginInstallerService check the same way.
-            if (!AssetHash.Matches(zipPath, asset.Digest))
-            {
-                log.LogDebug("DepotDownloader asset digest mismatch; keeping the existing tool");
-                try { File.Delete(zipPath); } catch { }
-                if (have) RecordAttempt(); // don't re-download a bad asset on the very next depot
-                return have ? ExePath : null;
-            }
-
-            // Extract the WHOLE zip: the exe needs SteamKit2.dll and friends beside it.
-            ZipFile.ExtractToDirectory(zipPath, ToolDir, overwriteFiles: true);
-            try { File.Delete(zipPath); } catch { /* leftover zip is harmless */ }
-
-            if (!File.Exists(ExePath))
+            if (!await DownloadAndExtractToolAsync(asset, progress, ct))
             {
                 if (have) RecordAttempt();
                 return have ? ExePath : null;
             }
 
             cache.DepotDownloaderVersion = release!.TagName;
-            cache.DepotDownloaderCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            RecordAttempt();
             return ExePath;
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             log.LogDebug(ex, "Obtaining DepotDownloader failed");
-            // Same backoff as the explicit failure paths: a throwing check must not be retried per depot.
-            if (have) cache.DepotDownloaderCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (have) RecordAttempt();
             return have ? ExePath : null;
         }
         finally { _toolGate.Release(); }
+    }
+
+    private void RecordAttempt() =>
+        cache.DepotDownloaderCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    private async Task<(GithubRelease? release, GithubAsset? asset)> FetchLatestReleaseAsync(CancellationToken ct)
+    {
+        string url = $"https://api.github.com/repos/{AppConfig.DepotDownloaderRepo}/releases/latest";
+        using var res = await gh.SendAsync(url, ct);
+        if (res is null || !res.IsSuccessStatusCode)
+        {
+            log.LogDebug("DepotDownloader release lookup failed: {Status}", res?.StatusCode);
+            return (null, null);
+        }
+
+        var release = JsonSerializer.Deserialize<GithubRelease>(await res.Content.ReadAsStringAsync(ct), JsonOpts);
+        var asset = release?.Assets.FirstOrDefault(a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+        if (asset is null) log.LogDebug("DepotDownloader release has no .zip asset");
+        return (release, asset);
+    }
+
+    private async Task<bool> DownloadAndExtractToolAsync(GithubAsset asset, IProgress<DownloadProgress>? progress, CancellationToken ct)
+    {
+        Directory.CreateDirectory(ToolDir);
+        string zipPath = Path.Combine(ToolDir, "depotdownloader.zip");
+        var sink = progress is null ? null : new ProgressRelay<double?>(f =>
+            progress.Report(new DownloadProgress((long)((f ?? 0) * asset.Size), asset.Size > 0 ? asset.Size : null)));
+        
+        await gh.DownloadAsync(asset.DownloadUrl, zipPath, sink, ct);
+
+        if (!AssetHash.Matches(zipPath, asset.Digest))
+        {
+            log.LogDebug("DepotDownloader asset digest mismatch; keeping the existing tool");
+            try { File.Delete(zipPath); } catch { }
+            return false;
+        }
+
+        ZipFile.ExtractToDirectory(zipPath, ToolDir, overwriteFiles: true);
+        try { File.Delete(zipPath); } catch { }
+
+        return File.Exists(ExePath);
     }
 
     // ── Input sourcing ───────────────────────────────────────────────
@@ -290,7 +288,13 @@ public partial class DepotDownloaderService(
     public IReadOnlyDictionary<long, string> ResolveKeys(long appId)
     {
         var keys = new Dictionary<long, string>();
+        LoadKeysFromLua(appId, keys);
+        LoadKeysFromVdf(keys);
+        return keys;
+    }
 
+    private void LoadKeysFromLua(long appId, Dictionary<long, string> keys)
+    {
         try
         {
             if (steam.StPlugInDir is { } dir)
@@ -298,15 +302,16 @@ public partial class DepotDownloaderService(
                 string lua = Path.Combine(dir, $"{appId}.lua");
                 if (File.Exists(lua) && LuaFileParser.Parse(lua, appId) is { } parsed)
                 {
-                    // DisabledEntries too: a depot switched off on the Depots page still has a valid key,
-                    // and the user explicitly picked it for download.
                     foreach (var e in parsed.Entries.Concat(parsed.DisabledEntries))
                         if (e.Key is { Length: > 0 }) keys[e.Id] = e.Key;
                 }
             }
         }
         catch (Exception ex) { log.LogDebug(ex, "Reading depot keys from lua failed for {AppId}", appId); }
+    }
 
+    private void LoadKeysFromVdf(Dictionary<long, string> keys)
+    {
         try
         {
             if (steam.EffectivePath is { } root)
@@ -320,8 +325,6 @@ public partial class DepotDownloaderService(
             }
         }
         catch (Exception ex) { log.LogDebug(ex, "Reading depot keys from config.vdf failed"); }
-
-        return keys;
     }
 
     /// <summary>
@@ -442,9 +445,7 @@ public partial class DepotDownloaderService(
         IProgress<double>? depotFraction, CancellationToken ct, IProgress<DepotPhase>? phase = null,
         IProgress<string>? createdFile = null)
     {
-        // Depot downloading feature is temporarily paused while MRC updates are integrated
         return await Task.FromResult(new DepotRunResult(false, "Depot downloading is temporarily paused due to what steam caused, it may return in the future"));
-
 #pragma warning disable CS0162
         string? exe = await EnsureToolAsync(null, ct);
         if (exe is null) return new DepotRunResult(false, "tool");
@@ -453,30 +454,7 @@ public partial class DepotDownloaderService(
         try
         {
             Directory.CreateDirectory(outDir);
-
-            var psi = new ProcessStartInfo(exe)
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                WorkingDirectory = ToolDir,
-            };
-            ArgumentNullException.ThrowIfNull(sel.ManifestId);
-            ArgumentNullException.ThrowIfNull(sel.ManifestPath);
-
-            foreach (string a in new[]
-            {
-                "-app", appId.ToString(),
-                "-depot", sel.DepotId.ToString(),
-                "-manifest", sel.ManifestId!,
-                "-depotkeys", keysFile,
-                "-manifestfile", sel.ManifestPath,
-                "-dir", outDir,
-                "-max-downloads", MaxChunkDownloads.ToString(),
-            }) psi.ArgumentList.Add(a);
-
-            if (validate) psi.ArgumentList.Add("-validate");
+            var psi = BuildDepotDownloaderArgs(exe, appId, sel, keysFile, outDir, validate);
 
             using var proc = Process.Start(psi);
             if (proc is null) return new DepotRunResult(false, "spawn");
@@ -484,43 +462,13 @@ public partial class DepotDownloaderService(
             long lastOutput = DateTime.UtcNow.Ticks;
             string? lastError = null;
             string? lastLine = null;
-
             DepotPhase? lastPhase = null;
+
             proc.OutputDataReceived += (_, e) =>
             {
                 if (e.Data is null) return;
                 Interlocked.Exchange(ref lastOutput, DateTime.UtcNow.Ticks);
-
-                var m = ProgressRegex().Match(e.Data);
-                if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float,
-                        CultureInfo.InvariantCulture, out double pct))
-                {
-                    if (lastPhase != DepotPhase.Downloading)
-                    {
-                        lastPhase = DepotPhase.Downloading;
-                        phase?.Report(DepotPhase.Downloading);
-                    }
-                    depotFraction?.Report(Math.Clamp(pct / 100d, 0d, 1d));
-                    return;
-                }
-
-                string trimmed = e.Data.Trim();
-
-                if (createdFile is not null
-                    && trimmed.StartsWith(PreAllocatingPrefix, StringComparison.Ordinal))
-                {
-                    string path = trimmed[PreAllocatingPrefix.Length..].Trim();
-                    if (path.Length > 0) createdFile.Report(path);
-                }
-
-                if (PhaseOf(trimmed) is { } p && p != lastPhase)
-                {
-                    lastPhase = p;
-                    phase?.Report(p);
-                }
-
-                string line = e.Data.Trim();
-                if (line.Length > 0 && !line.StartsWith("at ", StringComparison.Ordinal)) lastLine = line;
+                ParseOutputLine(e.Data, ref lastPhase, ref lastLine, depotFraction, phase, createdFile);
             };
             proc.ErrorDataReceived += (_, e) =>
             {
@@ -528,6 +476,7 @@ public partial class DepotDownloaderService(
                 Interlocked.Exchange(ref lastOutput, DateTime.UtcNow.Ticks);
                 lastError = e.Data;
             };
+
             proc.BeginOutputReadLine();
             proc.BeginErrorReadLine();
 
@@ -551,8 +500,7 @@ public partial class DepotDownloaderService(
             {
                 string? why = lastError ?? lastLine;
                 if (why is { Length: > 300 }) why = why[..300];
-                log.LogDebug("DepotDownloader exited {Code} for depot {Depot}: {Err}",
-                    proc.ExitCode, sel.DepotId, why);
+                log.LogDebug("DepotDownloader exited {Code} for depot {Depot}: {Err}", proc.ExitCode, sel.DepotId, why);
                 return new DepotRunResult(false, why ?? $"exit {proc.ExitCode}");
             }
 
@@ -561,6 +509,66 @@ public partial class DepotDownloaderService(
         }
         finally { _runGate.Release(); }
 #pragma warning restore CS0162
+    }
+
+    private ProcessStartInfo BuildDepotDownloaderArgs(string exe, long appId, DepotSelection sel, string keysFile, string outDir, bool validate)
+    {
+        var psi = new ProcessStartInfo(exe)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            WorkingDirectory = ToolDir,
+        };
+        ArgumentNullException.ThrowIfNull(sel.ManifestId);
+        ArgumentNullException.ThrowIfNull(sel.ManifestPath);
+
+        foreach (string a in new[]
+        {
+            "-app", appId.ToString(),
+            "-depot", sel.DepotId.ToString(),
+            "-manifest", sel.ManifestId!,
+            "-depotkeys", keysFile,
+            "-manifestfile", sel.ManifestPath,
+            "-dir", outDir,
+            "-max-downloads", MaxChunkDownloads.ToString(),
+        }) psi.ArgumentList.Add(a);
+
+        if (validate) psi.ArgumentList.Add("-validate");
+        return psi;
+    }
+
+    private void ParseOutputLine(string data, ref DepotPhase? lastPhase, ref string? lastLine, 
+        IProgress<double>? depotFraction, IProgress<DepotPhase>? phase, IProgress<string>? createdFile)
+    {
+        var m = ProgressRegex().Match(data);
+        if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double pct))
+        {
+            if (lastPhase != DepotPhase.Downloading)
+            {
+                lastPhase = DepotPhase.Downloading;
+                phase?.Report(DepotPhase.Downloading);
+            }
+            depotFraction?.Report(Math.Clamp(pct / 100d, 0d, 1d));
+            return;
+        }
+
+        string trimmed = data.Trim();
+        if (createdFile is not null && trimmed.StartsWith(PreAllocatingPrefix, StringComparison.Ordinal))
+        {
+            string path = trimmed[PreAllocatingPrefix.Length..].Trim();
+            if (path.Length > 0) createdFile.Report(path);
+        }
+
+        if (PhaseOf(trimmed) is { } p && p != lastPhase)
+        {
+            lastPhase = p;
+            phase?.Report(p);
+        }
+
+        string line = data.Trim();
+        if (line.Length > 0 && !line.StartsWith("at ", StringComparison.Ordinal)) lastLine = line;
     }
 
     /// <summary>
