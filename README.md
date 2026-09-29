@@ -6,12 +6,10 @@
 
 A modern desktop interface for Steam manifest management, native hook injection, and store plugin integration.
 
-[![Version](https://img.shields.io/badge/version-v2.00.0-cyan?style=for-the-badge&labelColor=090a0f&logo=github&logoColor=cyan)](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0)
-[![Framework](https://img.shields.io/badge/framework-.NET_8.0_WPF-7000ff?style=for-the-badge&labelColor=090a0f&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![License](https://img.shields.io/badge/license-MIT-10b981?style=for-the-badge&labelColor=090a0f&logo=open-source-initiative&logoColor=white)](LICENSE)
-
-[![Download Setup](https://img.shields.io/badge/Download-Setup_v2.00.0-06b6d4?style=for-the-badge&labelColor=090a0f&logo=windows&logoColor=cyan)](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0)
-[![Jack-in Plugin](https://img.shields.io/badge/Steam_Plugin-Jack--in_v1.0-a855f7?style=for-the-badge&labelColor=090a0f&logo=steam&logoColor=white)](https://github.com/NetrunnerGames/Jack-in/releases/tag/v1.0)
+[![DataJackUI Release](https://img.shields.io/badge/DataJackUI-v2.00.0-06b6d4?style=for-the-badge&logo=github&logoColor=white)](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0)
+[![Jack-in Plugin](https://img.shields.io/badge/Jack--in_Plugin-v1.0-a855f7?style=for-the-badge&logo=steam&logoColor=white)](https://github.com/NetrunnerGames/Jack-in/releases/tag/v1.0)
+[![Framework](https://img.shields.io/badge/Framework-.NET_8.0_WPF-7000ff?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![License](https://img.shields.io/badge/License-MIT-10b981?style=for-the-badge&logo=open-source-initiative&logoColor=white)](LICENSE)
 
 </div>
 
