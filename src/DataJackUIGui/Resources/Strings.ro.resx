@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Steam va fi închis pentru a putea fi modificate fișierele sale, apoi repornit automat. Toate jocurile sau descărcările în curs se vor opri.</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>Anulează</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Închide Steam și continuă</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>Un fork open source al OpenSteamTools, întreținut activ de echipa DataJackUI. Cu corecții și funcții noi!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>Un fork open source al OpenSteamTools, întreținut activ de echipa DataJackUI. Cu corecții și funcții noi!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>Gestionează</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>Nu s-a putut descărca sau lansa CloudRedirect.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>Versiune nightly a OpenSteamTools din cel mai recent cod sursă. Cele mai noi remedieri, dar poate fi mai puțin stabilă.</value></data>

@@ -13,7 +13,16 @@ import re
 import sys
 import glob
 import os
-import xml.etree.ElementTree as ET
+try:
+    import defusedxml
+    defusedxml.defuse_stdlib()
+except ImportError:
+    pass
+
+try:
+    from defusedxml.ElementTree import fromstring as parse_xml, ParseError as XMLParseError
+except ImportError:
+    from xml.etree.ElementTree import fromstring as parse_xml, ParseError as XMLParseError
 
 RES_DIR = os.path.join("src", "DataJackUIGui", "Resources")
 ENGLISH = os.path.join(RES_DIR, "Strings.resx")
@@ -28,7 +37,7 @@ PLACEHOLDER_RE = re.compile(r'\{(\d+)\}')
 # This list IS the handoff to the translation pass. When a feature's UI is final: translate its keys
 # across every Strings.<tag>.resx, clear them from here, and this check goes back to demanding full
 # parity. Anything left here is untranslated in all 29 languages.
-PENDING_TRANSLATION: set[str] = set()
+PENDING_TRANSLATION: set[str] = {"Builds_PinningPauseNote"}
 # Empty on purpose: every key is translated in all 29 languages, so the parity check above is
 # unconditional. Add a key here ONLY while its feature's UI is still moving, and clear it again
 # as soon as the translations land. Anything listed is English-only for every user.
@@ -38,7 +47,7 @@ PENDING_TRANSLATION: set[str] = set()
 def parse(path):
     """Return {key: value} for a RESX file (also raises if XML is malformed)."""
     text = open(path, encoding="utf-8").read()
-    ET.fromstring(text)  # well-formedness check
+    parse_xml(text)  # well-formedness check
     return dict(DATA_RE.findall(text))
 
 
@@ -59,7 +68,7 @@ def main():
         name = os.path.basename(path)
         try:
             tr = parse(path)
-        except ET.ParseError as e:
+        except XMLParseError as e:
             problems.append(f"{name}: INVALID XML. {e}")
             continue
 

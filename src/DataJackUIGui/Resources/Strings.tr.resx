@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Dosyalarının değiştirilebilmesi için Steam kapatılacak, ardından otomatik olarak yeniden başlatılacaktır. Çalışan tüm oyunlar veya indirmeler duracaktır.</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>İptal</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Steam'i kapat ve devam et</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>DataJackUI ekibi tarafından aktif olarak geliştirilen açık kaynaklı bir OpenSteamTools fork'u. Düzeltmeler ve yeni özelliklerle!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>DataJackUI ekibi tarafından aktif olarak geliştirilen açık kaynaklı bir OpenSteamTools fork'u. Düzeltmeler ve yeni özelliklerle!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>Yönet</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>CloudRedirect indirilemedi veya başlatılamadı.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>OpenSteamTools'un en son kaynaktan alınan gecelik derlemesi. En yeni düzeltmeler, ancak daha az kararlı olabilir.</value></data>

@@ -156,7 +156,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>将关闭 Steam 以便更改其文件，随后自动重启。所有正在运行的游戏或下载都会停止。</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>取消</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>关闭 Steam 并继续</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>OpenSteamTools 的开源分支，由 DataJackUI 团队积极维护。带来各种修复和新功能！</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>OpenSteamTools 的开源分支，由 DataJackUI 团队积极维护。带来各种修复和新功能！</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>管理</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>无法下载或启动 CloudRedirect。</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>从最新源码构建的 OpenSteamTools 每夜版。包含最新修复，但可能不太稳定。</value></data>

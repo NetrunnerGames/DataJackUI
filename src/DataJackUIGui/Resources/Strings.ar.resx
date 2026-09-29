@@ -157,7 +157,7 @@
   <data name="Mode_Cancel" xml:space="preserve"><value>إلغاء</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>إغلاق Steam والمتابعة</value></data>
   <!-- Mode descriptions + C# strings -->
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>نسخة مفتوحة المصدر من OpenSteamTools يطوّرها فريق DataJackUI باستمرار. مع إصلاحات وميزات جديدة!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>نسخة مفتوحة المصدر من OpenSteamTools يطوّرها فريق DataJackUI باستمرار. مع إصلاحات وميزات جديدة!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>إدارة</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>تعذّر تنزيل CloudRedirect أو تشغيله.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>إصدار ليلي من OpenSteamTools مبني من أحدث المصادر. أحدث الإصلاحات، لكنه قد يكون أقل استقرارًا.</value></data>

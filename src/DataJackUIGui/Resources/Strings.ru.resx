@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Steam будет закрыт, чтобы можно было изменить его файлы, а затем автоматически перезапущен. Все запущенные игры или загрузки будут остановлены.</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>Отмена</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Закрыть Steam и продолжить</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>Форк OpenSteamTools с открытым исходным кодом, который активно поддерживает команда DataJackUI. С исправлениями и новыми функциями!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>Форк OpenSteamTools с открытым исходным кодом, который активно поддерживает команда DataJackUI. С исправлениями и новыми функциями!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>Управление</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>Не удалось загрузить или запустить CloudRedirect.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>Ночная сборка OpenSteamTools из свежего исходного кода. Самые свежие исправления, но может быть менее стабильной.</value></data>

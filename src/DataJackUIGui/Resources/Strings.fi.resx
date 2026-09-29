@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Steam suljetaan, jotta sen tiedostoja voidaan muuttaa, ja käynnistetään sitten automaattisesti uudelleen. Kaikki käynnissä olevat pelit tai lataukset pysähtyvät.</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>Peruuta</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Sulje Steam ja jatka</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>Avoimen lähdekoodin fork OpenSteamToolsista, jota DataJackUI-tiimi ylläpitää aktiivisesti. Korjauksia ja uusia ominaisuuksia!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>Avoimen lähdekoodin fork OpenSteamToolsista, jota DataJackUI-tiimi ylläpitää aktiivisesti. Korjauksia ja uusia ominaisuuksia!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>Hallinta</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>CloudRedirectin lataaminen tai käynnistäminen epäonnistui.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>OpenSteamToolsin yöllinen koontiversio uusimmasta lähdekoodista. Uusimmat korjaukset, mutta voi olla epävakaampi.</value></data>

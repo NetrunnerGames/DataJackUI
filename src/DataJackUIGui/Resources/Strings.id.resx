@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Steam akan ditutup agar file-nya dapat diubah, lalu dimulai ulang secara otomatis. Semua gim atau unduhan yang berjalan akan berhenti.</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>Batal</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Tutup Steam dan lanjutkan</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>Fork sumber terbuka dari OpenSteamTools yang dikelola secara aktif oleh tim DataJackUI. Menghadirkan perbaikan dan fitur baru!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>Fork sumber terbuka dari OpenSteamTools yang dikelola secara aktif oleh tim DataJackUI. Menghadirkan perbaikan dan fitur baru!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>Kelola</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>Tidak dapat mengunduh atau menjalankan CloudRedirect.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>Build nightly OpenSteamTools dari sumber terbaru. Perbaikan terbaru, tetapi mungkin kurang stabil.</value></data>

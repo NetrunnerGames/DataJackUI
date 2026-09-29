@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Steam lukkes, så dets filer kan ændres, og genstartes derefter automatisk. Alle kørende spil eller downloads stopper.</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>Annuller</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Luk Steam og fortsæt</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>En open source-fork af OpenSteamTools, som vedligeholdes aktivt af DataJackUI-teamet. Med rettelser og nye funktioner!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>En open source-fork af OpenSteamTools, som vedligeholdes aktivt af DataJackUI-teamet. Med rettelser og nye funktioner!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>Administrer</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>Kunne ikke downloade eller starte CloudRedirect.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>Natlig build af OpenSteamTools fra den nyeste kildekode. Nyeste rettelser, men kan være mindre stabil.</value></data>

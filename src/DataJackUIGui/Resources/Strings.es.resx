@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Steam se cerrará para poder modificar sus archivos y luego se reiniciará automáticamente. Cualquier juego o descarga en curso se detendrá.</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>Cancelar</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Cerrar Steam y continuar</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>Un fork de código abierto de OpenSteamTools mantenido activamente por el equipo de DataJackUI. ¡Con correcciones y funciones nuevas!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>Un fork de código abierto de OpenSteamTools mantenido activamente por el equipo de DataJackUI. ¡Con correcciones y funciones nuevas!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>Gestionar</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>No se pudo descargar ni iniciar CloudRedirect.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>Compilación nocturna de OpenSteamTools desde el código más reciente. Las correcciones más recientes, pero puede ser menos estable.</value></data>

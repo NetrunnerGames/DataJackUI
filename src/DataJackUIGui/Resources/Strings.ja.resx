@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>ファイルを変更できるようにSteamを終了し、その後自動的に再起動します。実行中のゲームやダウンロードはすべて停止します。</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>キャンセル</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Steamを閉じて続行</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>OpenSteamTools のオープンソースフォーク。DataJackUI チームが積極的にメンテナンスし、修正や新機能を追加しています！</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>OpenSteamTools のオープンソースフォーク。DataJackUI チームが積極的にメンテナンスし、修正や新機能を追加しています！</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>管理</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>CloudRedirect をダウンロードまたは起動できませんでした。</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>最新ソースからビルドされた OpenSteamTools のナイトリー版。最新の修正が入りますが、安定性は低めの場合があります。</value></data>

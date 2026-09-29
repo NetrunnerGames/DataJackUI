@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Steam bude zavřen, aby bylo možné změnit jeho soubory, a poté se automaticky restartuje. Všechny spuštěné hry nebo stahování se zastaví.</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>Zrušit</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Zavřít Steam a pokračovat</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>Open source fork OpenSteamTools, který aktivně udržuje tým DataJackUI. Přináší opravy a nové funkce!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>Open source fork OpenSteamTools, který aktivně udržuje tým DataJackUI. Přináší opravy a nové funkce!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>Spravovat</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>Nepodařilo se stáhnout ani spustit CloudRedirect.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>Noční sestavení OpenSteamTools z nejnovějšího zdroje. Nejnovější opravy, ale může být méně stabilní.</value></data>

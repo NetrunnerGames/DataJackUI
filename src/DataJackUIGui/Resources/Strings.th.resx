@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Steam จะถูกปิดเพื่อให้สามารถเปลี่ยนไฟล์ได้ จากนั้นจะรีสตาร์ทโดยอัตโนมัติ เกมหรือการดาวน์โหลดที่กำลังทำงานทั้งหมดจะหยุดลง</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>ยกเลิก</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>ปิด Steam และดำเนินการต่อ</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>ฟอร์กโอเพนซอร์สของ OpenSteamTools ที่ทีม DataJackUI ดูแลอย่างต่อเนื่อง พร้อมการแก้ไขและฟีเจอร์ใหม่ ๆ!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>ฟอร์กโอเพนซอร์สของ OpenSteamTools ที่ทีม DataJackUI ดูแลอย่างต่อเนื่อง พร้อมการแก้ไขและฟีเจอร์ใหม่ ๆ!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>จัดการ</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>ไม่สามารถดาวน์โหลดหรือเปิด CloudRedirect ได้</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>บิลด์รายคืนของ OpenSteamTools จากซอร์สล่าสุด มีการแก้ไขล่าสุด แต่อาจเสถียรน้อยกว่า</value></data>

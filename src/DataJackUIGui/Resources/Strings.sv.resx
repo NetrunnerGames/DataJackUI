@@ -148,7 +148,7 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Steam stängs så att dess filer kan ändras och startas sedan om automatiskt. Alla spel eller nedladdningar som körs stoppas.</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>Avbryt</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Stäng Steam och fortsätt</value></data>
-  <data name="Mode_Desc_Bst" xml:space="preserve"><value>En fork med öppen källkod av OpenSteamTools som underhålls aktivt av DataJackUI-teamet. Med fixar och nya funktioner!</value></data>
+  <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>En fork med öppen källkod av OpenSteamTools som underhålls aktivt av DataJackUI-teamet. Med fixar och nya funktioner!</value></data>
   <data name="Mode_CloudRedirect_Manage" xml:space="preserve"><value>Hantera</value></data>
   <data name="Mode_CloudRedirect_LaunchFailed" xml:space="preserve"><value>Det gick inte att ladda ner eller starta CloudRedirect.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>Nightly-bygge av OpenSteamTools från den senaste källkoden. De senaste fixarna, men kan vara mindre stabil.</value></data>
