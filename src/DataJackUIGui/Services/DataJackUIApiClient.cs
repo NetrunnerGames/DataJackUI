@@ -22,13 +22,15 @@ public class DataJackUIApiClient
 
     private readonly AuthService _auth;
     private readonly SteamAppInfoCache _appInfo;
+    private readonly SteamAppListCache _appList;
     private readonly CoverCache _covers;
     private readonly SettingsService _settings;
 
-    public DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, CoverCache covers, SettingsService settings)
+    public DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, SteamAppListCache appList, CoverCache covers, SettingsService settings)
     {
         _auth = auth;
         _appInfo = appInfo;
+        _appList = appList;
         _covers = covers;
         _settings = settings;
 
@@ -94,39 +96,102 @@ public class DataJackUIApiClient
         catch { return []; }
     }
 
-    /// <summary>Steam's top sellers and new releases lists for the Add page strips. Public,
-    /// no auth. Queries Steam's storefront search API for games only (category1=998), falling back
-    /// to featuredcategories on failure. Returns empty lists on total failure.</summary>
+    /// <summary>Steam's top sellers (from global charts) and new releases lists for the Add page strips.
+    /// Public, no auth required. Uses Cloudflare CDN for images.</summary>
     public async Task<(List<SteamFeaturedItem> TopSellers, List<SteamFeaturedItem> NewReleases)> GetFeaturedAsync(
         CancellationToken ct = default)
     {
+        var topSellersTask = FetchTopSellersGlobalAsync(ct);
+        var newReleasesTask = FetchNewReleasesAsync(ct);
+        await Task.WhenAll(topSellersTask, newReleasesTask);
+
+        return (topSellersTask.Result, newReleasesTask.Result);
+    }
+
+    private async Task<List<SteamFeaturedItem>> FetchTopSellersGlobalAsync(CancellationToken ct)
+    {
         try
         {
-            var topSellersTask = FetchSearchCategoryAsync("filter=global_topsellers&category1=998", ct);
-            var newReleasesTask = FetchSearchCategoryAsync("filter=popularnew&category1=998", ct);
-            await Task.WhenAll(topSellersTask, newReleasesTask);
+            var url = "https://store.steampowered.com/charts/topselling/global";
+            var res = await _http.GetAsync(url, ct);
+            if (res.IsSuccessStatusCode)
+            {
+                var html = await res.Content.ReadAsStringAsync(ct);
+                var matches = System.Text.RegularExpressions.Regex.Matches(
+                    html, @"href=""https://store\.steampowered\.com/app/(\d+)/");
 
-            var top = topSellersTask.Result;
-            var fresh = newReleasesTask.Result;
+                var appIds = new List<long>();
+                foreach (System.Text.RegularExpressions.Match m in matches)
+                {
+                    if (long.TryParse(m.Groups[1].Value, out long aid) && aid > 0 && !appIds.Contains(aid))
+                    {
+                        appIds.Add(aid);
+                        if (appIds.Count >= 20) break;
+                    }
+                }
 
-            if (top.Count > 0 || fresh.Count > 0)
-                return (top, fresh);
+                if (appIds.Count > 0)
+                {
+                    var items = new List<SteamFeaturedItem>();
+                    foreach (var aid in appIds)
+                    {
+                        string name = _appList.GetName(aid)
+                            ?? (await _appInfo.ResolveAsync(aid, ct))?.Name
+                            ?? aid.ToString();
 
-            // Fallback to featuredcategories API if search API returned empty
-            var res = await _http.GetAsync($"{AppConfig.SteamFeaturedUrl}?cc=us&l=english", ct);
-            if (!res.IsSuccessStatusCode) return ([], []);
-            var data = await ReadJsonAsync<SteamFeaturedResponse>(res, ct);
-
-            static List<SteamFeaturedItem> Clean(SteamFeaturedCategory? c) =>
-                (c?.Items ?? [])
-                    .Where(i => i.Type == 0 && i.Id > 0 && !string.IsNullOrEmpty(i.LargeCapsuleImage))
-                    .DistinctBy(i => i.Id)
-                    .Take(20)
-                    .ToList();
-
-            return (Clean(data?.TopSellers), Clean(data?.NewReleases));
+                        items.Add(new SteamFeaturedItem
+                        {
+                            Id = aid,
+                            Name = name,
+                            Type = 0,
+                            LargeCapsuleImage = $"https://cdn.cloudflare.steamstatic.com/steam/apps/{aid}/header.jpg"
+                        });
+                    }
+                    return items;
+                }
+            }
         }
-        catch { return ([], []); }
+        catch { }
+
+        return await FetchSearchCategoryAsync("filter=global_topsellers&category1=998", ct);
+    }
+
+    private async Task<List<SteamFeaturedItem>> FetchNewReleasesAsync(CancellationToken ct)
+    {
+        try
+        {
+            var res = await _http.GetAsync($"{AppConfig.SteamFeaturedUrl}?cc=us&l=english", ct);
+            if (res.IsSuccessStatusCode)
+            {
+                var data = await ReadJsonAsync<SteamFeaturedResponse>(res, ct);
+                var rawNew = data?.NewReleases?.Items;
+                if (rawNew is { Count: > 0 })
+                {
+                    var items = new List<SteamFeaturedItem>();
+                    foreach (var i in rawNew)
+                    {
+                        if (i.Type == 0 && i.Id > 0)
+                        {
+                            string imgUrl = SteamCdnUrl.Sanitize(i.LargeCapsuleImage)
+                                ?? $"https://cdn.cloudflare.steamstatic.com/steam/apps/{i.Id}/header.jpg";
+
+                            items.Add(new SteamFeaturedItem
+                            {
+                                Id = i.Id,
+                                Name = i.Name,
+                                Type = i.Type,
+                                LargeCapsuleImage = imgUrl
+                            });
+                        }
+                    }
+                    var distinct = items.DistinctBy(x => x.Id).Take(20).ToList();
+                    if (distinct.Count > 0) return distinct;
+                }
+            }
+        }
+        catch { }
+
+        return await FetchSearchCategoryAsync("filter=popularnew&sort_by=Released_DESC", ct);
     }
 
     private async Task<List<SteamFeaturedItem>> FetchSearchCategoryAsync(string queryParams, CancellationToken ct)
@@ -159,7 +224,7 @@ public class DataJackUIApiClient
                         Id = appId,
                         Name = name,
                         Type = 0,
-                        LargeCapsuleImage = $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appId}/header.jpg"
+                        LargeCapsuleImage = $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/header.jpg"
                     });
                 }
             }

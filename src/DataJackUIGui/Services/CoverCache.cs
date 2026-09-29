@@ -87,6 +87,8 @@ public class CoverCache
         if (File.Exists(path)) return Task.FromResult<string?>(path);
         if (string.IsNullOrWhiteSpace(remoteUrl)) return Task.FromResult<string?>(null);
 
+        remoteUrl = SteamCdnUrl.Sanitize(remoteUrl) ?? remoteUrl;
+
         // One download per appid even if asked concurrently (prefetch + page view).
         return _inFlight.GetOrAdd(appid, _ => DownloadAsync(appid, path, remoteUrl, ct));
     }
@@ -96,6 +98,7 @@ public class CoverCache
         try
         {
             if (string.IsNullOrWhiteSpace(remoteUrl)) return null;
+            remoteUrl = SteamCdnUrl.Sanitize(remoteUrl) ?? remoteUrl;
 
             byte[] bytes = await _http.GetByteArrayAsync(remoteUrl, ct);
             if (bytes.Length < MinValidBytes || !IsJpeg(bytes)) return null;

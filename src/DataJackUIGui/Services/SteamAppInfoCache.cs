@@ -126,7 +126,7 @@ public class SteamAppInfoCache
             if (d.ValueKind != JsonValueKind.Object) return null;
             string? name = d.TryGetProperty("name", out var n) ? n.GetString() : null;
             if (string.IsNullOrWhiteSpace(name)) return null;
-            string? image = d.TryGetProperty("header_image", out var img) ? img.GetString() : null;
+            string? image = SteamCdnUrl.Sanitize(d.TryGetProperty("header_image", out var img) ? img.GetString() : null);
             return new SteamAppInfo(name, image);
         }
         catch { return null; } // corrupt/partial blob → treat as not-cached
@@ -175,7 +175,7 @@ public class SteamAppInfoCache
         string? name = data.GetProperty("name").GetString();
         if (string.IsNullOrWhiteSpace(name)) return null;
 
-        string? image = data.TryGetProperty("header_image", out var img) ? img.GetString() : null;
+        string? image = SteamCdnUrl.Sanitize(data.TryGetProperty("header_image", out var img) ? img.GetString() : null);
         var info = new SteamAppInfo(name, image);
         _cache[appid] = info;
 
