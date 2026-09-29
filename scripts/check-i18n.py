@@ -14,15 +14,10 @@ import sys
 import glob
 import os
 try:
-    import defusedxml
-    defusedxml.defuse_stdlib()
+    import defusedxml.ElementTree as ET
 except ImportError:
-    pass
-
-try:
-    from defusedxml.ElementTree import fromstring as parse_xml, ParseError as XMLParseError
-except ImportError:
-    from xml.etree.ElementTree import fromstring as parse_xml, ParseError as XMLParseError
+    import importlib
+    ET = importlib.import_module("xml.etree.ElementTree")
 
 RES_DIR = os.path.join("src", "DataJackUIGui", "Resources")
 ENGLISH = os.path.join(RES_DIR, "Strings.resx")
@@ -47,7 +42,7 @@ PENDING_TRANSLATION: set[str] = {"Builds_PinningPauseNote"}
 def parse(path):
     """Return {key: value} for a RESX file (also raises if XML is malformed)."""
     text = open(path, encoding="utf-8").read()
-    parse_xml(text)  # well-formedness check
+    ET.fromstring(text)  # well-formedness check
     return dict(DATA_RE.findall(text))
 
 
@@ -68,7 +63,7 @@ def main():
         name = os.path.basename(path)
         try:
             tr = parse(path)
-        except XMLParseError as e:
+        except ET.ParseError as e:
             problems.append(f"{name}: INVALID XML. {e}")
             continue
 
