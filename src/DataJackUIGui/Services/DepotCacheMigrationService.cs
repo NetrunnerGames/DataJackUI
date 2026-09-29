@@ -88,6 +88,18 @@ public class DepotCacheMigrationService(SteamService steam, ILogger<DepotCacheMi
             if (ct.IsCancellationRequested) break;
             ProcessFile(src, realDir, log, ref moved, ref present, ref rejected, ref failed);
         }
+
+        if (moved > 0)
+            log.LogInformation(
+                "Moved {Moved} stranded manifest(s) from {Legacy} into {Real} " +
+                "({Present} already there, {Rejected} not valid, {Failed} failed)",
+                moved, legacyDir, realDir, present, rejected, failed);
+        else if (failed > 0)
+            log.LogDebug("Depotcache migration moved nothing; {Failed} failed", failed);
+
+        TryRemoveIfEmpty(legacyDir, log);
+
+        return new DepotCacheMigrationResult(moved, present, rejected, failed);
     }
 
     private static void ProcessFile(string src, string realDir, ILogger log, ref int moved, ref int present, ref int rejected, ref int failed)
@@ -115,19 +127,8 @@ public class DepotCacheMigrationService(SteamService steam, ILogger<DepotCacheMi
             failed++;
             log.LogDebug(ex, "Could not move stranded manifest {Name} into {Dir}", name, realDir);
         }
-
-        if (moved > 0)
-            log.LogInformation(
-                "Moved {Moved} stranded manifest(s) from {Legacy} into {Real} " +
-                "({Present} already there, {Rejected} not valid, {Failed} failed)",
-                moved, legacyDir, realDir, present, rejected, failed);
-        else if (failed > 0)
-            log.LogDebug("Depotcache migration moved nothing; {Failed} failed", failed);
-
-        TryRemoveIfEmpty(legacyDir, log);
-
-        return new DepotCacheMigrationResult(moved, present, rejected, failed);
     }
+
 
     /// <summary>
     /// Split <c>&lt;depot&gt;_&lt;gid&gt;.manifest</c>. Returns false for anything else, which is the
