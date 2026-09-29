@@ -10,12 +10,14 @@ A modern desktop interface for Steam manifest management, native hook injection,
 [![Framework](https://img.shields.io/badge/framework-.NET_8.0_WPF-7000ff?style=for-the-badge&labelColor=090a0f&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-MIT-10b981?style=for-the-badge&labelColor=090a0f&logo=open-source-initiative&logoColor=white)](LICENSE)
 
-[Download Setup](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0) • [Jack-in Steam Plugin](https://github.com/NetrunnerGames/Jack-in)
+[![Download Setup](https://img.shields.io/badge/Download-Setup_v2.00.0-06b6d4?style=for-the-badge&labelColor=090a0f&logo=windows&logoColor=cyan)](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0)
+[![Jack-in Plugin](https://img.shields.io/badge/Steam_Plugin-Jack--in_v1.0-a855f7?style=for-the-badge&labelColor=090a0f&logo=steam&logoColor=white)](https://github.com/NetrunnerGames/Jack-in/releases/tag/v1.0)
 
 </div>
 
-> [!NOTE]
-> DataJackUI is designed as a standalone framework-dependent WPF client for Windows 10 and 11, featuring hardware-accelerated dark Acrylic glass rendering and direct Steam client plugin integration.
+> [!IMPORTANT]
+> **DISCLAIMER & NOTICE**
+> DataJackUI is an independent open-source client utility. It is not affiliated with, endorsed by, or associated with Valve Corporation or Steam. All game titles, trademarks, and registered assets belong to their respective owners.
 
 ## Overview
 
