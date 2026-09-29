@@ -211,92 +211,61 @@ public class ManifestJobFactory(
         var keys = depotTool.ResolveKeys(appId);
         if (keys.Count == 0) throw new DownloadAbortedException(Resources.Strings.Depot_Err_NoKeys);
 
-        // Sampled ONCE, before anything runs. Checking it inside the loop would be self-fulfilling:
-        // the first depot creates outDir, so every later depot would see it and think a previous session
-        // had written there. (Harmless in cost — a depot whose files don't exist yet validates nothing —
-        // but the intent is "did an earlier run leave partial files here", which is only true up front.)
         bool outDirExisted = Directory.Exists(outDir);
 
-        // ── Phase 0: the downloader itself ───────────────────────────────────────────────────────────
-        // Hoisted out of the per-depot loop so the ~37 MB first fetch (and any update) happens once, with
-        // visible progress. RunAsync still calls EnsureToolAsync per depot, but those hit its fast path.
         OnUi(() => item.Detail = Resources.Strings.Downloads_Depots_GettingTool);
         if (await depotTool.EnsureToolAsync(progress, ct) is null)
             throw new DownloadAbortedException(Resources.Strings.Depot_Err_Tool);
 
-        // Hand the bar back. On a fresh install the step above just drove it to 100% against the tool's
-        // own size; leaving it there would show a full bar through Phase 1 and then snap to 0% when the
-        // depots start. A null total reads as indeterminate until Phase 2 knows the real one.
         progress.Report(new DownloadProgress(0, null));
 
-        // ── Phase 1: resolve EVERYTHING before a single byte is written ──────────────────────────────
-        // Sizes for every selection (including finished ones, so a resumed job's baseline is right), and
-        // manifests only for what's left to do. Doing this inside the download loop meant a manifest that
-        // couldn't be fetched aborted the job after earlier depots had already pulled tens of GB, and it
-        // left the free-space check below summing 0 for every unresolved shared depot.
+        var resolved = await ResolveAllDepotsAsync(item, selections, keys, ct);
+
+        CheckDiskSpace(resolved, item, outDir);
+
+        return await DownloadDepotsPhaseAsync(item, appId, gameName, resolved, keys, outDir, outDirExisted, progress, ct);
+    }
+
+    private async Task<List<DepotSelection>> ResolveAllDepotsAsync(DownloadItem item, IReadOnlyList<DepotSelection> selections, IReadOnlyDictionary<long, string> keys, CancellationToken ct)
+    {
         var resolved = new List<DepotSelection>(selections.Count);
         for (int i = 0; i < selections.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
-
-            // Formatted into a local BEFORE the closure: `i` is a for-loop variable, so it is shared
-            // across iterations and would have moved on by the time the dispatcher ran the lambda.
             string prep = string.Format(Resources.Strings.Downloads_Depots_Preparing, i + 1, selections.Count);
             OnUi(() => item.Detail = prep);
 
-            // A shared redistributable carries no gid or size in the game's own app-info (it's a
-            // three-field stub pointing at the owning app), so both are resolved here rather than at
-            // pick time. Cached per app by SteamDepotInfo, and the owner is app 228980 for nearly
-            // every game, so this costs one lookup per session across all downloads.
             var sized = await ResolveSharedAsync(selections[i], ct);
-
-            // Resolve the manifest, fetching it into depotcache if Steam doesn't already have it. This is
-            // what lets a depot be downloaded at all when the game was added with "Auto Update Apps" on,
-            // which comments out the pins and skips the manifest files. Skipped for a depot already
-            // finished — its bytes are on disk and nothing will re-read the manifest.
-            // `prep` (not the download-phase caption) is the step text here: EnsureManifestAsync appends
-            // "· fetching manifest" to whatever it's given, so passing the other string would relabel the
-            // row mid-pre-flight as though depots were already downloading.
             if (!item.CompletedDepots.Contains(sized.DepotId))
             {
                 sized = sized with { ManifestPath = await EnsureManifestAsync(item, sized, prep, ct) };
-
-                // Without a key the tool cannot decrypt a single chunk, and a depot that fails aborts the
-                // whole job below — so refuse here, before anything is written, naming the depot instead
-                // of surfacing the downloader's own "No valid depot key" much later.
                 if (!keys.TryGetValue(sized.DepotId, out string? hex) || !TryParseKey(hex, out byte[] key))
-                    throw new DownloadAbortedException(
-                        string.Format(Resources.Strings.Depot_Err_NoKeyFor, sized.DepotId));
-
-                // A key that exists but is WRONG can only be caught when the manifest still has its
-                // filenames encrypted, which is the small minority — see ManifestFile.KeyLooksValid.
+                    throw new DownloadAbortedException(string.Format(Resources.Strings.Depot_Err_NoKeyFor, sized.DepotId));
                 if (!ManifestFile.KeyLooksValid(sized.ManifestPath, key))
-                    throw new DownloadAbortedException(
-                        string.Format(Resources.Strings.Depot_Err_BadKey, sized.DepotId));
+                    throw new DownloadAbortedException(string.Format(Resources.Strings.Depot_Err_BadKey, sized.DepotId));
             }
 
-            // The manifest's own cb_disk_original beats app info's size: it is exact, and app info may
-            // not have carried a size at all (a token-gated app returns no depot list, so those depots
-            // arrive here as 0 and would otherwise be budgeted as free).
             if (ManifestFile.TryRead(sized.ManifestPath) is { SizeOnDisk: > 0 } info)
                 sized = sized with { Size = info.SizeOnDisk };
 
             resolved.Add(sized);
         }
+        return resolved;
+    }
 
-        // ── Phase 2: budget, now that the sizes are real ─────────────────────────────────────────────
-        // Refuse up front rather than part-way through. The downloader pre-allocates every file at its
-        // full size BEFORE fetching a byte, so a short disk fails almost immediately — but only after it
-        // has already created multi-GB of zero-filled files. Checking here also gives a message that says
-        // what's actually wrong instead of a raw allocation error.
-        long totalSize = resolved.Sum(s => s.Size);
+    private void CheckDiskSpace(List<DepotSelection> resolved, DownloadItem item, string outDir)
+    {
         long needed = resolved.Where(s => !item.CompletedDepots.Contains(s.DepotId)).Sum(s => s.Size);
         if (needed > 0 && DepotDownloaderService.FreeSpaceFor(outDir) is { } free && free < needed)
-            throw new DownloadAbortedException(string.Format(
-                Resources.Strings.Depot_Err_NoSpace, ByteFormat.Size(needed), ByteFormat.Size(free)));
+            throw new DownloadAbortedException(string.Format(Resources.Strings.Depot_Err_NoSpace, ByteFormat.Size(needed), ByteFormat.Size(free)));
+    }
 
-        // ── Phase 3: download ────────────────────────────────────────────────────────────────────────
+    private async Task<DownloadedFile> DownloadDepotsPhaseAsync(
+        DownloadItem item, long appId, string gameName, List<DepotSelection> resolved, IReadOnlyDictionary<long, string> keys,
+        string outDir, bool outDirExisted, IProgress<DownloadProgress> progress, CancellationToken ct)
+    {
         string keysFile = DepotDownloaderService.WriteKeysFile(keys);
+        long totalSize = resolved.Sum(s => s.Size);
         try
         {
             long done = 0;
@@ -305,82 +274,51 @@ public class ManifestJobFactory(
                 ct.ThrowIfCancellationRequested();
                 var ready = resolved[i];
 
-                // Resume skips what's already finished rather than re-hashing tens of GB. Its size is the
-                // resolved one, so a finished shared depot no longer contributes 0 to the baseline.
                 if (item.CompletedDepots.Contains(ready.DepotId)) { done += ready.Size; continue; }
 
-                // Re-checked per depot, not just once up front: the volume is shared with everything else
-                // on the machine, so a budget that cleared at the start can be gone by depot 12. Running
-                // out mid-download is not reported as a disk error — the tool simply stops printing, and
-                // the silence watchdog kills it ten minutes later as a "timeout", which explains nothing.
-                if (ready.Size > 0 && DepotDownloaderService.FreeSpaceFor(outDir) is { } left
-                    && left < ready.Size)
-                    throw new DownloadAbortedException(string.Format(
-                        Resources.Strings.Depot_Err_NoSpace,
-                        ByteFormat.Size(ready.Size), ByteFormat.Size(left)));
+                if (ready.Size > 0 && DepotDownloaderService.FreeSpaceFor(outDir) is { } left && left < ready.Size)
+                    throw new DownloadAbortedException(string.Format(Resources.Strings.Depot_Err_NoSpace, ByteFormat.Size(ready.Size), ByteFormat.Size(left)));
 
                 string step = string.Format(Resources.Strings.Downloads_Depots_Progress, i + 1, resolved.Count);
                 OnUi(() => item.Detail = step);
 
-                // Only the FIRST depot after a resume is the partially-written one, so only it needs the
-                // (expensive) re-hash. Consume the flag so later depots download at full speed.
-                //
-                // An existing output folder forces the same treatment even on a fresh item: it means a
-                // previous session already wrote here, and CompletedDepots does not survive an app
-                // restart. Skipping validation there would hand back a half-written file reported as
-                // complete, which is this tool's worst failure mode.
                 bool validate = item.NeedsValidate || outDirExisted;
                 item.NeedsValidate = false;
-
                 long baseBytes = done;
-                var relay = new ProgressRelay<double>(f =>
-                    progress.Report(new DownloadProgress(baseBytes + (long)(f * ready.Size), totalSize)));
 
-                // The phase is PARSED from the downloader's own output rather than guessed. A big depot
-                // pre-allocates every new file at full size before fetching a byte, so the row used to sit
-                // at "Downloading - 0 B of 4.49 GB" looking hung for minutes. Reported only on change.
-                var phases = new ProgressRelay<DepotPhase>(ph => OnUi(() =>
-                {
-                    item.Detail = ph switch
-                    {
-                        DepotPhase.PreAllocating => $"{step} · {Resources.Strings.Downloads_Depot_PreAllocating}",
-                        DepotPhase.Validating => $"{step} · {Resources.Strings.Downloads_Depot_Validating}",
-                        DepotPhase.Manifest => $"{step} · {Resources.Strings.Downloads_Depot_FetchingManifest}",
-                        _ => step,
-                    };
-
-                    // Verifying is a real status (it gates Pause and the label), so keep driving it -
-                    // but from what the tool actually reports, not from "validate was requested and no
-                    // bytes have arrived yet", which also covered pre-allocation and plain slow starts.
-                    item.Status = ph == DepotPhase.Validating
-                        ? DownloadStatus.Verifying
-                        : DownloadStatus.Downloading;
-                }));
-
-                // Recorded so a cancel can delete exactly what this download created. Collected off the
-                // UI thread on purpose: a big depot reports thousands of files and none of it is visible.
-                var created = new ProgressRelay<string>(path => item.CreatedFiles.Add(path));
-
-                var res = await depotTool.RunAsync(
-                    appId, ready, keysFile, outDir, validate, relay, ct, phases, created);
-                if (!res.Ok)
-                    throw new DownloadAbortedException(res.Error == "tool"
-                        ? Resources.Strings.Depot_Err_Tool
-                        : string.Format(Resources.Strings.Depot_Err_Failed, ready.DepotId, res.Error ?? ""));
-
+                await DownloadSingleDepotAsync(item, appId, ready, keysFile, outDir, validate, totalSize, baseBytes, step, progress, ct);
+                
                 item.CompletedDepots.Add(ready.DepotId);
                 done += ready.Size;
                 progress.Report(new DownloadProgress(done, totalSize));
             }
-
             OnUi(() => item.Detail = null);
-            // Sentinel for the queue's file plumbing: a directory, so the staged-file cleanup no-ops on it.
             return new DownloadedFile(outDir, gameName);
         }
-        finally
+        finally { DeleteStaged(keysFile); }
+    }
+
+    private async Task DownloadSingleDepotAsync(
+        DownloadItem item, long appId, DepotSelection ready, string keysFile, string outDir, bool validate, 
+        long totalSize, long baseBytes, string step, IProgress<DownloadProgress> progress, CancellationToken ct)
+    {
+        var relay = new ProgressRelay<double>(f => progress.Report(new DownloadProgress(baseBytes + (long)(f * ready.Size), totalSize)));
+        var phases = new ProgressRelay<DepotPhase>(ph => OnUi(() =>
         {
-            DeleteStaged(keysFile); // holds decryption keys; never leave it lying around
-        }
+            item.Detail = ph switch
+            {
+                DepotPhase.PreAllocating => $"{step} · {Resources.Strings.Downloads_Depot_PreAllocating}",
+                DepotPhase.Validating => $"{step} · {Resources.Strings.Downloads_Depot_Validating}",
+                DepotPhase.Manifest => $"{step} · {Resources.Strings.Downloads_Depot_FetchingManifest}",
+                _ => step,
+            };
+            item.Status = ph == DepotPhase.Validating ? DownloadStatus.Verifying : DownloadStatus.Downloading;
+        }));
+        var created = new ProgressRelay<string>(path => item.CreatedFiles.Add(path));
+
+        var res = await depotTool.RunAsync(appId, ready, keysFile, outDir, validate, relay, ct, phases, created);
+        if (!res.Ok)
+            throw new DownloadAbortedException(res.Error == "tool" ? Resources.Strings.Depot_Err_Tool : string.Format(Resources.Strings.Depot_Err_Failed, ready.DepotId, res.Error ?? ""));
     }
 
     /// <summary>
@@ -601,14 +539,7 @@ public class ManifestJobFactory(
             string fixDir = Path.Combine(installDir, FixRecordDir);
             string recordPath = Path.Combine(fixDir, $"{fixKey}.json");
 
-            var record = new DenuvoFixRecord
-            {
-                AppId = appId,
-                FixId = fixId,
-                AppliedAt = DateTimeOffset.UtcNow.ToString("o"),
-            };
-
-            // ── Phase 1: plan. File.Exists only; nothing on disk changes yet. ──────────────────────
+            var record = new DenuvoFixRecord { AppId = appId, FixId = fixId, AppliedAt = DateTimeOffset.UtcNow.ToString("o") };
             using var archive = ZipFile.OpenRead(file.FilePath);
             var plan = new List<(string RelPath, string Dest, string? BakRel, ZipArchiveEntry Entry)>();
             int failed = 0;
@@ -617,28 +548,12 @@ public class ManifestJobFactory(
             {
                 if (string.IsNullOrEmpty(entry.Name)) continue;
                 string relPath = entry.FullName.Replace('\\', '/');
-
-                // A zip entry naming its way out of the game folder is never legitimate; skip it and
-                // count it, rather than writing wherever it points.
                 if (ResolveInside(installDir, entry.FullName) is not { } dest) { failed++; continue; }
-
-                // Backups are keyed by the FULL relative path, not just the file name: fix archives
-                // routinely ship the same name in several folders (steam_api64.dll, config.ini), and
-                // keying by name alone collapsed them onto one .bak. The !File.Exists guard in phase 3
-                // then skipped backing the second one up while still recording it as "modified" pointing
-                // at the first one's backup — so a revert restored one file with the other's contents,
-                // or silently restored nothing once the .bak was consumed.
                 plan.Add((relPath, dest, File.Exists(dest) ? $"{fixKey}/{relPath}.bak" : null, entry));
             }
 
-            // ── Phase 2: commit. Nothing has been touched yet, so failing here costs nothing. ──────
             foreach (var (relPath, _, bakRel, _) in plan)
-                record.Files.Add(new DenuvoFixRecordEntry
-                {
-                    RelativePath = relPath,
-                    Action = bakRel is null ? "added" : "modified",
-                    BackupPath = bakRel,
-                });
+                record.Files.Add(new DenuvoFixRecordEntry { RelativePath = relPath, Action = bakRel is null ? "added" : "modified", BackupPath = bakRel });
 
             try
             {
@@ -651,56 +566,19 @@ public class ManifestJobFactory(
                 return new JobResult(false, ex.Message);
             }
 
-            // ── Phase 3: apply, recording what really happened rather than what was planned. ───────
             var applied = new List<DenuvoFixRecordEntry>(plan.Count);
-
-            foreach (var (relPath, dest, bakRel, entry) in plan)
+            foreach (var step in plan)
             {
                 try
                 {
-                    DenuvoFixRecordEntry recordEntry;
-                    if (bakRel is not null)
-                    {
-                        string bakAbs = Path.Combine(fixDir, bakRel);
-                        if (!File.Exists(bakAbs)) // never clobber a known-good .bak
-                        {
-                            Directory.CreateDirectory(Path.GetDirectoryName(bakAbs)!);
-                            File.Copy(dest, bakAbs, overwrite: false);
-                        }
-                        // Hash the ORIGINAL before it is overwritten; there is no second chance.
-                        recordEntry = new DenuvoFixRecordEntry
-                        {
-                            RelativePath = relPath,
-                            Action = "modified",
-                            BackupPath = bakRel,
-                            HashBefore = FileHash.Sha256(dest),
-                        };
-                    }
-                    else
-                    {
-                        recordEntry = new DenuvoFixRecordEntry { RelativePath = relPath, Action = "added" };
-                    }
-
-                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                    entry.ExtractToFile(dest, overwrite: true);
-
-                    // Hash what we just wrote. This is what a later revert checks the file against to
-                    // prove nothing has replaced it since — another fix layered on top, a game update, a
-                    // hand-edit. Set after the extract so it describes the file as it really landed.
-                    recordEntry.HashAfter = FileHash.Sha256(dest);
-                    applied.Add(recordEntry);
+                    applied.Add(ApplySingleFixFile(step.RelPath, step.Dest, step.BakRel, step.Entry, fixDir));
                 }
-                catch { failed++; } // entry stays OUT of `applied`, so the settled record won't claim it
+                catch { failed++; }
             }
 
-            // ── Phase 4: settle. Replace the promise with the facts. ───────────────────────────────
             record.Files = applied;
-            try { File.WriteAllText(recordPath, SerializeRecord(record)); }
-            catch { /* the provisional record from phase 2 stands: over-broad, but still revertable */ }
+            try { File.WriteAllText(recordPath, SerializeRecord(record)); } catch { }
 
-            // Index it even on partial failure, for the same reason the record is written: files were
-            // backed up, so the fix IS applied and must be listable and revertable. The index is only a
-            // hint, so a failure to update it is not a failure to apply.
             fixIndex.Add(appId, fixId, gameName, installDir, record.AppliedAt, record.Files.Count);
 
             if (failed > 0)
@@ -719,10 +597,31 @@ public class ManifestJobFactory(
             toast.Show(Resources.Strings.Fixes_Toast_CouldntApply, ex.Message, error: true);
             return new JobResult(false, ex.Message);
         }
-        finally
+        finally { DeleteStaged(file.FilePath); }
+    }
+
+    private DenuvoFixRecordEntry ApplySingleFixFile(string relPath, string dest, string? bakRel, ZipArchiveEntry entry, string fixDir)
+    {
+        DenuvoFixRecordEntry recordEntry;
+        if (bakRel is not null)
         {
-            DeleteStaged(file.FilePath);
+            string bakAbs = Path.Combine(fixDir, bakRel);
+            if (!File.Exists(bakAbs))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(bakAbs)!);
+                File.Copy(dest, bakAbs, overwrite: false);
+            }
+            recordEntry = new DenuvoFixRecordEntry { RelativePath = relPath, Action = "modified", BackupPath = bakRel, HashBefore = FileHash.Sha256(dest) };
         }
+        else
+        {
+            recordEntry = new DenuvoFixRecordEntry { RelativePath = relPath, Action = "added" };
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+        entry.ExtractToFile(dest, overwrite: true);
+        recordEntry.HashAfter = FileHash.Sha256(dest);
+        return recordEntry;
     }
 
     // ── Fix revert ──────────────────────────────────────────────────
@@ -820,101 +719,27 @@ public class ManifestJobFactory(
 
             foreach (var entry in record.Files)
             {
-                // The record sits in a user-writable folder and a fix archive can plant one, so its
-                // paths get the same containment check the extract does. This branch DELETES.
-                if (ResolveInside(installDir, entry.RelativePath) is not { } dest) { errors++; continue; }
-
-                try
-                {
-                    if (entry.Action == "modified" && entry.BackupPath is { } bakRel)
-                    {
-                        if (ResolveInside(Path.Combine(installDir, FixRecordDir), bakRel)
-                            is not { } bakAbs) { errors++; continue; }
-                        if (!File.Exists(bakAbs))
-                        {
-                            // The record says this file was modified, so a backup MUST exist. Missing
-                            // means it was never written or something removed it, and the original is
-                            // gone for good — the one case where the fixed file silently stays in place.
-                            // Counting it as an error is the only honest outcome: reporting success here
-                            // would tell the user their game is clean when it is still patched.
-                            errors++;
-                            continue;
-                        }
-
-                        // Only put the original back if the file on disk is still the one THIS fix wrote.
-                        // Two hashes count as ours: HashAfter (untouched since we applied) and HashBefore
-                        // (an earlier attempt already restored it, so a retry must not treat it as
-                        // foreign). Anything else means something replaced the file after us — most
-                        // likely a second fix layered on top, whose own backup holds our version — and
-                        // restoring would throw that away. Both hashes null is an old record, and
-                        // FileHash.Matches reads null as "nothing to check", so those revert as before.
-                        if (File.Exists(dest)
-                            && !FileHash.Matches(dest, entry.HashAfter)
-                            && !FileHash.Matches(dest, entry.HashBefore))
-                        {
-                            conflicts++;
-                            conflictFile ??= entry.RelativePath;
-                            continue;
-                        }
-
-                        // The .bak is NOT deleted here, deliberately. Backups are removed as a group once
-                        // the whole revert succeeds (see below). Deleting per-file would make a retry
-                        // after a partial failure impossible to tell apart from a lost backup: every
-                        // already-restored entry would come back as a missing .bak and fail forever.
-                        // Leaving them means a retry just re-copies, which is idempotent.
-                        File.Copy(bakAbs, dest, overwrite: true);
-                        restored++;
-                    }
-                    else if (entry.Action == "added")
-                    {
-                        if (File.Exists(dest))
-                        {
-                            // This fix created the file, so deleting it is normally right — but not if
-                            // someone has since replaced it. Then the file is theirs, not ours.
-                            if (!FileHash.Matches(dest, entry.HashAfter))
-                            {
-                                conflicts++;
-                                conflictFile ??= entry.RelativePath;
-                                continue;
-                            }
-                            File.Delete(dest);
-                            deleted++;
-                        }
-                    }
-                }
-                catch { errors++; }
+                RevertSingleEntry(entry, installDir, ref restored, ref deleted, ref errors, ref conflicts, ref conflictFile);
             }
 
-            // Reported before plain errors because it is the only outcome the user can act on, and the
-            // action is specific: revert the fix that was applied later, then come back to this one.
             if (conflicts > 0)
             {
-                string conflictErr = string.Format(
-                    Resources.Strings.Fixes_Revert_Conflict_Body, conflictFile, conflicts);
+                string conflictErr = string.Format(Resources.Strings.Fixes_Revert_Conflict_Body, conflictFile, conflicts);
                 toast.Show(Resources.Strings.Fixes_Revert_Conflict, conflictErr, error: true);
                 return new JobResult(false, conflictErr);
             }
 
             if (errors > 0)
             {
-                // Backups and record stay put ON PURPOSE. The usual reason a revert fails is a locked
-                // file because the game is running, and deleting the .bak files here would leave the user
-                // half-reverted with no way to ever finish. Keeping them means the revert is simply
-                // retryable once the game is closed. Same principle the apply path already follows: it
-                // writes the record even on partial failure so the backups stay recoverable.
                 string err = string.Format(Resources.Strings.Fixes_Revert_Partial_Body, errors);
                 toast.Show(Resources.Strings.Fixes_Revert_Partial, err, error: true);
                 return new JobResult(false, err);
             }
 
-            // Fully reverted, so the backups have served their purpose and the record is what makes the
-            // Revert button appear — both go, and the fix reads as un-applied again.
             string backupDir = Path.Combine(installDir, FixRecordDir, SafeFixKey(fixId));
             try { if (Directory.Exists(backupDir)) Directory.Delete(backupDir, recursive: true); } catch { }
             try { if (File.Exists(recordPath)) File.Delete(recordPath); } catch { }
 
-            // Drop it from the index last, so the index is never emptier than the truth. If this fails the
-            // stale entry is pruned on the next read anyway, since its record file is now gone.
             fixIndex.Remove(appId, fixId);
 
             string message = string.Format(Resources.Strings.Fixes_Revert_Done_Body, restored, deleted);
@@ -923,11 +748,47 @@ public class ManifestJobFactory(
         }
         catch (Exception ex)
         {
-            // "Couldn't revert", not "Couldn't apply" — this is the revert path, and the old title said
-            // the opposite of what had just happened.
             toast.Show(Resources.Strings.Fixes_Revert_Failed, ex.Message, error: true);
             return new JobResult(false, ex.Message);
         }
+    }
+
+    private void RevertSingleEntry(DenuvoFixRecordEntry entry, string installDir, ref int restored, ref int deleted, ref int errors, ref int conflicts, ref string? conflictFile)
+    {
+        if (ResolveInside(installDir, entry.RelativePath) is not { } dest) { errors++; return; }
+
+        try
+        {
+            if (entry.Action == "modified" && entry.BackupPath is { } bakRel)
+            {
+                if (ResolveInside(Path.Combine(installDir, FixRecordDir), bakRel) is not { } bakAbs) { errors++; return; }
+                if (!File.Exists(bakAbs)) { errors++; return; }
+
+                if (File.Exists(dest) && !FileHash.Matches(dest, entry.HashAfter) && !FileHash.Matches(dest, entry.HashBefore))
+                {
+                    conflicts++;
+                    conflictFile ??= entry.RelativePath;
+                    return;
+                }
+                File.Copy(bakAbs, dest, overwrite: true);
+                restored++;
+            }
+            else if (entry.Action == "added")
+            {
+                if (File.Exists(dest))
+                {
+                    if (!FileHash.Matches(dest, entry.HashAfter))
+                    {
+                        conflicts++;
+                        conflictFile ??= entry.RelativePath;
+                        return;
+                    }
+                    File.Delete(dest);
+                    deleted++;
+                }
+            }
+        }
+        catch { errors++; }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
