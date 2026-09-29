@@ -77,59 +77,69 @@ public class SteamlessService(GithubProxy gh, SteamLibraryService library, Steam
         try
         {
             have = File.Exists(CliPath);
-            if (have && CheckedRecently(cache.SteamlessCheckedAtMs)) return CliPath; // won the race
+            if (have && CheckedRecently(cache.SteamlessCheckedAtMs)) return CliPath;
 
-            // A failed lookup still counts as "we looked", so an offline run backs off instead of
-            // retrying the whole GithubProxy mirror chain on the next call.
-            void RecordAttempt() =>
-                cache.SteamlessCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-            // Latest release → the single distributable .zip asset.
-            string url = $"https://api.github.com/repos/{AppConfig.SteamlessRepo}/releases/latest";
-            using var res = await gh.SendAsync(url, ct);
-            if (res is null || !res.IsSuccessStatusCode) { if (have) RecordAttempt(); return have ? CliPath : null; }
-
-            var release = JsonSerializer.Deserialize<GithubRelease>(await res.Content.ReadAsStringAsync(ct), JsonOpts);
-            var asset = release?.Assets.FirstOrDefault(a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
-            if (asset is null) { if (have) RecordAttempt(); return have ? CliPath : null; }
-
-            // Already on the published build: record that we looked and skip the download.
-            if (have && !string.IsNullOrEmpty(release!.TagName)
-                     && string.Equals(release.TagName, cache.SteamlessVersion, StringComparison.Ordinal))
+            var (release, asset) = await FetchLatestReleaseAsync(ct);
+            if (asset is null)
             {
-                cache.SteamlessCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                return CliPath;
-            }
-
-            Directory.CreateDirectory(ToolDir);
-            string zipPath = Path.Combine(ToolDir, "steamless.zip");
-            await gh.DownloadAsync(asset.DownloadUrl, zipPath, progress, ct);
-
-            // Verify before overwriting a working install: this is an executable we then run.
-            if (!AssetHash.Matches(zipPath, asset.Digest))
-            {
-                try { File.Delete(zipPath); } catch { }
                 if (have) RecordAttempt();
                 return have ? CliPath : null;
             }
 
-            // Extract the WHOLE zip: the CLI needs its plugin DLLs alongside it.
-            ZipFile.ExtractToDirectory(zipPath, ToolDir, overwriteFiles: true);
-            try { File.Delete(zipPath); } catch { /* leftover zip is harmless */ }
+            if (have && !string.IsNullOrEmpty(release!.TagName) && string.Equals(release.TagName, cache.SteamlessVersion, StringComparison.Ordinal))
+            {
+                RecordAttempt();
+                return CliPath;
+            }
 
-            if (!File.Exists(CliPath)) { if (have) RecordAttempt(); return have ? CliPath : null; }
+            if (!await DownloadAndExtractToolAsync(asset, progress, ct))
+            {
+                if (have) RecordAttempt();
+                return have ? CliPath : null;
+            }
 
             cache.SteamlessVersion = release!.TagName;
-            cache.SteamlessCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            RecordAttempt();
             return CliPath;
         }
         catch (OperationCanceledException) { throw; }
         catch
         {
-            if (have) cache.SteamlessCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (have) RecordAttempt();
             return have ? CliPath : null;
         }
         finally { _toolGate.Release(); }
+    }
+
+    private void RecordAttempt() => cache.SteamlessCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    private async Task<(GithubRelease? release, GithubAsset? asset)> FetchLatestReleaseAsync(CancellationToken ct)
+    {
+        string url = $"https://api.github.com/repos/{AppConfig.SteamlessRepo}/releases/latest";
+        using var res = await gh.SendAsync(url, ct);
+        if (res is null || !res.IsSuccessStatusCode) return (null, null);
+
+        var release = JsonSerializer.Deserialize<GithubRelease>(await res.Content.ReadAsStringAsync(ct), JsonOpts);
+        var asset = release?.Assets.FirstOrDefault(a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+        return (release, asset);
+    }
+
+    private async Task<bool> DownloadAndExtractToolAsync(GithubAsset asset, IProgress<double?>? progress, CancellationToken ct)
+    {
+        Directory.CreateDirectory(ToolDir);
+        string zipPath = Path.Combine(ToolDir, "steamless.zip");
+        await gh.DownloadAsync(asset.DownloadUrl, zipPath, progress, ct);
+
+        if (!AssetHash.Matches(zipPath, asset.Digest))
+        {
+            try { File.Delete(zipPath); } catch { }
+            return false;
+        }
+
+        ZipFile.ExtractToDirectory(zipPath, ToolDir, overwriteFiles: true);
+        try { File.Delete(zipPath); } catch { }
+
+        return File.Exists(CliPath);
     }
 
     /// <summary>Strip SteamStub DRM from a game's executable(s). Best-effort; never throws out of the loop.</summary>
