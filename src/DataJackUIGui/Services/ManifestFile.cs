@@ -66,33 +66,39 @@ public static class ManifestFile
         try
         {
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (IsZippedManifest(fs)) return ParseMetadata(FindSection(Unwrap(File.ReadAllBytes(path)), MetadataMagic));
 
-            // A zipped manifest has to be inflated whole; it cannot be seeked through.
-            Span<byte> peek = stackalloc byte[2];
-            if (fs.Read(peek) == 2 && peek[0] == 'P' && peek[1] == 'K')
-                return ParseMetadata(FindSection(Unwrap(File.ReadAllBytes(path)), MetadataMagic));
-            fs.Position = 0;
-
-            byte[] header = new byte[8];
-            while (fs.Position + 8 <= fs.Length)
-            {
-                if (fs.Read(header, 0, 8) != 8) return null;
-                uint magic = BinaryPrimitives.ReadUInt32LittleEndian(header);
-                uint len = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(4));
-
-                if (magic == EofMagic) break;
-                if (len > int.MaxValue || fs.Position + len > fs.Length) return null; // truncated
-
-                if (magic != MetadataMagic) { fs.Position += len; continue; }
-
-                byte[] meta = new byte[len];
-                return fs.ReadAtLeast(meta, (int)len, throwOnEndOfStream: false) == (int)len
-                    ? ParseMetadata(meta)
-                    : null;
-            }
-            return null; // no metadata section
+            return FindAndParseMetadata(fs);
         }
-        catch { return null; } // unreadable, truncated, or not a manifest at all
+        catch { return null; }
+    }
+
+    private static bool IsZippedManifest(FileStream fs)
+    {
+        Span<byte> peek = stackalloc byte[2];
+        bool isZipped = fs.Read(peek) == 2 && peek[0] == 'P' && peek[1] == 'K';
+        fs.Position = 0;
+        return isZipped;
+    }
+
+    private static ManifestInfo? FindAndParseMetadata(FileStream fs)
+    {
+        byte[] header = new byte[8];
+        while (fs.Position + 8 <= fs.Length)
+        {
+            if (fs.Read(header, 0, 8) != 8) return null;
+            uint magic = BinaryPrimitives.ReadUInt32LittleEndian(header);
+            uint len = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(4));
+
+            if (magic == EofMagic) break;
+            if (len > int.MaxValue || fs.Position + len > fs.Length) return null;
+            
+            if (magic != MetadataMagic) { fs.Position += len; continue; }
+            
+            byte[] meta = new byte[len];
+            return fs.ReadAtLeast(meta, (int)len, throwOnEndOfStream: false) == (int)len ? ParseMetadata(meta) : null;
+        }
+        return null;
     }
 
     private static ManifestInfo? ParseMetadata(byte[]? meta)
@@ -243,28 +249,32 @@ public static class ManifestFile
         {
             if (!ReadTag(payload, ref o, out int field, out int wire)) return null;
 
-            if (field == 1 && wire == 2) // repeated FileMapping
-            {
-                if (!ReadVarint(payload, ref o, out ulong len)) return null;
-                int end = o + (int)len;
-                if (end > payload.Length) return null;
-
-                int inner = o;
-                while (inner < end)
-                {
-                    if (!ReadTag(payload, ref inner, out int f2, out int w2)) return null;
-                    if (f2 == 1 && w2 == 2) // filename
-                    {
-                        if (!ReadVarint(payload, ref inner, out ulong n)) return null;
-                        if (inner + (int)n > payload.Length) return null;
-                        return Encoding.UTF8.GetString(payload, inner, (int)n);
-                    }
-                    if (!SkipField(payload, ref inner, w2)) return null;
-                }
-                o = end;
-            }
+            if (field == 1 && wire == 2) return ParseFileMapping(payload, ref o);
             else if (!SkipField(payload, ref o, wire)) return null;
         }
+        return null;
+    }
+
+    private static string? ParseFileMapping(byte[] payload, ref int o)
+    {
+        if (!ReadVarint(payload, ref o, out ulong len)) return null;
+        int end = o + (int)len;
+        if (end > payload.Length) return null;
+
+        while (o < end)
+        {
+            if (!ReadTag(payload, ref o, out int f2, out int w2)) return null;
+            if (f2 == 1 && w2 == 2)
+            {
+                if (!ReadVarint(payload, ref o, out ulong n)) return null;
+                if (o + (int)n > payload.Length) return null;
+                string name = Encoding.UTF8.GetString(payload, o, (int)n);
+                o += (int)n;
+                return name;
+            }
+            if (!SkipField(payload, ref o, w2)) return null;
+        }
+        o = end;
         return null;
     }
 
