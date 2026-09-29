@@ -116,37 +116,21 @@ public partial class DonateKeysService(SettingsService settings, SteamService st
         {
             char c = content[pos];
 
-            if (c == '/' && pos + 1 < len && content[pos + 1] == '/')
+            if (IsComment(content, pos, len))
             {
                 int nl = content.IndexOf('\n', pos);
                 pos = nl < 0 ? len : nl + 1;
+                continue;
             }
-            else if (c == '"')
-            {
-                int end = content.IndexOf('"', pos + 1);
-                if (end < 0) break;
-                string token = content[(pos + 1)..end];
-                pos = end + 1;
 
-                if (pendingKey is null)
-                {
-                    pendingKey = token;
-                }
-                else
-                {
-                    stack.Peek()[pendingKey] = token; // key → leaf string value
-                    pendingKey = null;
-                }
+            if (c == '"')
+            {
+                pos = ParseStringToken(content, pos, stack, ref pendingKey);
+                if (pos < 0) break;
             }
             else if (c == '{')
             {
-                if (pendingKey is not null)
-                {
-                    var child = new Dictionary<string, object>();
-                    stack.Peek()[pendingKey] = child;
-                    stack.Push(child);
-                    pendingKey = null;
-                }
+                ParseObjectStart(stack, ref pendingKey);
                 pos++;
             }
             else if (c == '}')
@@ -154,12 +138,35 @@ public partial class DonateKeysService(SettingsService settings, SteamService st
                 if (stack.Count > 1) stack.Pop();
                 pos++;
             }
-            else
-            {
-                pos++;
-            }
+            else pos++;
         }
 
         return root;
+    }
+
+    private static bool IsComment(string content, int pos, int len) => content[pos] == '/' && pos + 1 < len && content[pos + 1] == '/';
+
+    private static int ParseStringToken(string content, int pos, Stack<Dictionary<string, object>> stack, ref string? pendingKey)
+    {
+        int end = content.IndexOf('"', pos + 1);
+        if (end < 0) return -1;
+        
+        string token = content[(pos + 1)..end];
+        if (pendingKey is null) pendingKey = token;
+        else
+        {
+            stack.Peek()[pendingKey] = token;
+            pendingKey = null;
+        }
+        return end + 1;
+    }
+
+    private static void ParseObjectStart(Stack<Dictionary<string, object>> stack, ref string? pendingKey)
+    {
+        if (pendingKey is null) return;
+        var child = new Dictionary<string, object>();
+        stack.Peek()[pendingKey] = child;
+        stack.Push(child);
+        pendingKey = null;
     }
 }
