@@ -355,7 +355,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     private async Task OpenGame(FixGameCardVm game)
     {
         SelectedGame = game;
-        _ = game.EnsureCoverAsync(covers); // ensure the flyout header image is cached too
+        _ = game.EnsureCoverAsync(covers);
         Fixes.Clear();
         _allFixes = [];
         FixTags.Clear();
@@ -364,37 +364,31 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         try
         {
             var data = await api.GetDenuvoFixesAsync(game.AppId);
-            if (data is not null)
-            {
-                _allFixes = data.Fixes.Select(f => new FixItemVm(f)).ToList();
-
-                // Is the game on disk? GetInstallDir walks libraryfolders.vdf + appmanifest_*.acf, so
-                // it's file I/O — off the UI thread. Resolved once here rather than per fix row.
-                string? installDir = long.TryParse(game.AppId, out long gameAppId)
-                    ? await Task.Run(() => library.GetInstallDir(gameAppId))
-                    : null;
-                foreach (var f in _allFixes)
-                {
-                    f.GameInstalled = installDir is not null;
-                    // Whether this specific fix has been applied (its revert record on disk).
-                    f.IsApplied = installDir is not null
-                        && File.Exists(ManifestJobFactory.GetFixRecordPath(installDir, f.Id));
-                }
-
-                // Build the per-game filter pills from the distinct tags across this game's fixes.
-                // But only when there's more than one (a single tag is no filter).
-                var distinct = _allFixes.SelectMany(f => f.Tags)
-                    .GroupBy(t => t.Id).Select(g => g.First())
-                    .OrderBy(t => t.Name).ToList();
-                if (distinct.Count > 1)
-                    foreach (var t in distinct) FixTags.Add(new TagPillVm(t));
-
-                OnPropertyChanged(nameof(HasFixTags));
-                ApplyFixFilter();
-            }
+            if (data is not null) await ProcessGameDataAsync(game, data);
         }
-        catch { /* leave empty. Flyout shows "no fixes" */ }
+        catch { }
         finally { IsLoadingFixes = false; }
+    }
+
+    private async Task ProcessGameDataAsync(FixGameCardVm game, DenuvoFixList data)
+    {
+        _allFixes = data.Fixes.Select(f => new FixItemVm(f)).ToList();
+        
+        long gameAppId = 0;
+        long.TryParse(game.AppId, out gameAppId);
+        string? installDir = gameAppId > 0 ? await Task.Run(() => library.GetInstallDir(gameAppId)) : null;
+        
+        foreach (var f in _allFixes)
+        {
+            f.GameInstalled = installDir is not null;
+            f.IsApplied = installDir is not null && File.Exists(ManifestJobFactory.GetFixRecordPath(installDir, f.Id));
+        }
+
+        var distinct = _allFixes.SelectMany(f => f.Tags).GroupBy(t => t.Id).Select(g => g.First()).OrderBy(t => t.Name).ToList();
+        if (distinct.Count > 1) foreach (var t in distinct) FixTags.Add(new TagPillVm(t));
+
+        OnPropertyChanged(nameof(HasFixTags));
+        ApplyFixFilter();
     }
 
     [RelayCommand]
@@ -473,36 +467,28 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         if (SelectedGame is not { } game) return;
         if (!long.TryParse(game.AppId, out long appId)) return;
 
-        // The Fix button is disabled for uninstalled games, but the flyout's snapshot can be stale by
-        // now (and nothing stops a programmatic caller). Cheap local check, so do it before queueing
-        // rather than after paying for a download.
         if (slot == "fix" && library.GetInstallDir(appId) is null)
         {
-            toast.Show(Resources.Strings.Fixes_Toast_GameNotFound,
-                string.Format(Resources.Strings.Fixes_Toast_GameNotFound_Body, game.Name), error: true);
+            toast.Show(Resources.Strings.Fixes_Toast_GameNotFound, string.Format(Resources.Strings.Fixes_Toast_GameNotFound_Body, game.Name), error: true);
             return;
         }
 
-        string fallback = slot == "manifest"
-            ? fix.ManifestFilename ?? $"{game.AppId}.zip"
-            : fix.FixFilename ?? $"{game.AppId}_fix.zip";
+        EnqueueDownloadJob(fix, slot, game, appId);
+    }
 
-        var job = jobs.CreateDenuvoJob(fix.Id, slot, fallback, appId, game.Name, fix.Title,
-            onFinished: (item, result) =>
+    private void EnqueueDownloadJob(FixItemVm fix, string slot, FixGameCardVm game, long appId)
+    {
+        string fallback = slot == "manifest" ? (fix.ManifestFilename ?? $"{game.AppId}.zip") : (fix.FixFilename ?? $"{game.AppId}_fix.zip");
+
+        var job = jobs.CreateDenuvoJob(fix.Id, slot, fallback, appId, game.Name, fix.Title, onFinished: (item, result) =>
+        {
+            if (result is null && item.Status == DownloadStatus.Failed)
             {
-                // The factory already toasts success and install failures. A download that never got
-                // that far (network, auth, daily limit) still needs to say something.
-                if (result is null && item.Status == DownloadStatus.Failed)
-                {
-                    toast.Show(Resources.Strings.Fixes_Toast_DownloadFailed,
-                        item.Message ?? Resources.Strings.Fixes_Toast_DownloadFailed_Body, error: true);
-                    return;
-                }
-
-                // A successfully applied fix unlocks the Revert button right away, without closing and
-                // reopening the flyout.
-                if (slot == "fix" && result?.Ok == true) fix.IsApplied = true;
-            });
+                toast.Show(Resources.Strings.Fixes_Toast_DownloadFailed, item.Message ?? Resources.Strings.Fixes_Toast_DownloadFailed_Body, error: true);
+                return;
+            }
+            if (slot == "fix" && result?.Ok == true) fix.IsApplied = true;
+        });
 
         var item = queue.Enqueue(job);
         if (slot == "manifest") fix.ManifestItem = item;
