@@ -195,57 +195,23 @@ public class SteamAutoCrackService(
         try
         {
             have = File.Exists(ExePath);
-            if (!force && have && CheckedRecently(cache.SteamAutoCrackCheckedAtMs)) return ExePath; // won the race
+            if (!force && have && CheckedRecently(cache.SteamAutoCrackCheckedAtMs)) return ExePath;
 
-            // A failed lookup still counts as "we looked", so an offline click backs off instead of
-            // re-walking the whole GithubProxy mirror chain every time the button is pressed.
-            void RecordAttempt() =>
-                cache.SteamAutoCrackCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-            string url = $"https://api.github.com/repos/{AppConfig.SteamAutoCrackRepo}/releases/latest";
-            using var res = await gh.SendAsync(url, ct);
-            if (res is null || !res.IsSuccessStatusCode)
-            {
-                log.LogDebug("SteamAutoCrack release lookup failed: {Status}", res?.StatusCode);
-                if (have) RecordAttempt();
-                return have ? ExePath : null;
-            }
-
-            var release = JsonSerializer.Deserialize<GithubRelease>(await res.Content.ReadAsStringAsync(ct), JsonOpts);
-            var asset = release?.Assets.FirstOrDefault(a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+            var (release, asset) = await FetchLatestReleaseAsync(ct);
             if (asset is null)
             {
-                log.LogDebug("SteamAutoCrack release has no .zip asset");
                 if (have) RecordAttempt();
                 return have ? ExePath : null;
             }
 
-            if (!force && have && !string.IsNullOrEmpty(release!.TagName)
-                             && string.Equals(release.TagName, cache.SteamAutoCrackVersion, StringComparison.Ordinal))
+            if (!force && have && !string.IsNullOrEmpty(release!.TagName) &&
+                string.Equals(release.TagName, cache.SteamAutoCrackVersion, StringComparison.Ordinal))
             {
                 RecordAttempt();
                 return ExePath;
             }
 
-            Directory.CreateDirectory(ToolDir);
-            string zipPath = Path.Combine(ToolDir, "steamautocrack.zip");
-            var sink = progress is null ? null : new ProgressRelay<double?>(f =>
-                progress.Report(new DownloadProgress(
-                    (long)((f ?? 0) * asset.Size), asset.Size > 0 ? asset.Size : null)));
-            await gh.DownloadAsync(asset.DownloadUrl, zipPath, sink, ct);
-
-            if (!AssetHash.Matches(zipPath, asset.Digest))
-            {
-                log.LogDebug("SteamAutoCrack asset digest mismatch; keeping the existing copy");
-                try { File.Delete(zipPath); } catch { }
-                if (have) RecordAttempt();
-                return have ? ExePath : null;
-            }
-
-            ZipFile.ExtractToDirectory(zipPath, ToolDir, overwriteFiles: true);
-            try { File.Delete(zipPath); } catch { }
-
-            if (!File.Exists(ExePath))
+            if (!await DownloadAndExtractToolAsync(asset, progress, ct))
             {
                 if (have) RecordAttempt();
                 return have ? ExePath : null;
@@ -259,10 +225,51 @@ public class SteamAutoCrackService(
         catch (Exception ex)
         {
             log.LogDebug(ex, "Obtaining SteamAutoCrack failed");
-            if (have) cache.SteamAutoCrackCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (have) RecordAttempt();
             return have ? ExePath : null;
         }
         finally { _gate.Release(); }
+    }
+
+    private void RecordAttempt() =>
+        cache.SteamAutoCrackCheckedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    private async Task<(GithubRelease? release, GithubAsset? asset)> FetchLatestReleaseAsync(CancellationToken ct)
+    {
+        string url = $"https://api.github.com/repos/{AppConfig.SteamAutoCrackRepo}/releases/latest";
+        using var res = await gh.SendAsync(url, ct);
+        if (res is null || !res.IsSuccessStatusCode)
+        {
+            log.LogDebug("SteamAutoCrack release lookup failed: {Status}", res?.StatusCode);
+            return (null, null);
+        }
+
+        var release = JsonSerializer.Deserialize<GithubRelease>(await res.Content.ReadAsStringAsync(ct), JsonOpts);
+        var asset = release?.Assets.FirstOrDefault(a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+        if (asset is null) log.LogDebug("SteamAutoCrack release has no .zip asset");
+        return (release, asset);
+    }
+
+    private async Task<bool> DownloadAndExtractToolAsync(GithubAsset asset, IProgress<DownloadProgress>? progress, CancellationToken ct)
+    {
+        Directory.CreateDirectory(ToolDir);
+        string zipPath = Path.Combine(ToolDir, "steamautocrack.zip");
+        var sink = progress is null ? null : new ProgressRelay<double?>(f =>
+            progress.Report(new DownloadProgress((long)((f ?? 0) * asset.Size), asset.Size > 0 ? asset.Size : null)));
+        
+        await gh.DownloadAsync(asset.DownloadUrl, zipPath, sink, ct);
+
+        if (!AssetHash.Matches(zipPath, asset.Digest))
+        {
+            log.LogDebug("SteamAutoCrack asset digest mismatch; keeping the existing copy");
+            try { File.Delete(zipPath); } catch { }
+            return false;
+        }
+
+        ZipFile.ExtractToDirectory(zipPath, ToolDir, overwriteFiles: true);
+        try { File.Delete(zipPath); } catch { }
+
+        return File.Exists(ExePath);
     }
 
     /// <summary>
