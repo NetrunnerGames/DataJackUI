@@ -190,15 +190,17 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
     private readonly DepotDownloaderService _depotTool;
     private readonly DownloadQueue _queue;
     private readonly ManifestJobFactory _jobs;
+    private readonly SteamLibraryService _library;
 
     public BuildsViewModel(SteamService steam, LuaVault vault, SteamAppListCache appList,
         SteamAppInfoCache appInfo, CoverCache covers, SteamDepotInfo depotInfo, ToastService toast,
         SettingsService settings, DepotDownloaderService depotTool, DownloadQueue queue,
-        ManifestJobFactory jobs)
+        ManifestJobFactory jobs, SteamLibraryService library)
     {
         _depotTool = depotTool;
         _queue = queue;
         _jobs = jobs;
+        _library = library;
         _steam = steam;
         _vault = vault;
         _appList = appList;
@@ -323,9 +325,11 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
                 //
                 // Nothing is deleted to achieve this: the variants stay on disk untouched and the game
                 // reappears with them intact once its lua is added back. Hidden, not discarded.
+                var installedDiskAppIds = _library.EnumerateInstalled().Select(g => g.AppId).ToHashSet();
                 var installed = LuaInstaller.EnumerateInstalled(_steam).ToDictionary(f => f.AppId, f => f.Path);
                 var appIds = new HashSet<long>(installed.Keys);
                 foreach (var (appId, _, _) in _vault.EnumerateLooseBuildLuas()) appIds.Add(appId);
+                appIds.IntersectWith(installedDiskAppIds);
 
                 return appIds
                     .Select(appId =>

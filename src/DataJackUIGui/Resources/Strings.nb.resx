@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Egen unlocker</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>EKSPERIMENTELL</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>CLOUDREDIRECT-STØTTE</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Bringer tilbake innebygd Steam Cloud-støtte via tredjeparts lagringsleverandører som Google Drive / OneDrive / Cloudflare R2 med flere. Foreløpig bare kompatibel med OpenSteamTools / BetterSteamTools. Ikke glem å konfigurere den ved å klikke "Administrer" etter aktivering, og start deretter Steam på nytt!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Velg OpenSteamTools / BetterSteamTools for å bruke CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Bringer tilbake innebygd Steam Cloud-støtte via tredjeparts lagringsleverandører som Google Drive / OneDrive / Cloudflare R2 med flere. Foreløpig bare kompatibel med OpenSteamTools / IceBreaker. Ikke glem å konfigurere den ved å klikke "Administrer" etter aktivering, og start deretter Steam på nytt!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Velg OpenSteamTools / IceBreaker for å bruke CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Aktiver</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Deaktiver</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Aktivert.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Logg inn for å låse opp tillegg av spill og fikser.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Logget inn ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Bruk anbefalte innstillinger</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Modus: BetterSteamTools · FastFetch på</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Modus: IceBreaker · FastFetch på</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Installer vår berømte plugin</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Legger til «Add via DataJackUI»-knappen på Steam-butikksider.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Ja takk</value></data>
@@ -315,7 +315,7 @@ Dette sletter .lua-filene fra Steam\config\stplug-in.</value></data>
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Kunne ikke bruke fiksen</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Oppdatert</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} spill med fixer.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>La oss hente Lua™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Skriv inn en App ID, lim inn en Steam-lenke, eller søk etter spillnavn</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Skriv inn App ID eller søk spill...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Bestselgere</value></data>
@@ -371,15 +371,15 @@ Dette sletter .lua-filene fra Steam\config\stplug-in.</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Ingen tilgjengelige kilder funnet for dette spillet</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· via {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>DataJackUI-programtillegg</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI Steam-programtillegget! — Bruker nå LuaLoader i stedet for Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI Steam-programtillegget! — Bruker nå Netrunning i stedet for Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Status</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Oppdatering tilgjengelig</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Installert versjon</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Nyeste versjon</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Laster (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium oppdaget — DataJackUI kjører ved siden av det. Installasjon deaktiverer Milleniums egen kopi av dette programtillegget, slik at bare LuaLoader injiserer.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader installeres i Steam-mappen din. Denne appen fungerer som backend — hvis du lukker den fra systemstatusfeltet, slutter programtillegget å fungere!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Laster (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium oppdaget — DataJackUI kjører ved siden av det. Installasjon deaktiverer Milleniums egen kopi av dette programtillegget, slik at bare Netrunning injiserer.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning installeres i Steam-mappen din. Denne appen fungerer som backend — hvis du lukker den fra systemstatusfeltet, slutter programtillegget å fungere!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Installer</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Oppdater</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Installer på nytt</value></data>

@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Egen unlocker</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>EKSPERIMENTEL</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>CLOUDREDIRECT-UNDERSTØTTELSE</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Bringer indbygget Steam Cloud-understøttelse tilbage via tredjeparts lagringsudbydere som Google Drive / OneDrive / Cloudflare R2 med flere. Kun kompatibel med OpenSteamTools / BetterSteamTools i øjeblikket. Husk at konfigurere det ved at klikke på "Administrer" efter aktivering, og genstart derefter Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Vælg OpenSteamTools / BetterSteamTools for at bruge CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Bringer indbygget Steam Cloud-understøttelse tilbage via tredjeparts lagringsudbydere som Google Drive / OneDrive / Cloudflare R2 med flere. Kun kompatibel med OpenSteamTools / IceBreaker i øjeblikket. Husk at konfigurere det ved at klikke på "Administrer" efter aktivering, og genstart derefter Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Vælg OpenSteamTools / IceBreaker for at bruge CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Aktivér</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Deaktivér</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Aktiveret.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Log ind for at låse op for tilføjelse af spil og rettelser.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Logget ind ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Anvend anbefalede indstillinger</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Tilstand: BetterSteamTools · FastFetch til</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Tilstand: IceBreaker · FastFetch til</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Installer vores berømte plugin</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Tilføjer knappen "Add via DataJackUI" til Steam-butikssider.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Ja tak</value></data>
@@ -315,7 +315,7 @@ Dette sletter .lua-filerne fra Steam\config\stplug-in.</value></data>
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Kunne ikke anvende rettelse</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Opdateret</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} spil med fixes.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Lad os hente Lua™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Indtast et App ID, indsæt et Steam-link, eller søg efter spilnavn</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Indtast App ID eller søg spil...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Mest solgte</value></data>
@@ -371,15 +371,15 @@ Dette sletter .lua-filerne fra Steam\config\stplug-in.</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Ingen tilgængelige kilder fundet til dette spil</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· via {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>DataJackUI-plugin</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI Steam-pluginet! — Bruger nu LuaLoader i stedet for Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI Steam-pluginet! — Bruger nu Netrunning i stedet for Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Status</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Opdatering tilgængelig</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Installeret version</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Nyeste version</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Indlæser (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium registreret — DataJackUI kører ved siden af det. Installation deaktiverer Milleniums egen kopi af dette plugin, så kun LuaLoader indsætter.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader installeres i din Steam-mappe. Denne app fungerer som backend — hvis du lukker den fra proceslinjen, holder pluginet op med at fungere!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Indlæser (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium registreret — DataJackUI kører ved siden af det. Installation deaktiverer Milleniums egen kopi af dette plugin, så kun Netrunning indsætter.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning installeres i din Steam-mappe. Denne app fungerer som backend — hvis du lukker den fra proceslinjen, holder pluginet op med at fungere!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Installer</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Opdater</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Geninstaller</value></data>

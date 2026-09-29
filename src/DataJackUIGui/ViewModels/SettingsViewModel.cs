@@ -22,6 +22,8 @@ public partial class SettingsViewModel : ObservableObject
     private readonly HubcapService _hubcap;
 
     [ObservableProperty] private string? _displayName;
+    [ObservableProperty] private string? _username;
+    [ObservableProperty] private string? _userId;
     [ObservableProperty] private string? _email;
     [ObservableProperty] private string? _avatarUrl;
 
@@ -288,6 +290,8 @@ public partial class SettingsViewModel : ObservableObject
     {
         IsGuest = _auth.IsGuest;
         DisplayName = _auth.DisplayName;
+        Username = _auth.Username ?? _auth.DisplayName;
+        UserId = _auth.UserId ?? _auth.DiscordId;
         Email = _auth.Email;
         AvatarUrl = _auth.AvatarUrl;
         IsBotProvisioned = _auth.IsBotProvisioned;

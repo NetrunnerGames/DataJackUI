@@ -173,8 +173,8 @@
   <data name="Mode_UserManaged" xml:space="preserve"><value>You're on your own</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>EXPERIMENTAL</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>CLOUDREDIRECT SUPPORT</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Brings back native Steam Cloud support via third-party storage providers such as Google Drive / OneDrive / Cloudflare R2 + more. Only compatible with OpenSteamTools / BetterSteamTools at the moment. Don't forget to configure it by clicking "Manage" after enabling, then restart Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Select OpenSteamTools / BetterSteamTools to use CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Brings back native Steam Cloud support via third-party storage providers such as Google Drive / OneDrive / Cloudflare R2 + more. Only compatible with OpenSteamTools / IceBreaker at the moment. Don't forget to configure it by clicking "Manage" after enabling, then restart Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Select OpenSteamTools / IceBreaker to use CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Enable</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Disable</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Enabled.</value></data>
@@ -189,7 +189,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Sign in to unlock adding games and fixes.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Signed in ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Apply recommended settings</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mode: BetterSteamTools · FastFetch on</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mode: IceBreaker · FastFetch on</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Install our famous plugin</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Adds the "Add via DataJackUI" button to Steam store pages.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Yes please</value></data>
@@ -367,7 +367,7 @@ This deletes the .lua files from Steam\config\stplug-in.</value></data>
   <data name="Fixes_MyGames_NotInstalled" xml:space="preserve"><value>No luas added yet — add a game (or install one) to see it here.</value></data>
 
   <!-- ── Add / Download page ── -->
-  <data name="Add_Title" xml:space="preserve"><value>Let's get Luing™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let's Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Enter an App ID, paste a Steam link, or search by game name</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Enter App ID or search games...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Top Sellers</value></data>
@@ -418,15 +418,15 @@ This deletes the .lua files from Steam\config\stplug-in.</value></data>
   <data name="Confirm_Skip" xml:space="preserve"><value>Skip</value></data>
   <data name="Confirm_Replace" xml:space="preserve"><value>Replace</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>DataJackUI Plugin</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>The DataJackUI Steam Plugin! Now using LuaLoader instead of Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>The DataJackUI Steam Plugin! Now using Netrunning instead of Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Status</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Update available</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Installed version</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Latest version</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Loader (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium detected. DataJackUI runs alongside it. Installing disables Millennium's own copy of this plugin so only LuaLoader injects.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader installs into your Steam folder. This app works as the backend, so if you close it from the tray, the plugin will no longer function!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Loader (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium detected. DataJackUI runs alongside it. Installing disables Millennium's own copy of this plugin so only Netrunning injects.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning installs into your Steam folder. This app works as the backend, so if you close it from the tray, the plugin will no longer function!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Install</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Update</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Reinstall</value></data>

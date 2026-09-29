@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Unlocker sendiri</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>EKSPERIMENTAL</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>DUKUNGAN CLOUDREDIRECT</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Menghadirkan kembali dukungan Steam Cloud bawaan melalui penyedia penyimpanan pihak ketiga seperti Google Drive / OneDrive / Cloudflare R2 dan lainnya. Saat ini hanya kompatibel dengan OpenSteamTools / BetterSteamTools. Jangan lupa mengonfigurasinya dengan mengeklik "Kelola" setelah mengaktifkan, lalu mulai ulang Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Pilih OpenSteamTools / BetterSteamTools untuk menggunakan CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Menghadirkan kembali dukungan Steam Cloud bawaan melalui penyedia penyimpanan pihak ketiga seperti Google Drive / OneDrive / Cloudflare R2 dan lainnya. Saat ini hanya kompatibel dengan OpenSteamTools / IceBreaker. Jangan lupa mengonfigurasinya dengan mengeklik "Kelola" setelah mengaktifkan, lalu mulai ulang Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Pilih OpenSteamTools / IceBreaker untuk menggunakan CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Aktifkan</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Nonaktifkan</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Aktif.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Masuk untuk membuka fitur menambahkan game dan perbaikan.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Sudah masuk ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Terapkan pengaturan yang disarankan</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mode: BetterSteamTools · FastFetch aktif</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mode: IceBreaker · FastFetch aktif</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Pasang plugin terkenal kami</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Menambahkan tombol "Add via DataJackUI" ke halaman toko Steam.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Ya, silakan</value></data>
@@ -315,7 +315,7 @@ Ini menghapus berkas .lua dari Steam\config\stplug-in.</value></data>
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Tidak dapat menerapkan perbaikan</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Diperbarui</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} game dengan fix.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Ayo kumpulkan Lua™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Masukkan App ID, tempel tautan Steam, atau cari berdasarkan nama gim</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Masukkan App ID atau cari gim...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Terlaris</value></data>
@@ -371,15 +371,15 @@ Ini menghapus berkas .lua dari Steam\config\stplug-in.</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Tidak ada sumber tersedia yang ditemukan untuk game ini</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· melalui {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>Plugin DataJackUI</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>Plugin DataJackUI untuk Steam! — Kini memakai LuaLoader alih-alih Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>Plugin DataJackUI untuk Steam! — Kini memakai Netrunning alih-alih Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Status</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Pembaruan tersedia</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Versi terpasang</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Versi terbaru</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Pemuat (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium terdeteksi — DataJackUI berjalan berdampingan dengannya. Pemasangan menonaktifkan salinan plugin ini milik Millennium sehingga hanya LuaLoader yang menyuntikkan.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader dipasang ke folder Steam Anda. Aplikasi ini berfungsi sebagai backend — jika Anda menutupnya dari tray, plugin tidak akan berfungsi lagi!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Pemuat (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium terdeteksi — DataJackUI berjalan berdampingan dengannya. Pemasangan menonaktifkan salinan plugin ini milik Millennium sehingga hanya Netrunning yang menyuntikkan.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning dipasang ke folder Steam Anda. Aplikasi ini berfungsi sebagai backend — jika Anda menutupnya dari tray, plugin tidak akan berfungsi lagi!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Pasang</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Perbarui</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Pasang ulang</value></data>

@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Trình mở khóa tùy chỉnh</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>THỬ NGHIỆM</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>HỖ TRỢ CLOUDREDIRECT</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Mang lại hỗ trợ Steam Cloud gốc thông qua các nhà cung cấp lưu trữ bên thứ ba như Google Drive / OneDrive / Cloudflare R2 và nhiều hơn nữa. Hiện chỉ tương thích với OpenSteamTools / BetterSteamTools. Đừng quên cấu hình bằng cách nhấp "Quản lý" sau khi bật, rồi khởi động lại Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Chọn OpenSteamTools / BetterSteamTools để dùng CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Mang lại hỗ trợ Steam Cloud gốc thông qua các nhà cung cấp lưu trữ bên thứ ba như Google Drive / OneDrive / Cloudflare R2 và nhiều hơn nữa. Hiện chỉ tương thích với OpenSteamTools / IceBreaker. Đừng quên cấu hình bằng cách nhấp "Quản lý" sau khi bật, rồi khởi động lại Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Chọn OpenSteamTools / IceBreaker để dùng CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Bật</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Tắt</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Đã bật.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Đăng nhập để mở khóa thêm trò chơi và bản sửa lỗi.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Đã đăng nhập ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Áp dụng cài đặt được đề xuất</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Chế độ: BetterSteamTools · Bật FastFetch</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Chế độ: IceBreaker · Bật FastFetch</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Cài đặt plugin nổi tiếng của chúng tôi</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Thêm nút "Add via DataJackUI" vào các trang cửa hàng Steam.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Vâng</value></data>
@@ -315,7 +315,7 @@ Thao tác này xóa các tệp .lua khỏi Steam\config\stplug-in.</value></data
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Không thể áp dụng bản sửa lỗi</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Đã làm mới</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} trò chơi có fix.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Đi săn Lua nào™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Nhập App ID, dán liên kết Steam hoặc tìm theo tên trò chơi</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Nhập App ID hoặc tìm trò chơi...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Bán chạy nhất</value></data>
@@ -371,15 +371,15 @@ Thao tác này xóa các tệp .lua khỏi Steam\config\stplug-in.</value></data
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Không tìm thấy nguồn khả dụng cho trò chơi này</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· qua {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>Plugin DataJackUI</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>Plugin DataJackUI cho Steam! — Giờ đây dùng LuaLoader thay cho Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>Plugin DataJackUI cho Steam! — Giờ đây dùng Netrunning thay cho Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Trạng thái</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Có bản cập nhật</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Phiên bản đã cài</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Phiên bản mới nhất</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Trình tải (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Đã phát hiện Millennium — DataJackUI chạy song song với nó. Việc cài đặt sẽ tắt bản sao plugin này của Millennium để chỉ LuaLoader chèn.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader được cài vào thư mục Steam của bạn. Ứng dụng này hoạt động như backend — nếu bạn đóng nó từ khay hệ thống, plugin sẽ ngừng hoạt động!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Trình tải (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Đã phát hiện Millennium — DataJackUI chạy song song với nó. Việc cài đặt sẽ tắt bản sao plugin này của Millennium để chỉ Netrunning chèn.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning được cài vào thư mục Steam của bạn. Ứng dụng này hoạt động như backend — nếu bạn đóng nó từ khay hệ thống, plugin sẽ ngừng hoạt động!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Cài đặt</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Cập nhật</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Cài đặt lại</value></data>

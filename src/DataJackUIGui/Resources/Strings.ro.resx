@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Deblocator personalizat</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>EXPERIMENTAL</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>SUPORT CLOUDREDIRECT</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Readuce suportul nativ Steam Cloud prin furnizori de stocare terți precum Google Drive / OneDrive / Cloudflare R2 și altele. Momentan compatibil doar cu OpenSteamTools / BetterSteamTools. Nu uita să îl configurezi apăsând pe "Gestionează" după activare, apoi repornește Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Selectează OpenSteamTools / BetterSteamTools pentru a folosi CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Readuce suportul nativ Steam Cloud prin furnizori de stocare terți precum Google Drive / OneDrive / Cloudflare R2 și altele. Momentan compatibil doar cu OpenSteamTools / IceBreaker. Nu uita să îl configurezi apăsând pe "Gestionează" după activare, apoi repornește Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Selectează OpenSteamTools / IceBreaker pentru a folosi CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Activează</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Dezactivează</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Activat.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Conectează-te pentru a debloca adăugarea de jocuri și remedieri.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Conectat ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Aplică setările recomandate</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mod: BetterSteamTools · FastFetch activat</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mod: IceBreaker · FastFetch activat</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Instalează faimosul nostru plugin</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Adaugă butonul „Add via DataJackUI” pe paginile din magazinul Steam.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Da, te rog</value></data>
@@ -315,7 +315,7 @@ Aceasta șterge fișierele .lua din Steam\config\stplug-in.</value></data>
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Remedierea nu a putut fi aplicată</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Actualizat</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} jocuri cu fixuri.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Hai să luăm niște Lua™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Introdu un App ID, lipește un link Steam sau caută după numele jocului</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Introdu un App ID sau caută jocuri...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Cele mai vândute</value></data>
@@ -371,15 +371,15 @@ Aceasta șterge fișierele .lua din Steam\config\stplug-in.</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Nu s-au găsit surse disponibile pentru acest joc</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· prin {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>Plugin DataJackUI</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>Pluginul DataJackUI pentru Steam! — Acum folosește LuaLoader în loc de Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>Pluginul DataJackUI pentru Steam! — Acum folosește Netrunning în loc de Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Stare</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Actualizare disponibilă</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Versiune instalată</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Cea mai recentă versiune</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Încărcător (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium detectat — DataJackUI rulează alături de el. Instalarea dezactivează copia proprie a acestui plugin din Millennium, astfel încât doar LuaLoader să injecteze.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader se instalează în folderul tău Steam. Această aplicație funcționează ca backend — dacă o închizi din bara de sistem, pluginul nu va mai funcționa!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Încărcător (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium detectat — DataJackUI rulează alături de el. Instalarea dezactivează copia proprie a acestui plugin din Millennium, astfel încât doar Netrunning să injecteze.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning se instalează în folderul tău Steam. Această aplicație funcționează ca backend — dacă o închizi din bara de sistem, pluginul nu va mai funcționa!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Instalează</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Actualizează</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Reinstalează</value></data>

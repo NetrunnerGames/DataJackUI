@@ -148,6 +148,7 @@ public class UserMetadata
 {
     [JsonPropertyName("full_name")] public string? FullName { get; set; }
     [JsonPropertyName("name")] public string? Name { get; set; }
+    [JsonPropertyName("user_name")] public string? UserName { get; set; }
     [JsonPropertyName("avatar_url")] public string? AvatarUrl { get; set; }
     [JsonPropertyName("custom_claims")] public CustomClaims? CustomClaims { get; set; }
 }
@@ -155,6 +156,7 @@ public class UserMetadata
 public class CustomClaims
 {
     [JsonPropertyName("global_name")] public string? GlobalName { get; set; }
+    [JsonPropertyName("preferred_username")] public string? PreferredUsername { get; set; }
 }
 
 /// <summary>Persisted (DPAPI-encrypted) auth state.</summary>
@@ -164,6 +166,8 @@ public class StoredAuth
     public string AccessToken { get; set; } = "";
     public DateTimeOffset ExpiresAt { get; set; }
     public string? DisplayName { get; set; }
+    public string? Username { get; set; }
+    public string? UserId { get; set; }
     public string? Email { get; set; }
     public string? AvatarUrl { get; set; }
     public string? DiscordId { get; set; }

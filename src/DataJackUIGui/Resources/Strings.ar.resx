@@ -166,8 +166,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>أداة فتح مخصصة</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>تجريبي</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>دعم CloudRedirect</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>يعيد دعم Steam Cloud الأصلي عبر مزوّدي تخزين خارجيين مثل Google Drive / OneDrive / Cloudflare R2 وغيرها. متوافق حاليًا مع OpenSteamTools / BetterSteamTools فقط. لا تنسَ إعداده بالضغط على "إدارة" بعد التفعيل، ثم أعد تشغيل Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>اختر OpenSteamTools / BetterSteamTools لاستخدام CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>يعيد دعم Steam Cloud الأصلي عبر مزوّدي تخزين خارجيين مثل Google Drive / OneDrive / Cloudflare R2 وغيرها. متوافق حاليًا مع OpenSteamTools / IceBreaker فقط. لا تنسَ إعداده بالضغط على "إدارة" بعد التفعيل، ثم أعد تشغيل Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>اختر OpenSteamTools / IceBreaker لاستخدام CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>تفعيل</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>تعطيل</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>مُفعَّل.</value></data>
@@ -181,7 +181,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>سجّل الدخول لفتح إضافة الألعاب والإصلاحات.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>تم تسجيل الدخول ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>تطبيق الإعدادات الموصى بها</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>الوضع: BetterSteamTools · تشغيل FastFetch</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>الوضع: IceBreaker · تشغيل FastFetch</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>تثبيت إضافتنا الشهيرة</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>يضيف زر "Add via DataJackUI" إلى صفحات متجر Steam.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>نعم من فضلك</value></data>
@@ -338,7 +338,7 @@
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} لعبة تحتوي على إصلاحات.</value></data>
 
   <!-- ── Add / Download page ── -->
-  <data name="Add_Title" xml:space="preserve"><value>هيا نبدأ اللْوَنة™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>أدخِل App ID، أو الصِق رابط Steam، أو ابحث باسم اللعبة</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>أدخِل App ID أو ابحث عن الألعاب...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>الأكثر مبيعًا</value></data>
@@ -397,15 +397,15 @@
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>لم يتم العثور على مصادر متاحة لهذه اللعبة</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· عبر {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>إضافة DataJackUI</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>إضافة DataJackUI لمتجر Steam! — تستخدم الآن LuaLoader بدلًا من Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>إضافة DataJackUI لمتجر Steam! — تستخدم الآن Netrunning بدلًا من Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>الحالة</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>تحديث متاح</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>الإصدار المثبَّت</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>أحدث إصدار</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>الواجهة</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>المُحمِّل (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>تم اكتشاف Millennium — يعمل DataJackUI جنبًا إلى جنب معه. سيؤدي التثبيت إلى تعطيل نسخة Millennium من هذه الإضافة حتى يقوم LuaLoader وحده بالحقن.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>يُثبَّت LuaLoader في مجلد Steam. يعمل هذا التطبيق كخلفية — إذا أغلقته من شريط النظام، فلن تعمل الإضافة بعد الآن!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>المُحمِّل (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>تم اكتشاف Millennium — يعمل DataJackUI جنبًا إلى جنب معه. سيؤدي التثبيت إلى تعطيل نسخة Millennium من هذه الإضافة حتى يقوم Netrunning وحده بالحقن.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>يُثبَّت Netrunning في مجلد Steam. يعمل هذا التطبيق كخلفية — إذا أغلقته من شريط النظام، فلن تعمل الإضافة بعد الآن!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>تثبيت</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>تحديث</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>إعادة التثبيت</value></data>

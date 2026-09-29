@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Свій анлокер</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>ЕКСПЕРИМЕНТАЛЬНА</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>ПІДТРИМКА CLOUDREDIRECT</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Повертає вбудовану підтримку Steam Cloud через сторонні сховища, як-от Google Drive / OneDrive / Cloudflare R2 та інші. Наразі сумісно лише з OpenSteamTools / BetterSteamTools. Не забудьте налаштувати його, натиснувши "Керування" після ввімкнення, а потім перезапустіть Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Виберіть OpenSteamTools / BetterSteamTools, щоб використовувати CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Повертає вбудовану підтримку Steam Cloud через сторонні сховища, як-от Google Drive / OneDrive / Cloudflare R2 та інші. Наразі сумісно лише з OpenSteamTools / IceBreaker. Не забудьте налаштувати його, натиснувши "Керування" після ввімкнення, а потім перезапустіть Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Виберіть OpenSteamTools / IceBreaker, щоб використовувати CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Увімкнути</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Вимкнути</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Увімкнено.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Увійдіть, щоб розблокувати додавання ігор і фіксів.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Вхід виконано ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Застосувати рекомендовані налаштування</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Режим: BetterSteamTools · FastFetch увімкнено</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Режим: IceBreaker · FastFetch увімкнено</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Установити наш знаменитий плагін</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Додає кнопку «Add via DataJackUI» на сторінки крамниці Steam.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Так, будь ласка</value></data>
@@ -315,7 +315,7 @@
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Не вдалося застосувати фікс</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Оновлено</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} ігор з фіксами.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Ходімо по Lua™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Введіть App ID, вставте посилання Steam або виконайте пошук за назвою гри</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Введіть App ID або знайдіть ігри...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Бестселери</value></data>
@@ -371,15 +371,15 @@
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Для цієї гри не знайдено доступних джерел</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· через {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>Плагін DataJackUI</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>Плагін DataJackUI для Steam! — Тепер використовує LuaLoader замість Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>Плагін DataJackUI для Steam! — Тепер використовує Netrunning замість Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Статус</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Доступне оновлення</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Встановлена версія</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Найновіша версія</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Фронтенд</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Завантажувач (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Виявлено Millennium — DataJackUI працює поряд із ним. Встановлення вимикає власну копію цього плагіна в Millennium, щоб впроваджував лише LuaLoader.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader встановлюється в папку Steam. Цей застосунок працює як бекенд — якщо закрити його з трея, плагін перестане працювати!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Завантажувач (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Виявлено Millennium — DataJackUI працює поряд із ним. Встановлення вимикає власну копію цього плагіна в Millennium, щоб впроваджував лише Netrunning.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning встановлюється в папку Steam. Цей застосунок працює як бекенд — якщо закрити його з трея, плагін перестане працювати!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Встановити</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Оновити</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Перевстановити</value></data>

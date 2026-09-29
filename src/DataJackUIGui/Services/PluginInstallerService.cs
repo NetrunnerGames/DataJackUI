@@ -59,16 +59,11 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
 
     private static readonly LoaderSlot[] Slots =
     {
-        new("winmm.dll", "winmm_real.dll", "winmm.dll"),
+        new("version.dll", "version_real.dll", "version.dll"),
     };
 
-    // Old slots to clean up on install/update: if left in the Steam root they'd load and run the loader
-    // payload an extra time (double DataJackUI launch), and bcrypt/dbghelp specifically would still install
-    // their own now-obsolete CreateProcessInternalW hook from the old shipped binary. Covers the shipped
-    // bcrypt dual-slot build and the psapi/dbghelp test builds some users received during this
-    // investigation. *_real are their forwarding companions.
     private static readonly string[] LegacyDllNames =
-        { "bcrypt.dll", "bcrypt_real.dll", "psapi.dll", "dbghelp.dll", "dbghelp_real.dll" };
+        { "winmm.dll", "winmm_real.dll", "bcrypt.dll", "bcrypt_real.dll", "psapi.dll", "dbghelp.dll", "dbghelp_real.dll" };
 
     // ── CDP marker junction ──────────────────────────────────────────────────
     // `.cef-enable-remote-debugging` next to Steam's exe, created as an NTFS JUNCTION (not a plain file)

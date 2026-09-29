@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Egen unlocker</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>EXPERIMENTELL</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>CLOUDREDIRECT-STÖD</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Återinför inbyggt Steam Cloud-stöd via tredjeparts lagringsleverantörer som Google Drive / OneDrive / Cloudflare R2 med flera. För närvarande endast kompatibelt med OpenSteamTools / BetterSteamTools. Glöm inte att konfigurera det genom att klicka på "Hantera" efter aktivering och starta sedan om Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Välj OpenSteamTools / BetterSteamTools för att använda CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Återinför inbyggt Steam Cloud-stöd via tredjeparts lagringsleverantörer som Google Drive / OneDrive / Cloudflare R2 med flera. För närvarande endast kompatibelt med OpenSteamTools / IceBreaker. Glöm inte att konfigurera det genom att klicka på "Hantera" efter aktivering och starta sedan om Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Välj OpenSteamTools / IceBreaker för att använda CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Aktivera</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Inaktivera</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Aktiverat.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Logga in för att låsa upp att lägga till spel och fixar.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Inloggad ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Tillämpa rekommenderade inställningar</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Läge: BetterSteamTools · FastFetch på</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Läge: IceBreaker · FastFetch på</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Installera vårt berömda plugin</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Lägger till knappen "Add via DataJackUI" på Steams butikssidor.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Ja tack</value></data>
@@ -315,7 +315,7 @@ Detta raderar .lua-filerna från Steam\config\stplug-in.</value></data>
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Det gick inte att tillämpa fixen</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Uppdaterad</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} spel med fixar.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Dags att hämta Lua™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Ange ett App ID, klistra in en Steam-länk eller sök efter spelnamn</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Ange App ID eller sök spel...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Storsäljare</value></data>
@@ -371,15 +371,15 @@ Detta raderar .lua-filerna från Steam\config\stplug-in.</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Inga tillgängliga källor hittades för detta spel</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· via {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>DataJackUI-tillägg</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI Steam-tillägget! — Använder nu LuaLoader istället för Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI Steam-tillägget! — Använder nu Netrunning istället för Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Status</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Uppdatering tillgänglig</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Installerad version</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Senaste version</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Laddare (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium upptäcktes — DataJackUI körs vid sidan av det. Installationen inaktiverar Milleniums egen kopia av det här tillägget så att bara LuaLoader injicerar.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader installeras i din Steam-mapp. Den här appen fungerar som backend — om du stänger den från aktivitetsfältet slutar tillägget att fungera!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Laddare (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium upptäcktes — DataJackUI körs vid sidan av det. Installationen inaktiverar Milleniums egen kopia av det här tillägget så att bara Netrunning injicerar.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning installeras i din Steam-mapp. Den här appen fungerar som backend — om du stänger den från aktivitetsfältet slutar tillägget att fungera!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Installera</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Uppdatera</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Installera om</value></data>

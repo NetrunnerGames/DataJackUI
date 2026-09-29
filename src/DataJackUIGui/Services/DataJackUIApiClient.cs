@@ -160,6 +160,48 @@ public class DataJackUIApiClient
     {
         try
         {
+            var res = await _http.GetAsync("https://store.steampowered.com/explore/new/", ct);
+            if (res.IsSuccessStatusCode)
+            {
+                var html = await res.Content.ReadAsStringAsync(ct);
+                var matches = System.Text.RegularExpressions.Regex.Matches(
+                    html, @"(?i)(?:href=""https://store\.steampowered\.com/app/|data-ds-appid="")(\d+)");
+
+                var appIds = new List<long>();
+                foreach (System.Text.RegularExpressions.Match m in matches)
+                {
+                    if (long.TryParse(m.Groups[1].Value, out long aid) && aid > 0 && !appIds.Contains(aid))
+                    {
+                        appIds.Add(aid);
+                        if (appIds.Count >= 20) break;
+                    }
+                }
+
+                if (appIds.Count > 0)
+                {
+                    var items = new List<SteamFeaturedItem>();
+                    foreach (var aid in appIds)
+                    {
+                        string name = _appList.GetName(aid)
+                            ?? (await _appInfo.ResolveAsync(aid, ct))?.Name
+                            ?? aid.ToString();
+
+                        items.Add(new SteamFeaturedItem
+                        {
+                            Id = aid,
+                            Name = name,
+                            Type = 0,
+                            LargeCapsuleImage = $"https://cdn.cloudflare.steamstatic.com/steam/apps/{aid}/header.jpg"
+                        });
+                    }
+                    return items;
+                }
+            }
+        }
+        catch { }
+
+        try
+        {
             var res = await _http.GetAsync($"{AppConfig.SteamFeaturedUrl}?cc=us&l=english", ct);
             if (res.IsSuccessStatusCode)
             {
@@ -350,20 +392,94 @@ public class DataJackUIApiClient
 
     // ── Denuvo fixes ────────────────────────────────────────────────
 
-    /// <summary>Public. Every game that has at least one Denuvo fix, plus the tag catalogue.</summary>
+    /// <summary>Public. Every game that has at least one Denuvo fix, plus the tag catalogue. Supports Ryuu, DepotBox, and self-hosted endpoints.</summary>
     public async Task<DenuvoListingsResponse?> GetDenuvoListingsAsync(CancellationToken ct = default)
     {
-        var res = await _http.GetAsync("/api/denuvo/listings", ct);
-        if (!res.IsSuccessStatusCode) return null;
-        return await ReadJsonAsync<DenuvoListingsResponse>(res, ct);
+        List<DenuvoGameListing> allGames = [];
+        List<DenuvoTag> allTags = [];
+
+        var endpoints = new[]
+        {
+            "/api/denuvo/listings",
+            "https://generator.ryuu.lol/api/denuvo/listings",
+            "https://depotbox.org/api/denuvo/listings"
+        };
+
+        foreach (var endpoint in endpoints)
+        {
+            try
+            {
+                var res = await _http.GetAsync(endpoint, ct);
+                if (res.IsSuccessStatusCode)
+                {
+                    var data = await ReadJsonAsync<DenuvoListingsResponse>(res, ct);
+                    if (data?.Games is { Count: > 0 })
+                    {
+                        allGames.AddRange(data.Games);
+                    }
+                    if (data?.Tags is { Count: > 0 })
+                    {
+                        allTags.AddRange(data.Tags);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        if (allGames.Count == 0) return null;
+
+        var mergedGames = allGames.DistinctBy(g => g.AppId).ToList();
+        var mergedTags = allTags.DistinctBy(t => t.Id).ToList();
+
+        return new DenuvoListingsResponse { Games = mergedGames, Tags = mergedTags };
     }
 
-    /// <summary>Public. One game's fixes (id/title/desc/tags + which download slots exist).</summary>
+    /// <summary>Public. One game's fixes (id/title/desc/tags + which download slots exist). Supports Ryuu, DepotBox, and self-hosted endpoints.</summary>
     public async Task<DenuvoFixesResponse?> GetDenuvoFixesAsync(string appid, CancellationToken ct = default)
     {
-        var res = await _http.GetAsync($"/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}", ct);
-        if (!res.IsSuccessStatusCode) return null; // 404 = no fixes for this appid
-        return await ReadJsonAsync<DenuvoFixesResponse>(res, ct);
+        string? name = null;
+        string? headerImage = null;
+        List<DenuvoFix> allFixes = [];
+
+        var endpoints = new[]
+        {
+            $"/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
+            $"https://generator.ryuu.lol/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
+            $"https://depotbox.org/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}"
+        };
+
+        foreach (var endpoint in endpoints)
+        {
+            try
+            {
+                var res = await _http.GetAsync(endpoint, ct);
+                if (res.IsSuccessStatusCode)
+                {
+                    var data = await ReadJsonAsync<DenuvoFixesResponse>(res, ct);
+                    if (data is not null)
+                    {
+                        name ??= data.Name;
+                        headerImage ??= data.HeaderImage;
+                        if (data.Fixes is { Count: > 0 })
+                        {
+                            allFixes.AddRange(data.Fixes);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        if (allFixes.Count == 0 && name is null) return null;
+
+        var mergedFixes = allFixes.DistinctBy(f => f.Id).ToList();
+        return new DenuvoFixesResponse
+        {
+            AppId = appid,
+            Name = name ?? appid,
+            HeaderImage = headerImage,
+            Fixes = mergedFixes
+        };
     }
 
     /// <summary>
@@ -395,9 +511,6 @@ public class DataJackUIApiClient
         var req = new HttpRequestMessage(method, url);
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _auth.GetValidAccessTokenAsync());
 
-        // External communication disabled: lua.tools API HTTP calls disabled
-        throw new ApiException("External communication disabled.");
-        /*
         var res = await _http.SendAsync(req, completion, ct);
         if (res.IsSuccessStatusCode) return res;
 
@@ -411,7 +524,6 @@ public class DataJackUIApiClient
 
         if (res.StatusCode == HttpStatusCode.Unauthorized) message = Resources.Strings.Api_Err_SessionExpired;
         throw new ApiException(message, res.StatusCode);
-        */
     }
 
     private static async Task<T?> ReadJsonAsync<T>(HttpResponseMessage res, CancellationToken ct) =>
@@ -430,14 +542,9 @@ public class DataJackUIApiClient
     {
         // New request (not via SendAsync) so no Bearer header and the absolute URL isn't prefixed.
         var req = new HttpRequestMessage(HttpMethod.Get, url);
-        // External communication disabled: Direct download from URL disabled
-        await Task.CompletedTask;
-        throw new ApiException("External communication disabled.");
-        /*
         var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
         if (!res.IsSuccessStatusCode)
             throw new ApiException(string.Format(Resources.Strings.Api_Err_DownloadFailed, (int)res.StatusCode), res.StatusCode);
         return await HttpFileDownloader.SaveResponseAsync(res, fallbackName, progress, ct);
-        */
     }
 }

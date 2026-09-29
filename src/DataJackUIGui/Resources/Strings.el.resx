@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Προσαρμοσμένο unlocker</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>ΠΕΙΡΑΜΑΤΙΚΟ</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>ΥΠΟΣΤΗΡΙΞΗ CLOUDREDIRECT</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Επαναφέρει την εγγενή υποστήριξη Steam Cloud μέσω παρόχων αποθήκευσης τρίτων, όπως Google Drive / OneDrive / Cloudflare R2 και άλλων. Προς το παρόν συμβατό μόνο με το OpenSteamTools / BetterSteamTools. Μην ξεχάσετε να το ρυθμίσετε κάνοντας κλικ στο "Διαχείριση" μετά την ενεργοποίηση και έπειτα επανεκκινήστε το Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Επιλέξτε OpenSteamTools / BetterSteamTools για να χρησιμοποιήσετε το CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Επαναφέρει την εγγενή υποστήριξη Steam Cloud μέσω παρόχων αποθήκευσης τρίτων, όπως Google Drive / OneDrive / Cloudflare R2 και άλλων. Προς το παρόν συμβατό μόνο με το OpenSteamTools / IceBreaker. Μην ξεχάσετε να το ρυθμίσετε κάνοντας κλικ στο "Διαχείριση" μετά την ενεργοποίηση και έπειτα επανεκκινήστε το Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Επιλέξτε OpenSteamTools / IceBreaker για να χρησιμοποιήσετε το CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Ενεργοποίηση</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Απενεργοποίηση</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Ενεργοποιημένο.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Συνδεθείτε για να ξεκλειδώσετε την προσθήκη παιχνιδιών και διορθώσεων.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Συνδεθήκατε ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Εφαρμογή προτεινόμενων ρυθμίσεων</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Λειτουργία: BetterSteamTools · FastFetch ενεργό</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Λειτουργία: IceBreaker · FastFetch ενεργό</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Εγκατάσταση του διάσημου πρόσθετού μας</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Προσθέτει το κουμπί «Add via DataJackUI» στις σελίδες του Steam Store.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Ναι, παρακαλώ</value></data>
@@ -315,7 +315,7 @@
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Δεν ήταν δυνατή η εφαρμογή της διόρθωσης</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Ανανεώθηκε</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} παιχνίδια με fixes.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Πάμε για Lua™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Εισαγάγετε ένα App ID, επικολλήστε έναν σύνδεσμο Steam ή αναζητήστε με το όνομα του παιχνιδιού</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Εισαγάγετε App ID ή αναζητήστε παιχνίδια...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Κορυφαίες πωλήσεις</value></data>
@@ -371,15 +371,15 @@
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Δεν βρέθηκαν διαθέσιμες πηγές για αυτό το παιχνίδι</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· μέσω {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>Πρόσθετο DataJackUI</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>Το πρόσθετο DataJackUI για το Steam! — Χρησιμοποιεί πλέον LuaLoader αντί για Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>Το πρόσθετο DataJackUI για το Steam! — Χρησιμοποιεί πλέον Netrunning αντί για Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Κατάσταση</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Διαθέσιμη ενημέρωση</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Εγκατεστημένη έκδοση</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Τελευταία έκδοση</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Φορτωτής (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Εντοπίστηκε το Millennium — το DataJackUI εκτελείται παράλληλα. Η εγκατάσταση απενεργοποιεί το αντίγραφο αυτού του πρόσθετου του Millennium, ώστε να κάνει ένεση μόνο το LuaLoader.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>Το LuaLoader εγκαθίσταται στον φάκελο του Steam. Αυτή η εφαρμογή λειτουργεί ως backend — αν την κλείσετε από την περιοχή ειδοποιήσεων, το πρόσθετο θα πάψει να λειτουργεί!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Φορτωτής (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Εντοπίστηκε το Millennium — το DataJackUI εκτελείται παράλληλα. Η εγκατάσταση απενεργοποιεί το αντίγραφο αυτού του πρόσθετου του Millennium, ώστε να κάνει ένεση μόνο το Netrunning.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Το Netrunning εγκαθίσταται στον φάκελο του Steam. Αυτή η εφαρμογή λειτουργεί ως backend — αν την κλείσετε από την περιοχή ειδοποιήσεων, το πρόσθετο θα πάψει να λειτουργεί!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Εγκατάσταση</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Ενημέρωση</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Επανεγκατάσταση</value></data>

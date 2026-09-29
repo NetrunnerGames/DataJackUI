@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Özel kilit açıcı</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>DENEYSEL</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>CLOUDREDIRECT DESTEĞİ</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Google Drive / OneDrive / Cloudflare R2 gibi üçüncü taraf depolama sağlayıcıları aracılığıyla yerleşik Steam Cloud desteğini geri getirir. Şu anda yalnızca OpenSteamTools / BetterSteamTools ile uyumludur. Etkinleştirdikten sonra "Yönet"e tıklayarak yapılandırmayı ve ardından Steam'i yeniden başlatmayı unutmayın!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>CloudRedirect'i kullanmak için OpenSteamTools / BetterSteamTools'u seçin.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Google Drive / OneDrive / Cloudflare R2 gibi üçüncü taraf depolama sağlayıcıları aracılığıyla yerleşik Steam Cloud desteğini geri getirir. Şu anda yalnızca OpenSteamTools / IceBreaker ile uyumludur. Etkinleştirdikten sonra "Yönet"e tıklayarak yapılandırmayı ve ardından Steam'i yeniden başlatmayı unutmayın!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>CloudRedirect'i kullanmak için OpenSteamTools / IceBreaker'u seçin.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Etkinleştir</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Devre dışı bırak</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Etkin.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Oyun ve düzeltme eklemeyi açmak için giriş yapın.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Giriş yapıldı ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Önerilen ayarları uygula</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mod: BetterSteamTools · FastFetch açık</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mod: IceBreaker · FastFetch açık</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Ünlü eklentimizi yükle</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Steam mağaza sayfalarına "Add via DataJackUI" düğmesini ekler.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Evet, lütfen</value></data>
@@ -315,7 +315,7 @@ Bu, .lua dosyalarını Steam\config\stplug-in konumundan siler.</value></data>
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Düzeltme uygulanamadı</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Yenilendi</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} oyunda fix var.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Hadi Lua toplayalım™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Bir App ID girin, bir Steam bağlantısı yapıştırın veya oyun adına göre arayın</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>App ID girin veya oyun arayın...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>En Çok Satanlar</value></data>
@@ -371,15 +371,15 @@ Bu, .lua dosyalarını Steam\config\stplug-in konumundan siler.</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Bu oyun için kullanılabilir kaynak bulunamadı</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· {0} aracılığıyla</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>DataJackUI Eklentisi</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI Steam eklentisi! — Artık Shittenium yerine LuaLoader kullanıyor</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI Steam eklentisi! — Artık Shittenium yerine Netrunning kullanıyor</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Durum</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Güncelleme mevcut</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Kurulu sürüm</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>En son sürüm</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Ön yüz</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Yükleyici (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium algılandı — DataJackUI onun yanında çalışır. Kurulum, yalnızca LuaLoader enjekte etsin diye bu eklentinin Millennium'a ait kopyasını devre dışı bırakır.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader, Steam klasörünüze kurulur. Bu uygulama arka uç olarak çalışır — sistem tepsisinden kapatırsanız eklenti artık çalışmaz!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Yükleyici (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium algılandı — DataJackUI onun yanında çalışır. Kurulum, yalnızca Netrunning enjekte etsin diye bu eklentinin Millennium'a ait kopyasını devre dışı bırakır.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning, Steam klasörünüze kurulur. Bu uygulama arka uç olarak çalışır — sistem tepsisinden kapatırsanız eklenti artık çalışmaz!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Kur</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Güncelle</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Yeniden kur</value></data>

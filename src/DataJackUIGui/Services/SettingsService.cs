@@ -98,10 +98,10 @@ public class SettingsService
         set { _settings.AutoUpdateApps = value; Save(); }
     }
 
-    /// <summary>When true (default), donate spare Steam decryption keys to the community pool.</summary>
+    /// <summary>When true, donate spare Steam decryption keys to the community pool (default OFF).</summary>
     public bool DonateKeys
     {
-        get => _settings.DonateKeys ?? true; // default ON
+        get => _settings.DonateKeys ?? false; // default OFF
         set { _settings.DonateKeys = value; Save(); }
     }
 

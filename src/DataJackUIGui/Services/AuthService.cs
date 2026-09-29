@@ -25,6 +25,8 @@ public class AuthService
     private DateTimeOffset _expiresAt;
 
     public string? DisplayName { get; private set; }
+    public string? Username { get; private set; }
+    public string? UserId { get; private set; }
     public string? Email { get; private set; }
     public string? AvatarUrl { get; private set; }
     public string? DiscordId { get; private set; }
@@ -62,6 +64,8 @@ public class AuthService
         _refreshToken = stored.RefreshToken;
         _expiresAt = stored.ExpiresAt;
         DisplayName = stored.DisplayName;
+        Username = stored.Username ?? stored.DisplayName;
+        UserId = stored.UserId ?? stored.DiscordId;
         Email = stored.Email;
         AvatarUrl = stored.AvatarUrl;
         DiscordId = stored.DiscordId;
@@ -481,6 +485,8 @@ public class AuthService
         {
             var meta = session.User.Metadata;
             DisplayName = meta?.CustomClaims?.GlobalName ?? meta?.FullName ?? meta?.Name ?? session.User.Email;
+            Username = meta?.UserName ?? meta?.CustomClaims?.PreferredUsername ?? meta?.Name ?? (session.User.Email?.Contains('@') == true ? session.User.Email.Split('@')[0] : session.User.Email);
+            UserId = session.User.Id ?? DiscordId ?? "";
             Email = session.User.Email;
             AvatarUrl = meta?.AvatarUrl;
         }
@@ -491,6 +497,8 @@ public class AuthService
             AccessToken = _accessToken,
             ExpiresAt = _expiresAt,
             DisplayName = DisplayName,
+            Username = Username,
+            UserId = UserId,
             Email = Email,
             AvatarUrl = AvatarUrl,
             DiscordId = DiscordId,
@@ -502,7 +510,7 @@ public class AuthService
         _accessToken = null;
         _refreshToken = null;
         _expiresAt = default;
-        DisplayName = Email = AvatarUrl = DiscordId = null;
+        DisplayName = Username = UserId = Email = AvatarUrl = DiscordId = null;
         try { File.Delete(AuthFile); } catch { /* best effort */ }
     }
 

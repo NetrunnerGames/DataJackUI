@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Saját feloldó</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>KÍSÉRLETI</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>CLOUDREDIRECT TÁMOGATÁS</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Visszahozza a natív Steam Cloud támogatást külső tárhelyszolgáltatókon keresztül, mint a Google Drive / OneDrive / Cloudflare R2 és mások. Jelenleg csak a OpenSteamTools / BetterSteamTools móddal kompatibilis. Ne feledd bekapcsolás után a "Kezelés" gombra kattintva beállítani, majd indítsd újra a Steamet!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Válaszd a OpenSteamTools / BetterSteamTools módot a CloudRedirect használatához.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Visszahozza a natív Steam Cloud támogatást külső tárhelyszolgáltatókon keresztül, mint a Google Drive / OneDrive / Cloudflare R2 és mások. Jelenleg csak a OpenSteamTools / IceBreaker móddal kompatibilis. Ne feledd bekapcsolás után a "Kezelés" gombra kattintva beállítani, majd indítsd újra a Steamet!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Válaszd a OpenSteamTools / IceBreaker módot a CloudRedirect használatához.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Bekapcsolás</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Kikapcsolás</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Bekapcsolva.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Jelentkezz be a játékok és javítások hozzáadásának feloldásához.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Bejelentkezve ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Ajánlott beállítások alkalmazása</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mód: BetterSteamTools · FastFetch bekapcsolva</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mód: IceBreaker · FastFetch bekapcsolva</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Híres bővítményünk telepítése</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Hozzáadja az „Add via DataJackUI” gombot a Steam áruház oldalaihoz.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Igen, kérem</value></data>
@@ -315,7 +315,7 @@ Ez törli a .lua fájlokat a Steam\config\stplug-in mappából.</value></data>
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>A javítást nem sikerült alkalmazni</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Frissítve</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} játék fixekkel.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Gyűjtsünk Luákat™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Adj meg egy App ID-t, illessz be egy Steam-linket, vagy keress játéknév alapján</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Adj meg egy App ID-t, vagy keress játékokat...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Toplista</value></data>
@@ -371,15 +371,15 @@ Ez törli a .lua fájlokat a Steam\config\stplug-in mappából.</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Nem található elérhető forrás ehhez a játékhoz</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· innen: {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>DataJackUI bővítmény</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>A DataJackUI Steam bővítmény! — Mostantól LuaLoader a Shittenium helyett</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>A DataJackUI Steam bővítmény! — Mostantól Netrunning a Shittenium helyett</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Állapot</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Frissítés érhető el</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Telepített verzió</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Legújabb verzió</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Betöltő (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium észlelve — a DataJackUI mellette fut. A telepítés letiltja e bővítmény Millennium-féle másolatát, hogy csak a LuaLoader injektáljon.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>A LuaLoader a Steam mappájába települ. Ez az alkalmazás háttérként működik — ha a tálcáról bezárod, a bővítmény többé nem működik!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Betöltő (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium észlelve — a DataJackUI mellette fut. A telepítés letiltja e bővítmény Millennium-féle másolatát, hogy csak a Netrunning injektáljon.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>A Netrunning a Steam mappájába települ. Ez az alkalmazás háttérként működik — ha a tálcáról bezárod, a bővítmény többé nem működik!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Telepítés</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Frissítés</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Újratelepítés</value></data>

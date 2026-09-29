@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>自訂解鎖器</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>實驗性</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>支援 CloudRedirect</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>透過 Google Drive / OneDrive / Cloudflare R2 等第三方儲存服務，恢復原生 Steam 雲端存檔支援。目前僅相容於 OpenSteamTools / BetterSteamTools。啟用後別忘了點擊「管理」進行設定，然後重新啟動 Steam！</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>選擇 OpenSteamTools / BetterSteamTools 以使用 CloudRedirect。</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>透過 Google Drive / OneDrive / Cloudflare R2 等第三方儲存服務，恢復原生 Steam 雲端存檔支援。目前僅相容於 OpenSteamTools / IceBreaker。啟用後別忘了點擊「管理」進行設定，然後重新啟動 Steam！</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>選擇 OpenSteamTools / IceBreaker 以使用 CloudRedirect。</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>啟用</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>停用</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>已啟用。</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>登入以解鎖新增遊戲與修正。</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>已登入 ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>套用建議設定</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>模式：BetterSteamTools · 開啟 FastFetch</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>模式：IceBreaker · 開啟 FastFetch</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>安裝我們著名的外掛</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>在 Steam 商店頁面新增「Add via DataJackUI」按鈕。</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>好的</value></data>
@@ -315,7 +315,7 @@
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>無法套用修正</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>已重新整理</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} 個含修復的遊戲。</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>開始新增 Lua 吧™！</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>輸入 App ID、貼上 Steam 連結，或依遊戲名稱搜尋</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>輸入 App ID 或搜尋遊戲...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>暢銷商品</value></data>
@@ -371,15 +371,15 @@
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>未找到此遊戲的可用來源</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· 來源：{0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>DataJackUI 外掛</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI 的 Steam 外掛！ — 現已改用 LuaLoader 取代 Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI 的 Steam 外掛！ — 現已改用 Netrunning 取代 Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>狀態</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>有可用更新</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>已安裝版本</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>最新版本</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>前端</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>載入器 (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>偵測到 Millennium——DataJackUI 與其並行執行。安裝會停用 Millennium 自帶的此外掛副本，以便僅由 LuaLoader 注入。</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader 會安裝到你的 Steam 資料夾。此應用程式作為後端運行——如果你從系統匣關閉它，外掛將無法再運作！</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>載入器 (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>偵測到 Millennium——DataJackUI 與其並行執行。安裝會停用 Millennium 自帶的此外掛副本，以便僅由 Netrunning 注入。</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning 會安裝到你的 Steam 資料夾。此應用程式作為後端運行——如果你從系統匣關閉它，外掛將無法再運作！</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>安裝</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>更新</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>重新安裝</value></data>

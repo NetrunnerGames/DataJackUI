@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Oma unlocker</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>KOKEELLINEN</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>CLOUDREDIRECT-TUKI</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Palauttaa natiivin Steam Cloud -tuen kolmannen osapuolen tallennuspalveluiden, kuten Google Drive / OneDrive / Cloudflare R2 ja muiden, kautta. Toistaiseksi yhteensopiva vain OpenSteamTools / BetterSteamToolsin kanssa. Muista määrittää se napsauttamalla "Hallinta" käyttöönoton jälkeen ja käynnistä sitten Steam uudelleen!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Valitse OpenSteamTools / BetterSteamTools käyttääksesi CloudRedirectiä.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Palauttaa natiivin Steam Cloud -tuen kolmannen osapuolen tallennuspalveluiden, kuten Google Drive / OneDrive / Cloudflare R2 ja muiden, kautta. Toistaiseksi yhteensopiva vain OpenSteamTools / IceBreakerin kanssa. Muista määrittää se napsauttamalla "Hallinta" käyttöönoton jälkeen ja käynnistä sitten Steam uudelleen!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Valitse OpenSteamTools / IceBreaker käyttääksesi CloudRedirectiä.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Ota käyttöön</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Poista käytöstä</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Käytössä.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Kirjaudu sisään avataksesi pelien ja korjausten lisäämisen.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Kirjauduttu sisään ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Ota suositellut asetukset käyttöön</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Tila: BetterSteamTools · FastFetch päällä</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Tila: IceBreaker · FastFetch päällä</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Asenna kuuluisa lisäosamme</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Lisää "Add via DataJackUI" -painikkeen Steamin kauppasivuille.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Kyllä kiitos</value></data>
@@ -315,7 +315,7 @@ Tämä poistaa .lua-tiedostot kansiosta Steam\config\stplug-in.</value></data>
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Korjausta ei voitu käyttää</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Päivitetty</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} peliä, joissa on fix.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Haetaan Luaa™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Syötä App ID, liitä Steam-linkki tai hae pelin nimellä</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Syötä App ID tai hae pelejä...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Myydyimmät</value></data>
@@ -371,15 +371,15 @@ Tämä poistaa .lua-tiedostot kansiosta Steam\config\stplug-in.</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Tälle pelille ei löytynyt saatavilla olevia lähteitä</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· kautta {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>DataJackUI-laajennus</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI-Steam-laajennus! — Käyttää nyt LuaLoaderia Shitteniumin sijaan</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>DataJackUI-Steam-laajennus! — Käyttää nyt Netrunningia Shitteniumin sijaan</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Tila</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Päivitys saatavilla</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Asennettu versio</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Uusin versio</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Käyttöliittymä</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Lataaja (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium havaittu — DataJackUI toimii sen rinnalla. Asennus poistaa käytöstä Millenniumin oman kopion tästä laajennuksesta, jotta vain LuaLoader injektoi.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader asennetaan Steam-kansioosi. Tämä sovellus toimii taustajärjestelmänä — jos suljet sen ilmaisinalueelta, laajennus lakkaa toimimasta!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Lataaja (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium havaittu — DataJackUI toimii sen rinnalla. Asennus poistaa käytöstä Millenniumin oman kopion tästä laajennuksesta, jotta vain Netrunning injektoi.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning asennetaan Steam-kansioosi. Tämä sovellus toimii taustajärjestelmänä — jos suljet sen ilmaisinalueelta, laajennus lakkaa toimimasta!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Asenna</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Päivitä</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Asenna uudelleen</value></data>

@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Własny unlocker</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>EKSPERYMENTALNE</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>OBSŁUGA CLOUDREDIRECT</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Przywraca natywną obsługę Steam Cloud za pośrednictwem zewnętrznych dostawców pamięci, takich jak Google Drive / OneDrive / Cloudflare R2 i inne. Obecnie zgodne tylko z OpenSteamTools / BetterSteamTools. Nie zapomnij skonfigurować go, klikając "Zarządzaj" po włączeniu, a następnie uruchom ponownie Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Wybierz OpenSteamTools / BetterSteamTools, aby użyć CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Przywraca natywną obsługę Steam Cloud za pośrednictwem zewnętrznych dostawców pamięci, takich jak Google Drive / OneDrive / Cloudflare R2 i inne. Obecnie zgodne tylko z OpenSteamTools / IceBreaker. Nie zapomnij skonfigurować go, klikając "Zarządzaj" po włączeniu, a następnie uruchom ponownie Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Wybierz OpenSteamTools / IceBreaker, aby użyć CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Włącz</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Wyłącz</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Włączone.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Zaloguj się, aby odblokować dodawanie gier i poprawek.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Zalogowano ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Zastosuj zalecane ustawienia</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Tryb: BetterSteamTools · FastFetch włączony</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Tryb: IceBreaker · FastFetch włączony</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Zainstaluj naszą słynną wtyczkę</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Dodaje przycisk „Add via DataJackUI” do stron sklepu Steam.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Tak, poproszę</value></data>
@@ -315,7 +315,7 @@ Spowoduje to usunięcie plików .lua z Steam\config\stplug-in.</value></data>
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Nie udało się zastosować poprawki</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Odświeżono</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} gier z fixami.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Bierzemy się za Lua™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Wpisz App ID, wklej link Steam lub wyszukaj według nazwy gry</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Wpisz App ID lub wyszukaj gry...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Najlepiej sprzedające się</value></data>
@@ -371,15 +371,15 @@ Spowoduje to usunięcie plików .lua z Steam\config\stplug-in.</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Nie znaleziono dostępnych źródeł dla tej gry</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· przez {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>Wtyczka DataJackUI</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>Wtyczka DataJackUI do Steam! — Teraz używa LuaLoader zamiast Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>Wtyczka DataJackUI do Steam! — Teraz używa Netrunning zamiast Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Stan</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Dostępna aktualizacja</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Zainstalowana wersja</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Najnowsza wersja</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Loader (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Wykryto Millennium — DataJackUI działa obok niego. Instalacja wyłącza kopię tej wtyczki należącą do Millennium, aby wstrzykiwał tylko LuaLoader.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader instaluje się w folderze Steam. Ta aplikacja działa jako backend — jeśli zamkniesz ją z zasobnika, wtyczka przestanie działać!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Loader (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Wykryto Millennium — DataJackUI działa obok niego. Instalacja wyłącza kopię tej wtyczki należącą do Millennium, aby wstrzykiwał tylko Netrunning.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning instaluje się w folderze Steam. Ta aplikacja działa jako backend — jeśli zamkniesz ją z zasobnika, wtyczka przestanie działać!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Zainstaluj</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Aktualizuj</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Zainstaluj ponownie</value></data>

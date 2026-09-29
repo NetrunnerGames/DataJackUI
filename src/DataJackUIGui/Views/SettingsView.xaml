@@ -74,11 +74,11 @@
                         <TextBlock
                             FontSize="14"
                             FontWeight="SemiBold"
-                            Text="{Binding DisplayName}" />
+                            Text="{Binding Username}" />
                         <TextBlock
                             FontSize="12"
                             Foreground="#6b7280"
-                            Text="{Binding Email}" />
+                            Text="{Binding UserId}" />
                     </StackPanel>
                         <ui:Button
                             Grid.Column="2"
@@ -505,17 +505,6 @@
                         FontSize="11.5"
                         Foreground="#6b7280"
                         Text="Used to fetch official Steam App info and cover art directly from https://api.steampowered.com." />
-
-                    <!-- Helper Tools Path -->
-                    <Border Style="{StaticResource RowDivider}" Margin="0,14" />
-                    <TextBlock
-                        FontSize="13"
-                        FontWeight="Medium"
-                        Text="Helper Tools Folder" />
-                    <ui:TextBox
-                        Margin="0,6,0,0"
-                        PlaceholderText="Path to local helper tools folder (Steamless, SteamAutoCrack, DepotDownloader)"
-                        Text="{Binding ToolsPath, UpdateSourceTrigger=PropertyChanged}" />
                 </StackPanel>
             </Border>
 

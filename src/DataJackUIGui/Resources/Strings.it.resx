@@ -157,8 +157,8 @@
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Unlocker personalizzato</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>SPERIMENTALE</value></data>
   <data name="Mode_CloudRedirectSupport" xml:space="preserve"><value>SUPPORTO CLOUDREDIRECT</value></data>
-  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Riporta il supporto nativo di Steam Cloud tramite provider di archiviazione di terze parti come Google Drive / OneDrive / Cloudflare R2 e altri. Al momento compatibile solo con OpenSteamTools / BetterSteamTools. Non dimenticare di configurarlo facendo clic su "Gestisci" dopo averlo attivato, poi riavvia Steam!</value></data>
-  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Seleziona OpenSteamTools / BetterSteamTools per usare CloudRedirect.</value></data>
+  <data name="Mode_CloudRedirect_AddonDesc" xml:space="preserve"><value>Riporta il supporto nativo di Steam Cloud tramite provider di archiviazione di terze parti come Google Drive / OneDrive / Cloudflare R2 e altri. Al momento compatibile solo con OpenSteamTools / IceBreaker. Non dimenticare di configurarlo facendo clic su "Gestisci" dopo averlo attivato, poi riavvia Steam!</value></data>
+  <data name="Mode_CloudRedirect_Locked" xml:space="preserve"><value>Seleziona OpenSteamTools / IceBreaker per usare CloudRedirect.</value></data>
   <data name="Mode_CloudRedirect_Enable" xml:space="preserve"><value>Attiva</value></data>
   <data name="Mode_CloudRedirect_Disable" xml:space="preserve"><value>Disattiva</value></data>
   <data name="Mode_CloudRedirect_Status_Enabled" xml:space="preserve"><value>Attivato.</value></data>
@@ -172,7 +172,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Accedi per sbloccare l'aggiunta di giochi e fix.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Accesso eseguito ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Applica le impostazioni consigliate</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Modalità: BetterSteamTools · FastFetch attivo</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Modalità: IceBreaker · FastFetch attivo</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Installa il nostro famoso plugin</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Aggiunge il pulsante «Add via DataJackUI» alle pagine dello store di Steam.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Sì, grazie</value></data>
@@ -315,7 +315,7 @@ Questo elimina i file .lua da Steam\config\stplug-in.</value></data>
   <data name="Fixes_Toast_CouldntApply" xml:space="preserve"><value>Impossibile applicare il fix</value></data>
   <data name="Fixes_Toast_Refreshed_Title" xml:space="preserve"><value>Aggiornato</value></data>
   <data name="Fixes_Toast_Refreshed_Body" xml:space="preserve"><value>{0} giochi con fix.</value></data>
-  <data name="Add_Title" xml:space="preserve"><value>Mettiamoci a Luare™!</value></data>
+  <data name="Add_Title" xml:space="preserve"><value>Let\'s Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Inserisci un App ID, incolla un link Steam o cerca il nome del gioco</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Inserisci un App ID o cerca giochi...</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>I più venduti</value></data>
@@ -371,15 +371,15 @@ Questo elimina i file .lua da Steam\config\stplug-in.</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>Nessuna fonte disponibile trovata per questo gioco</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· tramite {0}</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>Plugin DataJackUI</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>Il plugin DataJackUI per Steam! — Ora usa LuaLoader invece di Merdennium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>Il plugin DataJackUI per Steam! — Ora usa Netrunning invece di Merdennium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Stato</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Aggiornamento disponibile</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Versione installata</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Ultima versione</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Loader (winmm.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium rilevato — DataJackUI funziona insieme a esso. L'installazione disattiva la copia di questo plugin di Millennium, in modo che solo LuaLoader effettui l'iniezione.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>LuaLoader si installa nella tua cartella di Steam. Questa app funge da backend: se la chiudi dalla traybar, il plugin smetterà di funzionare!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Loader (version.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium rilevato — DataJackUI funziona insieme a esso. L'installazione disattiva la copia di questo plugin di Millennium, in modo che solo Netrunning effettui l'iniezione.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning si installa nella tua cartella di Steam. Questa app funge da backend: se la chiudi dalla traybar, il plugin smetterà di funzionare!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Installa</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Aggiorna</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Reinstalla</value></data>
