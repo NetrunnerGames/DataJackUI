@@ -136,7 +136,6 @@ public class SteamAppInfoCache
     /// failure. Pulls the FULL appdetails payload and caches the whole blob (for filters). Name/header
     /// are derived from it, so each app is only ever fetched once.</summary>
     public async Task<SteamAppInfo?> ResolveAsync(long appid, CancellationToken ct = default)
-    public async Task<SteamAppInfo?> GetDetailsAsync(long appid, CancellationToken ct = default)
     {
         if (_cache.TryGetValue(appid, out var hit)) return hit;
 
@@ -161,6 +160,27 @@ public class SteamAppInfoCache
             catch { return null; }
         }
         return null;
+    }
+
+    private async Task<SteamAppInfo?> ParseAndCacheDetailsAsync(JsonDocument doc, long appid)
+    {
+        var entry = doc.RootElement.GetProperty(appid.ToString());
+        if (!entry.GetProperty("success").GetBoolean())
+        {
+            _ = SaveFullDetailsAsync(appid, "{}");
+            return null;
+        }
+
+        var data = entry.GetProperty("data");
+        string? name = data.GetProperty("name").GetString();
+        if (string.IsNullOrWhiteSpace(name)) return null;
+
+        string? image = data.TryGetProperty("header_image", out var img) ? img.GetString() : null;
+        var info = new SteamAppInfo(name, image);
+        _cache[appid] = info;
+
+        _ = SaveFullDetailsAsync(appid, data.GetRawText());
+        return info;
     }
 
     // ── Full details (for filters) ───────────────────────────────────

@@ -255,7 +255,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         }
     }
 
-    private async Task<(string? version, string urlOrError, string zipName, string? wantedZipDigest, UpdateManifest? manifest)> ResolveReleaseAsync(ModeDef def, CancellationToken ct)
+    private async Task<(string? version, string urlOrError, string zipName, string? wantedZipDigest, UpdateManifest? manifest)> ResolveReleaseAsync(ModeDefinition def, CancellationToken ct)
     {
         if (def.UpdateManifestUrl is not null)
         {
@@ -276,7 +276,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
     }
 
     private async Task<(Dictionary<string, string>? staged, string? zipDigest, string? err)> StageAndVerifyFilesAsync(
-        ModeDef def, string staging, string zipUrl, string zipName, string? wantedZipDigest, UpdateManifest? manifest, IProgress<double?>? progress, CancellationToken ct)
+        ModeDefinition def, string staging, string zipUrl, string zipName, string? wantedZipDigest, UpdateManifest? manifest, IProgress<double?>? progress, CancellationToken ct)
     {
         string zipPath = Path.Combine(staging, zipName);
         await DownloadToFileAsync(zipUrl, zipPath, progress, ct);
@@ -297,7 +297,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         return (staged, zipDigest, null);
     }
 
-    private List<string> CopyToSteamRoot(string root, ModeDef def, Dictionary<string, string> staged)
+    private List<string> CopyToSteamRoot(string root, ModeDefinition def, Dictionary<string, string> staged)
     {
         var failed = new List<string>();
         foreach (string file in def.PlaceFiles)
@@ -454,7 +454,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         if (pathsEnd >= sectionEnd) pathsEnd = sectionEnd - 1;
 
         string block = string.Join("\n", lines.GetRange(pathsStart, pathsEnd - pathsStart + 1));
-        if (Regex.IsMatch(block, @"[\"']\s*" + Regex.Escape(OstLuaPath).Replace("/", @"[/\\]+") + @"\s*[\"']", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(block, @"[""']\s*" + Regex.Escape(OstLuaPath).Replace("/", @"[/\\]+") + @"\s*[""']", RegexOptions.IgnoreCase))
             return;
 
         int closeLine = pathsEnd;

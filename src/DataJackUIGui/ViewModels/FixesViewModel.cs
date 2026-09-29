@@ -370,7 +370,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         finally { IsLoadingFixes = false; }
     }
 
-    private async Task ProcessGameDataAsync(FixGameCardVm game, DenuvoFixList data)
+    private async Task ProcessGameDataAsync(FixGameCardVm game, DenuvoFixesResponse data)
     {
         _allFixes = data.Fixes.Select(f => new FixItemVm(f)).ToList();
         

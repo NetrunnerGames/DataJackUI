@@ -137,8 +137,7 @@ public class CefInjectorService : IHostedService
         if (string.IsNullOrWhiteSpace(tabsJson)) return;
 
         var tabs = JsonSerializer.Deserialize<List<CefTabInfo>>(tabsJson, JsonOpts) ?? new();
-        var script = _polyfillJs + "
-" + _datajackuiJs;
+        var script = _polyfillJs + "\n" + _datajackuiJs;
         var live = new List<(string, string)>();
         var seen = new HashSet<string>();
 
