@@ -301,66 +301,52 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
 
         using (archive)
         {
-            try { Directory.CreateDirectory(plugDir); } catch { /* reported per-file below */ }
+            try { Directory.CreateDirectory(plugDir); } catch { }
             try { Directory.CreateDirectory(depotDir); } catch { }
 
             foreach (var entry in archive.Entries)
             {
-                if (string.IsNullOrEmpty(entry.Name)) continue; // skip directory entries
+                if (string.IsNullOrEmpty(entry.Name)) continue;
 
-                string name = entry.Name;
-                bool isLua = name.EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
-                bool isManifest = name.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase);
-                if (!isLua && !isManifest) continue; // ignore anything else
+                bool isLua = entry.Name.EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
+                bool isManifest = entry.Name.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase);
+                if (!isLua && !isManifest) continue;
 
-                // The lua is forced to <appid>.lua; manifests keep their (depot_manifest) name.
-                string dest = isLua
-                    ? Path.Combine(plugDir, $"{appId}.lua")
-                    : Path.Combine(depotDir, name);
-
-                // Manifest filenames are content-addressed (the id is a hash of the content), so an
-                // existing one is byte-identical. Skip it. Avoids needless work and, importantly, the
-                // "file in use" failure when Steam is running and already has that manifest open.
-                if (isManifest && File.Exists(dest))
-                {
-                    manifestCount++;
-                    continue;
-                }
-
-                try
-                {
-                    if (isLua)
-                    {
-                        // Extract to a temp file, then write the (possibly manifest-stripped) lua.
-                        string tmp = Path.Combine(Path.GetTempPath(), $"datajackui_{Guid.NewGuid():N}.lua");
-                        try
-                        {
-                            entry.ExtractToFile(tmp, overwrite: true);
-                            // The ENTRY name is what carries the build id ("386940_18234567.lua"); `dest`
-                            // has already been flattened to <appid>.lua above, so it can't be read from there.
-                            string? buildId = BuildIdFromFileName(name);
-
-                            WriteLua(tmp, dest, KeepPinsFor(buildId, forceLocked));
-                            CaptureInstalled(appId, dest, buildId, source);
-                            luaInstalled = true;
-                            RecordLoaded(appId);
-                        }
-                        finally { try { File.Delete(tmp); } catch { /* best effort */ } }
-                    }
-                    else
-                    {
-                        entry.ExtractToFile(dest, overwrite: true);
-                        StampNow(dest);
-                        manifestCount++;
-                    }
-                }
-                catch
-                {
-                    failed.Add(name); // e.g. file locked because Steam is running
-                }
+                ProcessZipEntry(entry, plugDir, depotDir, appId, forceLocked, source, isLua, isManifest, ref luaInstalled, ref manifestCount, failed);
             }
         }
 
         return new InstallResult(luaInstalled, manifestCount, failed, Error: null);
+    }
+
+    private void ProcessZipEntry(ZipArchiveEntry entry, string plugDir, string depotDir, long appId, bool forceLocked, string? source, bool isLua, bool isManifest, ref bool luaInstalled, ref int manifestCount, List<string> failed)
+    {
+        string dest = isLua ? Path.Combine(plugDir, $"{appId}.lua") : Path.Combine(depotDir, entry.Name);
+        if (isManifest && File.Exists(dest)) { manifestCount++; return; }
+
+        try
+        {
+            if (isLua)
+            {
+                string tmp = Path.Combine(Path.GetTempPath(), $"datajackui_{Guid.NewGuid():N}.lua");
+                try
+                {
+                    entry.ExtractToFile(tmp, overwrite: true);
+                    string? buildId = BuildIdFromFileName(entry.Name);
+                    WriteLua(tmp, dest, KeepPinsFor(buildId, forceLocked));
+                    CaptureInstalled(appId, dest, buildId, source);
+                    luaInstalled = true;
+                    RecordLoaded(appId);
+                }
+                finally { try { File.Delete(tmp); } catch { } }
+            }
+            else
+            {
+                entry.ExtractToFile(dest, overwrite: true);
+                StampNow(dest);
+                manifestCount++;
+            }
+        }
+        catch { failed.Add(entry.Name); }
     }
 }
