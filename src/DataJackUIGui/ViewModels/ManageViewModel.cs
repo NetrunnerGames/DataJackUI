@@ -121,19 +121,23 @@ public partial class LuaTileViewModel : ObservableObject
         if (local is not null) return local;
         if (covers.IsKnownMissing(appId)) return null;
 
-        // Fast path: predictable CDN URL. The grey "Header Capsule" placeholder it can serve for newer
-        // apps is fingerprinted + rejected by CoverCache, so this falls through to header_image below.
         local = await covers.EnsureAsync(appId, SteamAppInfoCache.GuessHeaderImageUrl(appId));
         if (local is not null) return local;
 
-        // Slow path: appdetails header_image (throttled) + optional name backfill.
-        var info = appInfo.GetCached(appId) ?? await appInfo.ResolveAsync(appId);
-        if (onName is not null && !string.IsNullOrWhiteSpace(info?.Name)) onName(info!.Name);
-        if (!string.IsNullOrWhiteSpace(info?.HeaderImage))
-            local = await covers.EnsureAsync(appId, info!.HeaderImage!);
+        return await ResolveSlowPathAsync(appId, appInfo, covers, onName);
+    }
 
-        // info != null means appdetails answered (so an empty header = genuinely no cover).
-        // info == null means we couldn't reach it (rate-limited/offline). Don't give up, retry later.
+    private static async Task<string?> ResolveSlowPathAsync(long appId, SteamAppInfoCache appInfo, CoverCache covers, Action<string>? onName)
+    {
+        var info = appInfo.GetCached(appId) ?? await appInfo.ResolveAsync(appId);
+        
+        bool hasName = info is not null && !string.IsNullOrWhiteSpace(info.Name);
+        if (onName is not null && hasName) onName(info!.Name!);
+
+        string? local = null;
+        bool hasHeader = info is not null && !string.IsNullOrWhiteSpace(info.HeaderImage);
+        if (hasHeader) local = await covers.EnsureAsync(appId, info!.HeaderImage!);
+
         if (local is null && info is not null) covers.MarkMissing(appId);
         return local;
     }
@@ -696,24 +700,28 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
 
     private bool MatchesFilters(AppFilterData d)
     {
-        if (SelectedType != AnyOption &&
-            !string.Equals(d.Type, SelectedType, StringComparison.OrdinalIgnoreCase)) return false;
+        if (!MatchType(d)) return false;
+        if (!MatchGenre(d)) return false;
+        if (!MatchYear(d)) return false;
+        if (!MatchPrice(d)) return false;
+        if (!MatchContent(d)) return false;
+        return true;
+    }
 
-        if (SelectedGenre != AnyOption &&
-            !d.Genres.Any(g => string.Equals(g, SelectedGenre, StringComparison.OrdinalIgnoreCase))) return false;
+    private bool MatchType(AppFilterData d) => SelectedType == AnyOption || string.Equals(d.Type, SelectedType, StringComparison.OrdinalIgnoreCase);
+    private bool MatchGenre(AppFilterData d) => SelectedGenre == AnyOption || d.Genres.Any(g => string.Equals(g, SelectedGenre, StringComparison.OrdinalIgnoreCase));
+    private bool MatchYear(AppFilterData d) => SelectedYear == AnyOption || (d.ReleaseYear.HasValue && d.ReleaseYear.Value.ToString() == SelectedYear);
+    
+    private bool MatchPrice(AppFilterData d)
+    {
+        if (SelectedPrice == AnyOption) return true;
+        return SelectedPrice == "Free" ? d.IsFree : !d.IsFree;
+    }
 
-        if (SelectedYear != AnyOption &&
-            (d.ReleaseYear is null || d.ReleaseYear.Value.ToString() != SelectedYear)) return false;
-
-        if (SelectedPrice != AnyOption)
-        {
-            if (SelectedPrice == "Free" && !d.IsFree) return false;
-            if (SelectedPrice == "Paid" && d.IsFree) return false;
-        }
-
-        if (SelectedContent == "Hide adult" && d.IsAdult) return false;
-        if (SelectedContent == "Adult only" && !d.IsAdult) return false;
-
+    private bool MatchContent(AppFilterData d)
+    {
+        if (SelectedContent == "Hide adult") return !d.IsAdult;
+        if (SelectedContent == "Adult only") return d.IsAdult;
         return true;
     }
 
