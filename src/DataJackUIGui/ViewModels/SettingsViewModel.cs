@@ -12,6 +12,8 @@ namespace DataJackUIGui.ViewModels;
 /// "follow the system display language".</summary>
 public record LanguageOption(string Display, string? Tag);
 
+public record DnsModeOption(string Display, string Tag);
+
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly SettingsService _settings;
@@ -71,6 +73,22 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _donateKeys;
 
     partial void OnDonateKeysChanged(bool value) => _settings.DonateKeys = value;
+
+    // ── DNS resolution ────────────────────────────────────────────────
+    public ObservableCollection<DnsModeOption> DnsModeOptions { get; } =
+    [
+        new DnsModeOption("Automatic (fallback on failure)", "Auto"),
+        new DnsModeOption("Always use Cloudflare", "Always"),
+        new DnsModeOption("Use system DNS only", "Never")
+    ];
+
+    [ObservableProperty] private DnsModeOption _selectedDnsMode;
+
+    partial void OnSelectedDnsModeChanged(DnsModeOption value)
+    {
+        if (value != null)
+            _settings.DnsMode = value.Tag;
+    }
 
     // ── Startup behavior ────────────────────────────────────────────
     private const string RunKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
@@ -251,6 +269,8 @@ public partial class SettingsViewModel : ObservableObject
         _suppressLanguagePrompt = true;
         _selectedLanguage = LanguageOptions.FirstOrDefault(o => o.Tag == settings.Language) ?? LanguageOptions[0];
         _suppressLanguagePrompt = false;
+
+        _selectedDnsMode = DnsModeOptions.FirstOrDefault(o => o.Tag == settings.DnsMode) ?? DnsModeOptions[0];
     }
 
     private void RefreshSteam()

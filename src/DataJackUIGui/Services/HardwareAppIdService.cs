@@ -22,12 +22,26 @@ public class HardwareAppIdService
     private readonly HashSet<long> _ids;
     private Task? _loadTask;
 
+    private static readonly HashSet<long> BaselineHardwareIds =
+    [
+        1675200, // Steam Deck
+        1059530, // Valve Index VR
+        353370,  // Steam Controller
+        353380,  // Steam Link
+        250820,  // SteamVR
+        613270,  // Valve Index Controllers
+        613260,  // Valve Index Base Station
+        253980,  // Steam Controller Dongle
+        1059550, // Valve Index Headset
+        2138590  // Steam Controller Wireless Receiver
+    ];
+
     public HardwareAppIdService(GithubProxy gh, CacheService cache)
     {
         _gh = gh;
         _cache = cache;
-        // Seed from whatever was last cached so the filter works on the very first frame.
-        _ids = [.. cache.GetHardwareAppIds()];
+        // Seed from baseline hardware IDs + whatever was last cached so the filter works on the very first frame.
+        _ids = [.. BaselineHardwareIds, .. cache.GetHardwareAppIds()];
     }
 
     /// <summary>True if this appid is Steam hardware that should be hidden. Synchronous + allocation-free.</summary>
@@ -40,18 +54,21 @@ public class HardwareAppIdService
     private async Task RefreshIfStaleAsync()
     {
         long fetchedAt = _cache.GetHardwareAppIdsFetchedAt();
-        bool fresh = fetchedAt > 0 && _ids.Count > 0
+        bool fresh = fetchedAt > 0 && _ids.Count > BaselineHardwareIds.Count
             && DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeMilliseconds(fetchedAt) < MaxAge;
         if (fresh) return; // cached copy is recent enough
 
         try
         {
-            // External communication disabled: Hardware AppID list fetch from GitHub commented out
-            return;
-            /*
             using var res = await _gh.SendAsync(AppConfig.HardwareAppIdListUrl);
             if (res is null || !res.IsSuccessStatusCode) return;
-            */
+            var json = await res.Content.ReadAsStringAsync();
+            var apps = JsonSerializer.Deserialize<List<HardwareApp>>(json, JsonOpts);
+            if (apps is { Count: > 0 })
+            {
+                foreach (var a in apps) _ids.Add(a.AppId);
+                _cache.SaveHardwareAppIds([.. _ids], DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            }
         }
         catch
         {

@@ -15,15 +15,69 @@ public class ApiException(string message, HttpStatusCode? status = null) : Excep
 public record DownloadedFile(string FilePath, string FileName);
 
 /// <summary>Typed client for the lua.tools web API, authenticated with a Supabase bearer token.</summary>
-public class DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, CoverCache covers, SettingsService settings)
+public class DataJackUIApiClient
 {
-    private readonly HttpClient _http = new()
-    {
-        BaseAddress = new Uri(AppConfig.ApiBaseUrl),
-        Timeout = TimeSpan.FromMinutes(5), // large manifest zips on slow connections
-    };
-
+    private readonly HttpClient _http;
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
+
+    private readonly AuthService _auth;
+    private readonly SteamAppInfoCache _appInfo;
+    private readonly CoverCache _covers;
+    private readonly SettingsService _settings;
+
+    public DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, CoverCache covers, SettingsService settings)
+    {
+        _auth = auth;
+        _appInfo = appInfo;
+        _covers = covers;
+        _settings = settings;
+
+        var doh = new DohResolver();
+        var handler = new SocketsHttpHandler
+        {
+            ConnectCallback = async (context, cancellationToken) =>
+            {
+                string mode = _settings.DnsMode; // "Auto" | "Always" | "Never"
+                string host = context.DnsEndPoint.Host;
+                int port = context.DnsEndPoint.Port;
+
+                if (mode == "Always" && !DohResolver.ShouldBypass(host))
+                {
+                    var addrs = await doh.ResolveAsync(host, cancellationToken);
+                    if (addrs.Length > 0)
+                    {
+                        var s = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+                        await s.ConnectAsync(addrs[0], port, cancellationToken);
+                        return new System.Net.Sockets.NetworkStream(s, ownsSocket: true);
+                    }
+                }
+
+                try
+                {
+                    var s = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+                    await s.ConnectAsync(host, port, cancellationToken);
+                    return new System.Net.Sockets.NetworkStream(s, ownsSocket: true);
+                }
+                catch when (mode != "Never" && !DohResolver.ShouldBypass(host))
+                {
+                    var addrs = await doh.ResolveAsync(host, cancellationToken);
+                    if (addrs.Length > 0)
+                    {
+                        var s = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+                        await s.ConnectAsync(addrs[0], port, cancellationToken);
+                        return new System.Net.Sockets.NetworkStream(s, ownsSocket: true);
+                    }
+                    throw;
+                }
+            }
+        };
+
+        _http = new HttpClient(handler)
+        {
+            BaseAddress = new Uri(AppConfig.ApiBaseUrl),
+            Timeout = TimeSpan.FromMinutes(5)
+        };
+    }
 
     // ── Endpoints ───────────────────────────────────────────────────
 
@@ -40,14 +94,25 @@ public class DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, Co
         catch { return []; }
     }
 
-    /// <summary>Steam's featured "top sellers" + "new releases" lists for the Add page strips. Public,
-    /// no auth. Returns empty lists on any failure (the strips just don't show). Each list keeps only real
-    /// games (type 0) that have a capsule image, capped to keep the strips light.</summary>
+    /// <summary>Steam's top sellers and new releases lists for the Add page strips. Public,
+    /// no auth. Queries Steam's storefront search API for games only (category1=998), falling back
+    /// to featuredcategories on failure. Returns empty lists on total failure.</summary>
     public async Task<(List<SteamFeaturedItem> TopSellers, List<SteamFeaturedItem> NewReleases)> GetFeaturedAsync(
         CancellationToken ct = default)
     {
         try
         {
+            var topSellersTask = FetchSearchCategoryAsync("filter=global_topsellers&category1=998", ct);
+            var newReleasesTask = FetchSearchCategoryAsync("filter=popularnew&category1=998", ct);
+            await Task.WhenAll(topSellersTask, newReleasesTask);
+
+            var top = topSellersTask.Result;
+            var fresh = newReleasesTask.Result;
+
+            if (top.Count > 0 || fresh.Count > 0)
+                return (top, fresh);
+
+            // Fallback to featuredcategories API if search API returned empty
             var res = await _http.GetAsync($"{AppConfig.SteamFeaturedUrl}?cc=us&l=english", ct);
             if (!res.IsSuccessStatusCode) return ([], []);
             var data = await ReadJsonAsync<SteamFeaturedResponse>(res, ct);
@@ -64,6 +129,46 @@ public class DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, Co
         catch { return ([], []); }
     }
 
+    private async Task<List<SteamFeaturedItem>> FetchSearchCategoryAsync(string queryParams, CancellationToken ct)
+    {
+        try
+        {
+            var url = $"https://store.steampowered.com/search/results/?query=&start=0&count=20&{queryParams}&infinite=1";
+            var res = await _http.GetAsync(url, ct);
+            if (!res.IsSuccessStatusCode) return [];
+
+            var json = await res.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("results_html", out var htmlProp)) return [];
+
+            var html = htmlProp.GetString();
+            if (string.IsNullOrEmpty(html)) return [];
+
+            var matches = System.Text.RegularExpressions.Regex.Matches(
+                html,
+                @"(?s)<a [^>]*data-ds-appid=""(\d+)""[^>]*>.*?<span class=""title"">(.*?)</span>");
+
+            var items = new List<SteamFeaturedItem>();
+            foreach (System.Text.RegularExpressions.Match m in matches)
+            {
+                if (long.TryParse(m.Groups[1].Value, out long appId))
+                {
+                    string name = WebUtility.HtmlDecode(m.Groups[2].Value).Trim();
+                    items.Add(new SteamFeaturedItem
+                    {
+                        Id = appId,
+                        Name = name,
+                        Type = 0,
+                        LargeCapsuleImage = $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appId}/header.jpg"
+                    });
+                }
+            }
+
+            return items.DistinctBy(i => i.Id).Take(20).ToList();
+        }
+        catch { return []; }
+    }
+
     /// <summary>Public endpoint, no auth required.</summary>
     /// <summary>Game metadata straight from Steam's appdetails (cached to details\&lt;appid&gt;.json via the
     /// throttle, interactive priority), no lua.tools proxy. ANY fetch path funnels through here (normal /
@@ -71,9 +176,9 @@ public class DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, Co
     public async Task<GameDetails?> GetDetailsAsync(string appid, CancellationToken ct = default)
     {
         if (!long.TryParse(appid, out long id)) return null;
-        var details = await appInfo.ResolveGameDetailsAsync(id, ct);
+        var details = await _appInfo.ResolveGameDetailsAsync(id, ct);
         if (details is { HeaderImage: { Length: > 0 } img })
-            _ = covers.EnsureAsync(id, img, CancellationToken.None); // warm the cover cache (best-effort)
+            _ = _covers.EnsureAsync(id, img, CancellationToken.None); // warm the cover cache (best-effort)
         return details;
     }
 
@@ -104,7 +209,7 @@ public class DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, Co
             var req = new HttpRequestMessage(HttpMethod.Head, url);
             if (!string.IsNullOrEmpty(AppConfig.SupabaseAnonKey))
                 req.Headers.TryAddWithoutValidation("apikey", AppConfig.SupabaseAnonKey);
-            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await auth.GetValidAccessTokenAsync());
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _auth.GetValidAccessTokenAsync());
             req.Headers.TryAddWithoutValidation("Prefer", "count=exact");
 
             using var res = await _http.SendAsync(req, ct);
@@ -223,7 +328,7 @@ public class DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, Co
     {
         // All callers of SendAsync are login-gated endpoints; the caller ensures the user is signed in.
         var req = new HttpRequestMessage(method, url);
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await auth.GetValidAccessTokenAsync());
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _auth.GetValidAccessTokenAsync());
 
         // External communication disabled: lua.tools API HTTP calls disabled
         throw new ApiException("External communication disabled.");

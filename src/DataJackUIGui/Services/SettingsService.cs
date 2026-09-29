@@ -58,6 +58,9 @@ public class AppSettings
     // When true, FastFetch auto-picks the first available source and downloads immediately.
     // Nullable so "never set" (→ default OFF) is distinguishable from an explicit choice.
     public bool? FastFetch { get; set; }
+
+    // DNS resolution preference: "Auto" | "Always" | "Never". Null = "Auto".
+    public string? DnsMode { get; set; }
 }
 
 public class SettingsService
@@ -214,6 +217,12 @@ public class SettingsService
         catch { /* best effort */ }
     }
 
+    public string DnsMode
+    {
+        get => _settings.DnsMode ?? "Auto";
+        set { _settings.DnsMode = string.IsNullOrWhiteSpace(value) ? null : value; Save(); }
+    }
+
     private void Save()
     {
         // Nothing worth persisting → don't leave a settings file behind.
@@ -231,7 +240,8 @@ public class SettingsService
             && _settings.HubcapApiKey is null
             && _settings.StartWithWindows is null
             && _settings.MinimizeToTray is null
-            && _settings.FastFetch is null;
+            && _settings.FastFetch is null
+            && _settings.DnsMode is null;
         if (empty)
         {
             foreach (var p in new[] { FilePath, BakPath, TmpPath })

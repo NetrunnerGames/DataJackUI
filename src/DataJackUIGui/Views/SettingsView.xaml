@@ -417,6 +417,30 @@
                 </StackPanel>
             </Border>
 
+            <!-- Network & DNS Resolution -->
+            <TextBlock Style="{StaticResource SectionHeader}" Text="Network &amp; DNS Resolution" />
+            <Border Style="{StaticResource SettingsCard}">
+                <StackPanel Margin="14,12">
+                    <TextBlock
+                        FontSize="13"
+                        FontWeight="Medium"
+                        Text="DNS Resolution Mode" />
+                    <ComboBox
+                        Margin="0,8,0,0"
+                        MinWidth="280"
+                        HorizontalAlignment="Left"
+                        DisplayMemberPath="Display"
+                        ItemsSource="{Binding DnsModeOptions}"
+                        SelectedItem="{Binding SelectedDnsMode}" />
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        FontSize="12"
+                        Foreground="#6b7280"
+                        Text="If your provider blocks lua.tools, the app can look up addresses through Cloudflare (1.1.1.1) instead of your system resolver. Automatic only switches over after your normal DNS fails."
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
             <!-- Steam -->
             <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_Steam}" />
             <Border Style="{StaticResource SettingsCard}">
