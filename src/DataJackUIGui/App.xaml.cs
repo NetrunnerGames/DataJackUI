@@ -225,92 +225,54 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Legacy cleanup: older builds staged downloads in ~/Downloads/DataJackUI (they now stage in
-        // %TEMP% and self-delete). Remove any leftovers from that user-visible folder, best-effort.
-        // Also sweep the current %TEMP% staging folder: a crash mid-download, or an overwrite confirm
-        // the user never answered, leaves a staged zip nobody will ever delete.
-        _ = System.Threading.Tasks.Task.Run(() =>
-        {
-            try
-            {
-                string legacy = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "DataJackUI");
-                if (System.IO.Directory.Exists(legacy)) System.IO.Directory.Delete(legacy, recursive: true);
-            }
-            catch { /* best effort, never block startup on cleanup */ }
-
-            Services.Downloads.HttpFileDownloader.SweepStale();
-        });
-
+        RunStartupCleanup();
         await _host.StartAsync();
 
-        // Rewrite any pre-3-mode SelectedMode BEFORE anything reads it. UnlockerService.SelectedMode
-        // would otherwise parse a legacy value to null and quietly present an unconfigured app. Users
-        // whose mode was retired outright (SteamTools, the CloudRedirect fix) have no mode now, so
-        // onboarding is forced back open: OnboardingComplete is a permanent flag that every existing
-        // user already has set, and clearing SelectedMode alone would leave them with no mode AND no
-        // overlay explaining why.
         if (ModeMigration.Apply(_host.Services.GetRequiredService<SettingsService>()))
             _host.Services.GetRequiredService<CacheService>().OnboardingComplete = false;
 
-        // Point OST/BST at config/stplug-in so lua writes hot-reload. Must run AFTER the migration
-        // above, which is what makes SelectedMode parse. The app no longer tells anyone to restart
-        // Steam for a lua change, so this registration is what makes that promise true — and it
-        // previously only ever ran during a mode install through this app.
         _host.Services.GetRequiredService<UnlockerService>().EnsureLuaPathRegistered();
 
         var main = _host.Services.GetRequiredService<MainViewModel>();
         var settingsVm = _host.Services.GetRequiredService<SettingsViewModel>();
-
-        // Changing the language needs a relaunch (x:Static resources resolve at parse time).
-        settingsVm.RequestRestart = RelaunchApp;
-
         var window = _host.Services.GetRequiredService<MainWindow>();
 
-        // Turning off "Minimize to tray" while hidden in the tray → bring the window back.
+        WireSettingsAndWindow(settingsVm, main, window);
+        WireGlobalEvents(window);
+        WireNavigation(window);
+        WireLibraryRefresh(window);
+
+        string? url = Program.StartupUrl ?? ProtocolService.TryReadPending();
+        bool silentStartup = (url is not null && ProtocolService.Parse(url).Silent) || Program.StartMinimized;
+        _exitAfterSilentInstall = silentStartup && Program.StartupUrl is not null && !settingsVm.MinimizeToTray;
+
+        await ShowOrInitializeSilentAsync(silentStartup, window, main);
+
+        if (url is not null) HandleProtocolUrl(url);
+
+        StartBackgroundTasks();
+    }
+
+    private void RunStartupCleanup()
+    {
+        _ = System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                string legacy = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "DataJackUI");
+                if (System.IO.Directory.Exists(legacy)) System.IO.Directory.Delete(legacy, recursive: true);
+            }
+            catch { }
+            Services.Downloads.HttpFileDownloader.SweepStale();
+        });
+    }
+
+    private void WireSettingsAndWindow(SettingsViewModel settingsVm, MainViewModel main, MainWindow window)
+    {
+        settingsVm.RequestRestart = RelaunchApp;
         settingsVm.RequestShowWindow = () => Dispatcher.Invoke(window.RestoreFromTray);
-
-        // Relaunching the app (single-instance) signals this event → surface the existing window and
-        // check for any protocol URL a second instance wrote. AutoReset + executeOnlyOnce:false so it
-        // keeps firing for every relaunch.
-        if (Program.ShowWindowSignal is not null)
-            System.Threading.ThreadPool.RegisterWaitForSingleObject(
-                Program.ShowWindowSignal,
-                (_, _) => Dispatcher.Invoke(() =>
-                {
-                    // A silent install relaunch stays headless: don't surface the window for it.
-                    string? pending = ProtocolService.TryReadPending();
-                    bool silent = pending is not null && ProtocolService.Parse(pending).Silent;
-                    if (!silent)
-                        window.RestoreFromTray();
-                    if (pending is not null)
-                        HandleProtocolUrl(pending);
-                }),
-                null, System.Threading.Timeout.Infinite, executeOnlyOnce: false);
-
-        // A --tray-locked relaunch (the loader) signals this → enable close-to-tray for the session even if
-        // this instance was started without the flag. Idempotent; keeps firing for every relaunch.
-        if (Program.EnableTrayLockSignal is not null)
-            System.Threading.ThreadPool.RegisterWaitForSingleObject(
-                Program.EnableTrayLockSignal,
-                (_, _) => Program.SessionTrayLock = true,
-                null, System.Threading.Timeout.Infinite, executeOnlyOnce: false);
-
-        // A --tray-locked relaunch (the loader on Steam-open) signals this → re-run the update flow so an
-        // already-running app still updates when the user opens Steam. Guarded internally against overlap.
-        if (Program.RecheckUpdatesSignal is not null)
-            System.Threading.ThreadPool.RegisterWaitForSingleObject(
-                Program.RecheckUpdatesSignal,
-                (_, _) => _ = RunUpdateFlowAsync(),
-                null, System.Threading.Timeout.Infinite, executeOnlyOnce: false);
-
-        // Expose the same flow to non-UI callers (the /check-updates HTTP handler).
-        RunUpdateFlow = RunUpdateFlowAsync;
-
-        // Settings' own "Sign in with Discord" button → browser OAuth (unchanged).
         settingsVm.RequestSignIn = () => main.SignInCommand.ExecuteAsync(null);
 
-        // Guests hitting a protected action on other pages → navigate to Settings with context banner.
         Func<Task> navigateToSignIn = () =>
         {
             Dispatcher.Invoke(() =>
@@ -322,135 +284,100 @@ public partial class App : Application
         };
         _host.Services.GetRequiredService<DownloadViewModel>().RequestSignIn = navigateToSignIn;
         _host.Services.GetRequiredService<FixesViewModel>().RequestSignIn = navigateToSignIn;
+
         var toast = _host.Services.GetRequiredService<ToastService>();
-        toast.Attach(window.RootSnackbar); // wire the presenter before anything can raise a toast
+        toast.Attach(window.RootSnackbar);
 
-        // Language changed → persistent toast offering an immediate relaunch.
         settingsVm.RequestRestartPrompt = () => Dispatcher.Invoke(() =>
-            toast.ShowAction(
-                DataJackUIGui.Resources.Strings.Lang_Changed_Title,
-                DataJackUIGui.Resources.Strings.Lang_Changed_Body,
-                DataJackUIGui.Resources.Strings.Lang_Changed_Restart,
-                () => settingsVm.RequestRestart?.Invoke()));
+            toast.ShowAction(DataJackUIGui.Resources.Strings.Lang_Changed_Title, DataJackUIGui.Resources.Strings.Lang_Changed_Body,
+                DataJackUIGui.Resources.Strings.Lang_Changed_Restart, () => settingsVm.RequestRestart?.Invoke()));
+    }
 
-        // App updates now apply silently via RunUpdateFlowAsync (restart-on-Steam-open, unconditionally
-        // and before any plugin update), so no "Restart" prompt toast.
+    private void WireGlobalEvents(MainWindow window)
+    {
+        if (Program.ShowWindowSignal is not null)
+            System.Threading.ThreadPool.RegisterWaitForSingleObject(Program.ShowWindowSignal, (_, _) => Dispatcher.Invoke(() =>
+            {
+                string? pending = ProtocolService.TryReadPending();
+                if (pending is null || !ProtocolService.Parse(pending).Silent) window.RestoreFromTray();
+                if (pending is not null) HandleProtocolUrl(pending);
+            }), null, System.Threading.Timeout.Infinite, executeOnlyOnce: false);
+
+        if (Program.EnableTrayLockSignal is not null)
+            System.Threading.ThreadPool.RegisterWaitForSingleObject(Program.EnableTrayLockSignal, (_, _) => Program.SessionTrayLock = true, null, System.Threading.Timeout.Infinite, executeOnlyOnce: false);
+
+        if (Program.RecheckUpdatesSignal is not null)
+            System.Threading.ThreadPool.RegisterWaitForSingleObject(Program.RecheckUpdatesSignal, (_, _) => _ = RunUpdateFlowAsync(), null, System.Threading.Timeout.Infinite, executeOnlyOnce: false);
+
+        RunUpdateFlow = RunUpdateFlowAsync;
+        _ = CheckLaunchOptionDriftAsync();
+    }
+
+    private void WireNavigation(MainWindow window)
+    {
         var download = _host.Services.GetRequiredService<DownloadViewModel>();
-
         var manage = _host.Services.GetRequiredService<ManageViewModel>();
-
-        // Manage page "Update" → go to the Add page pre-seeded with that appid.
-        manage.NavigateToAdd = appId =>
-            Dispatcher.Invoke(() => { window.NavigateToAdd(); download.SeedSearch(appId); });
-
-        // Manage flyout "Manage Build" → go to the Builds page with that game selected.
         var builds = _host.Services.GetRequiredService<BuildsViewModel>();
-        manage.NavigateToBuilds = appId =>
-            Dispatcher.Invoke(() => { window.NavigateToBuilds(); _ = builds.SelectAppAsync(appId); });
+        var home = _host.Services.GetRequiredService<HomeViewModel>();
+        var main = _host.Services.GetRequiredService<MainViewModel>();
 
-        // Manage flyout "Launch options…" → modal editor over Steam's appinfo cache.
+        manage.NavigateToAdd = appId => Dispatcher.Invoke(() => { window.NavigateToAdd(); download.SeedSearch(appId); });
+        manage.NavigateToBuilds = appId => Dispatcher.Invoke(() => { window.NavigateToBuilds(); _ = builds.SelectAppAsync(appId); });
         manage.OpenLaunchOptions = (appId, name) => Dispatcher.Invoke(() =>
         {
-            var dialog = new LaunchOptionsDialog(
-                _host.Services.GetRequiredService<LaunchOptionsViewModel>(), appId, name)
-            { Owner = window };
+            var dialog = new LaunchOptionsDialog(_host.Services.GetRequiredService<LaunchOptionsViewModel>(), appId, name) { Owner = window };
             dialog.ShowDialog();
         });
 
-        // Steam regenerates appinfo.vdf from PICS, wiping launch edits. Check once at startup and
-        // OFFER to re-apply, never silently, since applying closes Steam.
-        _ = CheckLaunchOptionDriftAsync();
-
-        // Home "recently added" + Add install banner "Reveal" → go to Manage and open that game's detail.
-        Action<long> openInManage = appId =>
-            Dispatcher.Invoke(() => { window.NavigateToManage(); _ = manage.OpenDetailForAppIdAsync(appId); });
-        var home = _host.Services.GetRequiredService<HomeViewModel>();
+        Action<long> openInManage = appId => Dispatcher.Invoke(() => { window.NavigateToManage(); _ = manage.OpenDetailForAppIdAsync(appId); });
         home.NavigateToGame = openInManage;
-
-        // Deliberately NO queue-wide completion toast here. Every entry point already reports its own
-        // outcome: Fixes toasts from ManifestJobFactory, the Add page shows its InstallStatus banner, the
-        // store plugin has its popup, and a silent install pops a tray balloon. A global toast on top of
-        // those double-notified every one of them.
-
-        // The Downloads tab's "Review" button on an item waiting for an overwrite confirmation: the
-        // overlay lives on the Add page, so send the user there.
-        _host.Services.GetRequiredService<DownloadsViewModel>().RevealItem = _ => window.NavigateToAdd();
-
         download.NavigateToGame = openInManage;
-        builds.NavigateToManage = openInManage; // Builds "Manage" button: the reverse of "Manage Build"
-        // Depot download queues one item covering the whole selection; show the user where it went.
+        builds.NavigateToManage = openInManage;
+
+        _host.Services.GetRequiredService<DownloadsViewModel>().RevealItem = _ => window.NavigateToAdd();
         builds.RequestShowDownloads = () => Dispatcher.Invoke(window.NavigateToDownloads);
 
-        // Dragging a SteamDB / Steam store link onto either drop box installs that appid. Routed through
-        // HandleProtocolUrl rather than calling ProtocolInstall directly, so a dropped link and
-        // datajackui://install/<id> are literally the same path and can't drift apart later.
-        // DropInstallViewModel is transient, so Home and Add each hold their own instance.
-        Func<long, Task> installByAppId = appId =>
-        {
-            Dispatcher.Invoke(() => HandleProtocolUrl($"datajackui://install/{appId}"));
-            return Task.CompletedTask;
-        };
+        Func<long, Task> installByAppId = appId => { Dispatcher.Invoke(() => HandleProtocolUrl($"datajackui://install/{appId}")); return Task.CompletedTask; };
         home.Drop.InstallByAppId = installByAppId;
         download.Drop.InstallByAppId = installByAppId;
 
-        // Home dashboard cells → section navigation.
         home.NavigateToPlugin = () => Dispatcher.Invoke(window.NavigateToPlugin);
         home.NavigateToManage = () => Dispatcher.Invoke(window.NavigateToManage);
         home.NavigateToSettings = () => Dispatcher.Invoke(window.NavigateToSettings);
         home.NavigateToMode = () => Dispatcher.Invoke(window.NavigateToMode);
-
-        // Onboarding finished applying its actions → refresh the Home dashboard tiles (mode + plugin status).
         main.Onboarding.RefreshHome = () => Dispatcher.Invoke(() => home.LoadAsync());
+    }
 
-        // Any game added (plugin store-page button, drag-drop, Add page, Fixes) → refresh the library views
-        // live. LuaInstaller.Installed can fire on a background thread (plugin install), so marshal to UI.
+    private void WireLibraryRefresh(MainWindow window)
+    {
         var luaInstaller = _host.Services.GetRequiredService<LuaInstaller>();
         var appInfo = _host.Services.GetRequiredService<SteamAppInfoCache>();
+        var manage = _host.Services.GetRequiredService<ManageViewModel>();
+        var builds = _host.Services.GetRequiredService<BuildsViewModel>();
+        var home = _host.Services.GetRequiredService<HomeViewModel>();
+
         luaInstaller.Installed += appId => Dispatcher.InvokeAsync(async () =>
         {
-            _ = manage.LoadAsync();            // re-scan so Manage updates too if it's the visible page
-            _ = builds.LoadAsync();            // a newly installed lua is a new variant in the vault
-            await home.RefreshLibraryAsync();  // game appears (its cover may lag for newer titles)
-
-            // Newer titles have no guessable header URL: the classic CDN path 404s and the real header is
-            // a content-hashed store_item_assets URL that only comes from appdetails. Warm that game's
-            // details at interactive priority (retries past throttling), then refresh again so its cover
-            // fills in instead of staying blank until an app restart.
-            if (await appInfo.EnsureFullDetailsAsync(appId))
-                await home.RefreshLibraryAsync();
+            _ = manage.LoadAsync();
+            _ = builds.LoadAsync();
+            await home.RefreshLibraryAsync();
+            if (await appInfo.EnsureFullDetailsAsync(appId)) await home.RefreshLibraryAsync();
         });
+    }
 
-        // Handle a protocol URL from the command line (first launch) or from a temp file left by a
-        // second instance that exited before the signal listener was wired up.
-        string? url = Program.StartupUrl ?? ProtocolService.TryReadPending();
-
-        // A silent install launch (datajackui://install/silent/<id>) runs headless: stay in the tray and
-        // never surface the window. The window's Loaded handler (which restores auth) won't fire when we
-        // skip Show(), so restore the session explicitly before the install runs.
-        bool silentStartup = (url is not null && ProtocolService.Parse(url).Silent) || Program.StartMinimized;
-
-        // Auto-exit after a silent install only when this was a COLD launch for it (StartupUrl came on the
-        // command line, not from an already-running second instance) AND the user doesn't keep a tray app
-        // around. Otherwise the app was already living somewhere and must stay.
-        _exitAfterSilentInstall = silentStartup
-            && Program.StartupUrl is not null
-            && !settingsVm.MinimizeToTray;
-
+    private async Task ShowOrInitializeSilentAsync(bool silentStartup, MainWindow window, MainViewModel main)
+    {
         if (silentStartup)
         {
             window.StartSilent();
-            try { await main.InitializeAsync(); } catch { /* offline → install proceeds as guest */ }
+            try { await main.InitializeAsync(); } catch { }
         }
         else
         {
             window.Show();
-
-            // First-run onboarding: show the welcome overlay on a fresh install. Skip it (and mark done)
-            // when the user is already set up (a managed mode selected AND the plugin installed), so
-            // existing users / dev machines aren't nagged. Marking done here is permanent, so switching
-            // mode later never re-triggers onboarding (only ModeMigration ever clears it again).
             var cache = _host.Services.GetRequiredService<CacheService>();
             var auth = _host.Services.GetRequiredService<AuthService>();
+
             if (!auth.IsSignedIn)
             {
                 main.Onboarding.IsOpen = true;
@@ -459,37 +386,19 @@ public partial class App : Application
             {
                 var unlocker = _host.Services.GetRequiredService<UnlockerService>();
                 var installer = _host.Services.GetRequiredService<PluginInstallerService>();
-                // Custom deliberately doesn't count: a first-run user can't meaningfully choose "I'll
-                // manage it myself" before they've been shown what the options are.
-                bool configured =
-                    unlocker.SelectedMode is (UnlockerMode.Ost or UnlockerMode.IceBreaker)
-                    && installer.IsInstalledLocally();
+                bool configured = unlocker.SelectedMode is (UnlockerMode.Ost or UnlockerMode.IceBreaker) && installer.IsInstalledLocally();
                 if (configured) cache.OnboardingComplete = true;
                 else main.Onboarding.IsOpen = true;
             }
         }
+    }
 
-        if (url is not null)
-            HandleProtocolUrl(url);
-
-        // Background, non-blocking Steam-open update flow (app + plugin), but ONLY in the loader context
-        // (--tray-locked). A manual / protocol / silent-install launch skips it, so the app never
-        // auto-updates or restarts mid-manual-use. It only happens when Steam launches us. (Velopack only
-        // updates to a STRICTLY HIGHER version, so every release must bump --packVersion.)
-        if (Program.SessionTrayLock)
-            _ = RunUpdateFlowAsync();
-
-        // Background, non-blocking key donation (runs only when the setting is on; silent + deduped).
+    private void StartBackgroundTasks()
+    {
+        if (Program.SessionTrayLock) _ = RunUpdateFlowAsync();
         _ = _host.Services.GetRequiredService<DonateKeysService>().SendPendingKeysIfEnabledAsync();
-
-        // Anonymous app-launch ping (Cloudflare Worker -> PostHog). Fire-and-forget; never blocks.
         _ = _host.Services.GetRequiredService<AnalyticsService>().TrackAppLaunchAsync();
-
-        // Warm the hardware-appid blacklist (refreshes from GitHub if the cache is stale). Fire-and-forget.
         _ = _host.Services.GetRequiredService<HardwareAppIdService>().EnsureFreshAsync();
-
-        // Rescue manifests this app used to write into config\depotcache, which Steam never reads. Silent,
-        // idempotent, and costs nothing once the folder is gone. See DepotCacheMigrationService.
         _ = _host.Services.GetRequiredService<DepotCacheMigrationService>().RunAsync();
     }
 
