@@ -1591,8 +1591,12 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
                 CanToggle: inLua,   // anything the lua declares can be switched, in any variant
                 IsBaseApp: declId == baseAppId)
             {
-                ToggleId = declId, Size = d.Size, Os = d.Os, Language = d.Language,
-                FromAppId = d.FromAppId, LuaSize = entry?.SizeOnDisk ?? 0,
+                ToggleId = declId,
+                Size = d.Size,
+                Os = d.Os,
+                Language = d.Language,
+                FromAppId = d.FromAppId,
+                LuaSize = entry?.SizeOnDisk ?? 0,
             };
         }
 

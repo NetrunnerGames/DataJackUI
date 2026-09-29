@@ -24,7 +24,7 @@ public class SteamlessService(GithubProxy gh, SteamLibraryService library, Steam
 {
     private static readonly string ToolDir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui", "steamless");
-    
+
     private string CliPath
     {
         get

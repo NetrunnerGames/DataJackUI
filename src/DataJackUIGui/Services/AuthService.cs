@@ -285,11 +285,11 @@ public class AuthService
     {
         byte[] payloadBytes = Encoding.UTF8.GetBytes(payload);
         byte[] buffer = new byte[8 + payloadBytes.Length];
-        
+
         BitConverter.GetBytes(opcode).CopyTo(buffer, 0);
         BitConverter.GetBytes(payloadBytes.Length).CopyTo(buffer, 4);
         payloadBytes.CopyTo(buffer, 8);
-        
+
         await pipe.WriteAsync(buffer, ct);
     }
 

@@ -131,7 +131,8 @@ public class SteamDepotInfo
                     }
 
                     depots.Add(new ContentDepot(depotId, ReadPublicSize(v), dlcAppId, isShared, os, lang,
-                        ReadPublicManifestId(v)) { FromAppId = fromAppId });
+                        ReadPublicManifestId(v))
+                    { FromAppId = fromAppId });
                 }
             }
 

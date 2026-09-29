@@ -67,7 +67,8 @@ public class DlcDepot
     [JsonPropertyName("oslist")] public string? OsList { get; set; }
     [JsonPropertyName("included")] public bool Included { get; set; }
 
-    [JsonIgnore] public string Meta
+    [JsonIgnore]
+    public string Meta
     {
         get
         {

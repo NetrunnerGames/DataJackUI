@@ -366,6 +366,7 @@ public class DataJackUIApiClient
         // New request (not via SendAsync) so no Bearer header and the absolute URL isn't prefixed.
         var req = new HttpRequestMessage(HttpMethod.Get, url);
         // External communication disabled: Direct download from URL disabled
+        await Task.CompletedTask;
         throw new ApiException("External communication disabled.");
         /*
         var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);

@@ -80,7 +80,6 @@ public partial class DepotDownloaderService(
     AuthService auth,
     GithubProxy gh,
     SteamService steam,
-    DataJackUIApiClient api,
     CacheService cache,
     ILogger<DepotDownloaderService> log,
     SettingsService? settings = null)

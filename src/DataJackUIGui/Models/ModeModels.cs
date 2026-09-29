@@ -48,9 +48,9 @@ public sealed record ModeDefinition(
     string? FixedTag,        // e.g. "ST"; null → use the repo's latest release
     string[] PlaceFiles,     // files that end up in the Steam root (for status/verify)
     string? ZipAssetPattern, // e.g. "OpenSteamTool-{version}-Release.zip"; null unless Kind == Zip
-    // When set, version + hash come from this raw-hosted TOML instead of the GitHub releases API, and
-    // the zip URL is built from the version it reports. Costs no api.github.com call, so the mode is
-    // immune to the 60 req/hr unauthenticated limit. See UnlockerService.FetchUpdateManifestAsync.
+                             // When set, version + hash come from this raw-hosted TOML instead of the GitHub releases API, and
+                             // the zip URL is built from the version it reports. Costs no api.github.com call, so the mode is
+                             // immune to the 60 req/hr unauthenticated limit. See UnlockerService.FetchUpdateManifestAsync.
     string? UpdateManifestUrl = null,
     string? HiddenUnlessFile = null); // if set, the card is hidden unless this file exists in the Steam root (or the mode is active)
 

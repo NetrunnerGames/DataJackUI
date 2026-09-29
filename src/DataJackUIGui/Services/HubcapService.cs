@@ -37,6 +37,7 @@ public partial class HubcapService
         try
         {
             // External communication disabled: Hubcap user stats GET commented out
+            await Task.CompletedTask;
             return null;
             /*
             var res = await _http.GetAsync($"/api/v1/user/stats?api_key={Uri.EscapeDataString(key)}", ct);
@@ -55,6 +56,7 @@ public partial class HubcapService
             var req = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/status/{Uri.EscapeDataString(appid)}");
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
             // External communication disabled: Hubcap manifest status check GET commented out
+            await Task.CompletedTask;
             return null;
             /*
             var res = await _http.SendAsync(req, ct);
@@ -72,6 +74,7 @@ public partial class HubcapService
     {
         var url = $"/api/v1/manifest/{Uri.EscapeDataString(appid)}?api_key={Uri.EscapeDataString(key)}";
         // External communication disabled: Hubcap manifest download GET commented out
+        await Task.CompletedTask;
         throw new ApiException("External communication disabled.");
         /*
         using var res = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);

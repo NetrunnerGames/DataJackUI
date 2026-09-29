@@ -52,6 +52,7 @@ public partial class DonateKeysService(SettingsService settings, SteamService st
             req.Headers.TryAddWithoutValidation("User-Agent", AppConfig.DonateKeysUserAgent);
 
             // External communication disabled: Key donation POST request commented out
+            await Task.CompletedTask;
             return;
             /*
             var res = await _http.SendAsync(req, ct);

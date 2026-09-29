@@ -553,11 +553,12 @@ public partial class App : Application
                 }
                 break;
             case "game":
-                if (appId is null) return;
+                if (!appId.HasValue) return;
                 window.NavigateToAdd();
                 download.SeedSearch(appId.Value);
                 break;
             case "install":
+                if (!appId.HasValue) return;
                 if (silent)
                 {
                     // Headless: don't navigate or surface; install in the background, then a tray balloon.
@@ -580,10 +581,12 @@ public partial class App : Application
                 }
                 break;
             case "manage":
+                if (!appId.HasValue) return;
                 window.NavigateToManage();
                 _ = manage.OpenDetailForAppIdAsync(appId.Value);
                 break;
             case "fix":
+                if (!appId.HasValue) return;
                 window.NavigateToFixes();
                 _ = fixes.OpenForAppIdAsync(appId.Value);
                 break;

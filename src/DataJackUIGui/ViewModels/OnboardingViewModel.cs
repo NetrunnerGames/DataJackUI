@@ -92,7 +92,7 @@ public partial class OnboardingViewModel : ObservableObject
     private void Finish()
     {
         if (IsBusy) return;
-        
+
         if (!IsSignedIn)
         {
             StatusLine = "You must sign in with Discord to continue.";
