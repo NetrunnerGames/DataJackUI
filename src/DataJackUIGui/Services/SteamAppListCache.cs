@@ -89,72 +89,52 @@ public class SteamAppListCache
             using var doc = await JsonDocument.ParseAsync(stream);
             var root = doc.RootElement;
 
-            JsonElement apps = root;
             if (root.ValueKind == JsonValueKind.Object)
             {
-                if (root.TryGetProperty("applist", out var applist) && applist.TryGetProperty("apps", out var applistApps))
-                {
-                    apps = applistApps;
-                }
-                else if (root.TryGetProperty("gamelist", out var gamelist))
-                {
-                    apps = gamelist;
-                }
-                else if (root.TryGetProperty("games", out var games))
-                {
-                    apps = games;
-                }
-                else
-                {
-                    // Could be a map of appid string -> name/object
-                    foreach (var prop in root.EnumerateObject())
-                    {
-                        if (long.TryParse(prop.Name, out long id))
-                        {
-                            if (prop.Value.ValueKind == JsonValueKind.String)
-                            {
-                                var val = prop.Value.GetString();
-                                if (!string.IsNullOrWhiteSpace(val)) _names[id] = val;
-                            }
-                            else if (prop.Value.ValueKind == JsonValueKind.Object)
-                            {
-                                string? n = GetNameProperty(prop.Value);
-                                if (!string.IsNullOrWhiteSpace(n)) _names[id] = n;
-                            }
-                        }
-                    }
-                    return !_names.IsEmpty;
-                }
+                if (root.TryGetProperty("applist", out var al) && al.TryGetProperty("apps", out var apps)) return ParseArray(apps);
+                if (root.TryGetProperty("gamelist", out var gl)) return ParseArray(gl);
+                if (root.TryGetProperty("games", out var gs)) return ParseArray(gs);
+                return ParseObjectMap(root);
             }
 
-            if (apps.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in apps.EnumerateArray())
-                {
-                    if (item.ValueKind == JsonValueKind.Object)
-                    {
-                        long id = 0;
-                        if (item.TryGetProperty("appid", out var p1)) id = GetLong(p1);
-                        else if (item.TryGetProperty("appId", out var p2)) id = GetLong(p2);
-                        else if (item.TryGetProperty("app_id", out var p3)) id = GetLong(p3);
-                        else if (item.TryGetProperty("id", out var p4)) id = GetLong(p4);
-
-                        string? name = GetNameProperty(item);
-
-                        if (id > 0 && !string.IsNullOrWhiteSpace(name))
-                        {
-                            _names[id] = name;
-                        }
-                    }
-                }
-            }
-
+            if (root.ValueKind == JsonValueKind.Array) return ParseArray(root);
             return !_names.IsEmpty;
         }
-        catch
+        catch { return false; }
+    }
+
+    private bool ParseObjectMap(JsonElement root)
+    {
+        foreach (var prop in root.EnumerateObject())
         {
-            return false;
+            if (!long.TryParse(prop.Name, out long id)) continue;
+            if (prop.Value.ValueKind == JsonValueKind.String)
+            {
+                if (prop.Value.GetString() is { } val && !string.IsNullOrWhiteSpace(val)) _names[id] = val;
+            }
+            else if (prop.Value.ValueKind == JsonValueKind.Object)
+            {
+                if (GetNameProperty(prop.Value) is { } n && !string.IsNullOrWhiteSpace(n)) _names[id] = n;
+            }
         }
+        return !_names.IsEmpty;
+    }
+
+    private bool ParseArray(JsonElement apps)
+    {
+        if (apps.ValueKind != JsonValueKind.Array) return !_names.IsEmpty;
+        foreach (var item in apps.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object) continue;
+            long id = 0;
+            if (item.TryGetProperty("appid", out var p1)) id = GetLong(p1);
+            else if (item.TryGetProperty("appId", out var p2)) id = GetLong(p2);
+            else if (item.TryGetProperty("app_id", out var p3)) id = GetLong(p3);
+            else if (item.TryGetProperty("id", out var p4)) id = GetLong(p4);
+
+            if (id > 0 && GetNameProperty(item) is { } name && !string.IsNullOrWhiteSpace(name)) _names[id] = name;
+        }
+        return !_names.IsEmpty;
     }
 
     private static long GetLong(JsonElement el)
