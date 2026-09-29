@@ -86,37 +86,34 @@ public class DepotCacheMigrationService(SteamService steam, ILogger<DepotCacheMi
         foreach (string src in files)
         {
             if (ct.IsCancellationRequested) break;
+            ProcessFile(src, realDir, log, ref moved, ref present, ref rejected, ref failed);
+        }
+    }
 
-            string name = Path.GetFileName(src);
-            string dest = Path.Combine(realDir, name);
+    private static void ProcessFile(string src, string realDir, ILogger log, ref int moved, ref int present, ref int rejected, ref int failed)
+    {
+        string name = Path.GetFileName(src);
+        string dest = Path.Combine(realDir, name);
 
-            // The name is content-addressed (<depot>_<gid>), so a file already there IS this file. Leave
-            // the stale copy alone rather than deleting it: reclaiming disk is not worth a destructive
-            // step in a silent startup task.
-            try { if (File.Exists(dest)) { present++; continue; } }
-            catch { failed++; continue; }
+        try { if (File.Exists(dest)) { present++; return; } }
+        catch { failed++; return; }
 
-            // Only move something that really is the manifest its name claims. A truncated or half-written
-            // file that reaches the real depotcache is sticky — LuaInstaller skips a destination that
-            // exists, so a bad entry would survive every later fetch and break that depot permanently.
-            // Better to strand it here, where it already was and where it harms nothing.
-            if (!ParseName(name, out long depotId, out string gid) || !ManifestFile.Matches(src, depotId, gid))
-            {
-                rejected++;
-                continue;
-            }
+        if (!ParseName(name, out long depotId, out string gid) || !ManifestFile.Matches(src, depotId, gid))
+        {
+            rejected++;
+            return;
+        }
 
-            try
-            {
-                Directory.CreateDirectory(realDir); // only once there is something to put in it
-                File.Move(src, dest);
-                moved++;
-            }
-            catch (Exception ex)
-            {
-                failed++;
-                log.LogDebug(ex, "Could not move stranded manifest {Name} into {Dir}", name, realDir);
-            }
+        try
+        {
+            Directory.CreateDirectory(realDir);
+            File.Move(src, dest);
+            moved++;
+        }
+        catch (Exception ex)
+        {
+            failed++;
+            log.LogDebug(ex, "Could not move stranded manifest {Name} into {Dir}", name, realDir);
         }
 
         if (moved > 0)
