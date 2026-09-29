@@ -104,57 +104,63 @@ public class CefInjectorService : IHostedService
 
     private async Task InjectionLoop(CancellationToken ct)
     {
-        // The store tabs to drain each fast tick (id + ws url), refreshed on the ~1s injection cadence.
-        List<(string Id, string Ws)> storeTabs = new();
         int tick = 0;
+        List<(string Id, string WsUrl)> storeTabs = new();
 
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                // ── Slow cadence (~1s): discover store tabs, ensure datajackui.js is injected ──
                 if (tick % InjectEveryTicks == 0)
                 {
-                    // Millennium may also be present and running its own plugin loader on this same page.
-                    // That's fine now. The polyfill (BuildInlinePolyfill) only takes over "datajackui" calls and
-                    // passes everything else through to Millennium's real window.Millennium if one exists, so
-                    // the two no longer need to be mutually exclusive.
-                    var tabsJson = await _http.GetStringAsync(CefDebugUrl, ct);
-                    if (!string.IsNullOrWhiteSpace(tabsJson))
-                    {
-                        var tabs = JsonSerializer.Deserialize<List<CefTabInfo>>(tabsJson, JsonOpts) ?? new();
+                    await SyncTabsAsync(ct, storeTabs);
+                }
 
-                        // Inject datajackui.js into every store-page tab whose JS context isn't already alive.
-                        // Steam reuses the same CDP tab ID across SPA-style navigation (Home <-> store pages),
-                        // but navigating to a different page wipes the JS context entirely, so "already
-                        // injected by tab ID" is the wrong signal. Check liveness in the CURRENT context every
-                        // cycle instead (window.__DataJackUIReady, set as the last statement of datajackui.js's
-                        // main IIFE) and re-inject whenever it's gone.
-                        var script = _polyfillJs + "\n" + _datajackuiJs;
-                        var live = new List<(string, string)>();
-                        var seen = new HashSet<string>();
-                        foreach (var tab in tabs)
-                        {
-                            // Inject into ALL store pages, not just /app/ game pages: the store-wide header
-                            // icon (and the "games added since last restart" popup, which only fires on the
-                            // store home) need datajackui.js present on the home page too. Steam boots straight
-                            // to the home page, which has no "/app/" in its URL, so the old "/app/"-only filter
-                            // meant the icon/popup never appeared there. datajackui.js itself gates the per-game
-                            // "Add via DataJackUI" button to /app/ pages internally, so injecting store-wide is safe.
-                            if (tab.Url?.Contains("store.steampowered.com", StringComparison.OrdinalIgnoreCase) == true
-                                && !string.IsNullOrEmpty(tab.WebSocketDebuggerUrl)
-                                && !string.IsNullOrEmpty(tab.Id))
-                            {
-                                seen.Add(tab.Id!);
-                                // EvaluateReturnAsync's value.GetString() throws (silently, falling through to
-                                // the raw response text) for a JSON boolean, so stringify explicitly rather
-                                // than returning a bare boolean expression.
-                                var alive = await EvaluateReturnAsync(tab.Id!, tab.WebSocketDebuggerUrl!, "String(window.__DataJackUIReady === true)", ct);
-                                if (alive != "true")
-                                    await EvaluateAsync(tab.Id!, tab.WebSocketDebuggerUrl!, script, ct);
+                foreach (var (id, ws) in storeTabs)
+                    await ProcessSingleTab(id, ws, ct);
 
-                                live.Add((tab.Id!, tab.WebSocketDebuggerUrl!));
-                            }
+                tick++;
+                await Task.Delay(TickMs, ct);
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
+            {
+                _log.LogDebug("CEF cycle: {Message}", ex.Message);
+                try { await Task.Delay(1000, ct); } catch { break; }
+            }
+        }
+    }
+
+    private async Task SyncTabsAsync(CancellationToken ct, List<(string Id, string WsUrl)> storeTabs)
+    {
+        var tabsJson = await _http.GetStringAsync(CefDebugUrl, ct);
+        if (string.IsNullOrWhiteSpace(tabsJson)) return;
+
+        var tabs = JsonSerializer.Deserialize<List<CefTabInfo>>(tabsJson, JsonOpts) ?? new();
+        var script = _polyfillJs + "\n" + _datajackuiJs;
+        var live = new List<(string, string)>();
+        var seen = new HashSet<string>();
+
+        foreach (var tab in tabs)
+        {
+            if (tab.Url?.Contains("store.steampowered.com", StringComparison.OrdinalIgnoreCase) == true
+                && !string.IsNullOrEmpty(tab.WebSocketDebuggerUrl)
+                && !string.IsNullOrEmpty(tab.Id))
+            {
+                seen.Add(tab.Id!);
+                var alive = await EvaluateReturnAsync(tab.Id!, tab.WebSocketDebuggerUrl!, "String(window.__DataJackUIReady === true)", ct);
+                if (alive != "true") await EvaluateAsync(tab.Id!, tab.WebSocketDebuggerUrl!, script, ct);
+                live.Add((tab.Id!, tab.WebSocketDebuggerUrl!));
+            }
+        }
+
+        storeTabs.Clear();
+        storeTabs.AddRange(live);
+
+        foreach (var stale in _sockets.Keys.Where(k => !seen.Contains(k)).ToList())
+            EvictSocket(stale);
+    }
+
                         }
 
                         storeTabs = live;
