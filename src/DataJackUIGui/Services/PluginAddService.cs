@@ -102,15 +102,9 @@ public class PluginAddService(
     {
         try
         {
-            // The game name is only needed later for the "Added {name}" status. If the store page already
-            // supplied it (via Start), skip the lua.tools /details call entirely; otherwise fetch it in
-            // parallel so it never gates the picker behind its own serial round-trip.
             var nameTask = string.IsNullOrEmpty(state.GameName) ? SafeGetGameNameAsync(appId) : null;
             string? key = settings.HubcapApiKey;
 
-            // Hubcap/Sadie is the priority source. When a key is set, check ITS availability first, and in
-            // FastFetch, if Hubcap can serve this game, download straight from it and skip the lua.tools
-            // CheckSources call entirely (a lua.tools source would never be picked over Hubcap anyway).
             bool hubcapAvailable = false;
             if (!string.IsNullOrEmpty(key))
             {
@@ -120,75 +114,22 @@ public class PluginAddService(
 
             if (state.FastFetch && hubcapAvailable)
             {
-                var stats = await hubcap.GetStatsAsync(key!);
-                if (stats?.CanMakeRequests == true)
-                {
-                    var hubMeta = SourceMeta.Get(HubcapSourceName);
-                    var hubRow = new SourceRow
-                    {
-                        Name = HubcapSourceName,
-                        DisplayName = hubMeta.DisplayName ?? HubcapSourceName,
-                        Status = "available",
-                        NeedsKey = true,
-                        Stats = $"{stats.DailyUsage}/{stats.DailyLimit}",
-                    };
-                    if (nameTask is not null) state.GameName = await nameTask;
-                    PublishSources(state, new List<SourceRow> { hubRow }, appId);
-                    await DownloadAsync(appId, state, hubRow);
-                    return;
-                }
-                // Hubcap is out of daily quota → fall through and let a lua.tools source take over.
+                if (await TryFastFetchHubcapAsync(appId, state, key!, nameTask)) return;
             }
 
-            var statuses = await api.CheckSourcesAsync(appId.ToString());
-
-            // Synthesize the Hubcap/Sadie row from the availability already checked above (or "unknown"
-            // when no key is set, so it shows locked with the "needs a key" hint).
-            statuses[HubcapSourceName] = string.IsNullOrEmpty(key)
-                ? "unknown"
-                : (hubcapAvailable ? "available" : "unavailable");
-
-            // Premium (key-gated) sources first, mirroring the website/app ordering.
-            var rows = statuses
-                .OrderByDescending(kv => SourceMeta.Get(kv.Key).RequiresUserKey ? 1 : 0)
-                .Select(kv =>
-                {
-                    var meta = SourceMeta.Get(kv.Key);
-                    return new SourceRow
-                    {
-                        Name = kv.Key,
-                        DisplayName = meta.DisplayName ?? kv.Key,
-                        Status = kv.Value,
-                        NeedsKey = meta.RequiresUserKey,
-                    };
-                }).ToList();
-
-            // No-key premium rows lock immediately (they show the "needs a key" hint). Keyed rows get their
-            // real lock state from the Hubcap stats call in FillBadgesAsync.
+            var rows = await BuildSourceRowsAsync(appId, key, hubcapAvailable);
             var keyRows = rows.Where(r => r.NeedsKey).ToList();
             if (keyRows.Count > 0 && string.IsNullOrEmpty(key))
                 foreach (var r in keyRows) r.Locked = true;
 
-            if (nameTask is not null) state.GameName = await nameTask; // ready before any Pick builds its status
+            if (nameTask is not null) state.GameName = await nameTask;
 
             if (state.FastFetch)
             {
-                // Reached only when Hubcap couldn't serve it (no key / not on Hubcap / out of quota). No
-                // picker, so resolve just the Hubcap lock that CanDownload needs (skip the cosmetic X/25
-                // badges), then pick the best remaining source.
-                if (keyRows.Count > 0 && !string.IsNullOrEmpty(key))
-                    await FillHubcapBadgeAsync(keyRows, key);
-                PublishSources(state, rows, appId);
-
-                var best = rows.FirstOrDefault(r => r.CanDownload);
-                if (best is null) { state.Error = Resources.Strings.Err_NoSourceAvailable; PluginLog.Log($"PluginAdd.Check appid={appId} FastFetch: no downloadable source"); return; }
-                await DownloadAsync(appId, state, best);
+                await HandleFastFetchFallbackAsync(appId, state, rows, keyRows, key);
                 return;
             }
 
-            // FastFetch off: publish the picker as soon as availability is known, then lazy-fill the usage
-            // badges. The plugin polls state (~350ms), so the "12/25" / "X/Unlimited" counters and the real
-            // Hubcap lock pop in on the next tick instead of blocking the whole list.
             PublishSources(state, rows, appId);
             await FillBadgesAsync(rows, keyRows, key);
         }
@@ -198,6 +139,50 @@ public class PluginAddService(
             state.Checking = false;
             PluginLog.Log($"PluginAdd.Check appid={appId} EXCEPTION: {ex}");
         }
+    }
+
+    private async Task<bool> TryFastFetchHubcapAsync(long appId, AddState state, string key, Task<string?>? nameTask)
+    {
+        var stats = await hubcap.GetStatsAsync(key);
+        if (stats?.CanMakeRequests != true) return false;
+
+        var hubMeta = SourceMeta.Get(HubcapSourceName);
+        var hubRow = new SourceRow
+        {
+            Name = HubcapSourceName,
+            DisplayName = hubMeta.DisplayName ?? HubcapSourceName,
+            Status = "available",
+            NeedsKey = true,
+            Stats = $"{stats.DailyUsage}/{stats.DailyLimit}",
+        };
+        if (nameTask is not null) state.GameName = await nameTask;
+        PublishSources(state, new List<SourceRow> { hubRow }, appId);
+        await DownloadAsync(appId, state, hubRow);
+        return true;
+    }
+
+    private async Task<List<SourceRow>> BuildSourceRowsAsync(long appId, string? key, bool hubcapAvailable)
+    {
+        var statuses = await api.CheckSourcesAsync(appId.ToString());
+        statuses[HubcapSourceName] = string.IsNullOrEmpty(key) ? "unknown" : (hubcapAvailable ? "available" : "unavailable");
+
+        return statuses.OrderByDescending(kv => SourceMeta.Get(kv.Key).RequiresUserKey ? 1 : 0)
+            .Select(kv =>
+            {
+                var meta = SourceMeta.Get(kv.Key);
+                return new SourceRow { Name = kv.Key, DisplayName = meta.DisplayName ?? kv.Key, Status = kv.Value, NeedsKey = meta.RequiresUserKey };
+            }).ToList();
+    }
+
+    private async Task HandleFastFetchFallbackAsync(long appId, AddState state, List<SourceRow> rows, List<SourceRow> keyRows, string? key)
+    {
+        if (keyRows.Count > 0 && !string.IsNullOrEmpty(key))
+            await FillHubcapBadgeAsync(keyRows, key);
+        PublishSources(state, rows, appId);
+
+        var best = rows.FirstOrDefault(r => r.CanDownload);
+        if (best is null) { state.Error = Resources.Strings.Err_NoSourceAvailable; PluginLog.Log($"PluginAdd.Check appid={appId} FastFetch: no downloadable source"); return; }
+        await DownloadAsync(appId, state, best);
     }
 
     private void PublishSources(AddState state, List<SourceRow> rows, long appId)
