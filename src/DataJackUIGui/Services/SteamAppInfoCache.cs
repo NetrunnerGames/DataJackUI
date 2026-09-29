@@ -541,5 +541,4 @@ public class SteamAppInfoCache
         var times = _requestTimes.Select(t => new DateTimeOffset(t, TimeSpan.Zero).ToUnixTimeMilliseconds());
         _cache2.SaveSteamApiRequestTimes(times);
     }
-
 }

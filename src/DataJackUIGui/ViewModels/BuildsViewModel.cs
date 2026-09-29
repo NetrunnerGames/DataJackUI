@@ -416,7 +416,7 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         // …then jump to the PAGE holding it. Without this the ListBox simply can't select a game that
         // isn't on the current page, and the deep link would silently do nothing for anything past page 1.
         int index = _filtered.IndexOf(game);
-        if (index >= 0 && PageSize > 0) CurrentPage = index / PageSize + 1;
+        if (index >= 0 && PageSize > 0) CurrentPage = (index / PageSize) + 1;
 
         ActiveGame = game;                                             // drives the right-hand panel
         SelectedGame = Items.FirstOrDefault(g => g.AppId == appId);    // highlights the row
@@ -816,7 +816,6 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
 
         [ObservableProperty] private bool _isSelected;
     }
-
 
     /// <summary>True while the depot table is in "pick what to download" mode.</summary>
     [ObservableProperty]

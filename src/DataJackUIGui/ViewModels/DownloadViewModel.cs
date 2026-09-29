@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -266,7 +266,6 @@ public partial class DownloadViewModel : ObservableObject
             || string.Equals(s.DisplayName, name, StringComparison.OrdinalIgnoreCase));
         return row is null ? Task.CompletedTask : DownloadFromSourceAsync(row);
     }
-
 
     // ── Install result banner ───────────────────────────────────────
     [ObservableProperty]

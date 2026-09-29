@@ -626,5 +626,4 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
 
     private static GithubAsset? FindAsset(GithubRelease r, string name) =>
         r.Assets.FirstOrDefault(a => a.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-
 }
