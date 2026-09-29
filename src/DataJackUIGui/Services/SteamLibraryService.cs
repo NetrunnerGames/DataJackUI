@@ -84,26 +84,31 @@ public partial class SteamLibraryService(SteamService steam)
 
             foreach (string acf in acfs)
             {
-                InstalledGame? game = null;
-                try
-                {
-                    string text = File.ReadAllText(acf);
-
-                    var idm = AppIdRegex().Match(text);
-                    var dirm = InstallDirRegex().Match(text);
-                    if (!idm.Success || !dirm.Success) continue;
-                    if (!long.TryParse(idm.Groups[1].Value, out long appId)) continue;
-
-                    string full = Path.Combine(steamapps, "common", Unescape(dirm.Groups[1].Value));
-                    if (!Directory.Exists(full)) continue;
-
-                    var nm = NameRegex().Match(text);
-                    game = new InstalledGame(appId, nm.Success ? nm.Groups[1].Value : appId.ToString(), full);
-                }
-                catch { /* unreadable or malformed acf: skip this one, not the whole library */ }
-
-                if (game is not null) yield return game;
+                if (ParseAcf(acf, steamapps) is { } game)
+                    yield return game;
             }
+        }
+    }
+
+    private static InstalledGame? ParseAcf(string acf, string steamapps)
+    {
+        try
+        {
+            string text = File.ReadAllText(acf);
+            var idm = AppIdRegex().Match(text);
+            var dirm = InstallDirRegex().Match(text);
+            if (!idm.Success || !dirm.Success) return null;
+            if (!long.TryParse(idm.Groups[1].Value, out long appId)) return null;
+
+            string full = Path.Combine(steamapps, "common", Unescape(dirm.Groups[1].Value));
+            if (!Directory.Exists(full)) return null;
+
+            var nm = NameRegex().Match(text);
+            return new InstalledGame(appId, nm.Success ? nm.Groups[1].Value : appId.ToString(), full);
+        }
+        catch { return null; }
+    }
+
         }
     }
 
