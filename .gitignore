@@ -1,50 +1,67 @@
+# Build and output directories
 bin/
 obj/
 publish/
 Releases/
-*.user
-.vs/
+TestResults/
+[B|b]uild/
+[D|d]ebug/
+[R|r]elease/
 
 # WPF temporary project files (generated during builds)
 *_wpftmp.csproj
+*_wpftmp.*
 
-# Local agent / editor config (contains machine-specific absolute paths)
+# Visual Studio / IDE / User configuration
+.vs/
+*.user
+*.suo
+*.userosv
+*.userosv.*
+.idea/
+.vscode/
+*.cache
+*.userprefs
+
+# Local AI agent / IDE configuration
 .claude/
 CLAUDE.md
 AGENTS.md
 .cursor/
 .cursorrules
+.gemini/
 .github/copilot-instructions.md
-.idea/
-*.suo
-TestResults/
 
-# Third-party binary reference material. Kept locally, never committed.
-# These are other projects' compiled artifacts (no redistribution licence) and
-# nothing in the build references them.
+# Third-party binary reference material
 OpenSteamTool-releases/
 SteamTools-releases/
 
-# Maintainer-only scratch scripts and release-mirroring workflows
+# Maintainer-only scratch scripts, docs, and workflows
 tools/
-
-# Internal notes, server infrastructure config, and saved copies of third-party docs sites.
-# Kept locally; none of it belongs in the public repo.
 docs/
-
-# Maintainer-only release tooling
+scratch/
 build-release.ps1
 build_plugin_release.ps1
 deploy_workers.ps1
 run_local.ps1
-scratch/
 
-# Never commit
+# Temporary files and logs
 *.lnk
 *.log
+*.tmp
+*.bak
+*.swp
+
+# Environment, keys, and security certificates
 .env
 .env.*
 *.pfx
 *.p12
 *.pem
 *.snk
+*.key
+
+# Operating System system files
+Thumbs.db
+Desktop.ini
+.DS_Store
