@@ -511,68 +511,57 @@ public partial class DownloadViewModel : ObservableObject
     private async Task FetchAsync()
     {
         if (Details is null) return;
-        // DLC info is login-only; manifest source checking is public (guests allowed).
         if (Details.IsDlc && await PromptSignInIfGuestAsync(Resources.Strings.Add_SignIn_Dlc)) return;
         ResetResults();
         IsChecking = true;
         try
         {
-            if (Details.IsDlc)
+            if (Details.IsDlc) await FetchDlcAsync();
+            else await FetchGameAsync();
+        }
+        catch (ApiException ex) { Error = ex.Message; }
+        catch (Exception) { Error = Resources.Strings.Add_Err_Generic; }
+        finally { IsChecking = false; }
+    }
+
+    private async Task FetchDlcAsync()
+    {
+        if (Details!.BaseAppId is null)
+        {
+            Error = Resources.Strings.Add_Err_BaseGame;
+            return;
+        }
+        DlcInfo = await _api.GetDlcInfoAsync(Details.AppId.ToString(), Details.BaseAppId);
+        DlcDepots.Clear();
+        foreach (var d in DlcInfo?.Depots.OrderByDescending(d => d.Included) ?? Enumerable.Empty<DlcDepot>())
+            DlcDepots.Add(d);
+    }
+
+    private async Task FetchGameAsync()
+    {
+        var statuses = await _api.CheckSourcesAsync(Details!.AppId.ToString());
+        await AddHubcapSourceAsync(statuses, Details.AppId.ToString());
+
+        foreach (var (name, status) in statuses.OrderByDescending(kv => SourceMeta.Get(kv.Key).RequiresUserKey ? 1 : 0))
+            Sources.Add(new SourceRowViewModel(this, name, status));
+
+        await ApplyHubcapStateAsync();
+
+        if (FastFetch)
+        {
+            var best = Sources.FirstOrDefault(s => s.CanDownload);
+            if (best is null)
             {
-                if (Details.BaseAppId is null)
-                {
-                    Error = Resources.Strings.Add_Err_BaseGame;
-                    return;
-                }
-                DlcInfo = await _api.GetDlcInfoAsync(Details.AppId.ToString(), Details.BaseAppId);
-                DlcDepots.Clear();
-                // Included depots first, then missing: mirrors the website ordering
-                foreach (var d in DlcInfo?.Depots.OrderByDescending(d => d.Included) ?? Enumerable.Empty<DlcDepot>())
-                    DlcDepots.Add(d);
+                Error = Resources.Strings.Add_FastFetch_NoSource;
+                return;
             }
-            else
-            {
-                var statuses = await _api.CheckSourcesAsync(Details.AppId.ToString());
-
-                // The manifest backend no longer reports the Hubcap/Morrenus source. Synthesize it
-                // ourselves from a direct Hubcap status check (or show it locked if no key is set).
-                await AddHubcapSourceAsync(statuses, Details.AppId.ToString());
-
-                // Premium (key-gated) sources first, like the website
-                foreach (var (name, status) in statuses.OrderByDescending(kv => SourceMeta.Get(kv.Key).RequiresUserKey ? 1 : 0))
-                    Sources.Add(new SourceRowViewModel(this, name, status));
-
-                await ApplyHubcapStateAsync();
-
-                if (FastFetch)
-                {
-                    var best = Sources.FirstOrDefault(s => s.CanDownload);
-                    if (best is null)
-                    {
-                        Error = Resources.Strings.Add_FastFetch_NoSource;
-                        return;
-                    }
-                    _fastFetchSource = best.DisplayName;
-                    await DownloadFromSourceAsync(best);
-                }
-                else
-                {
-                    SourcesLoaded = true;
-                    await RefreshStandardUsageAsync();
-                }
-            }
+            _fastFetchSource = best.DisplayName;
+            await DownloadFromSourceAsync(best);
         }
-        catch (ApiException ex)
+        else
         {
-            Error = ex.Message;
-        }
-        catch (Exception)
-        {
-            Error = Resources.Strings.Add_Err_Generic;
-        }
-        finally
-        {
-            IsChecking = false;
+            SourcesLoaded = true;
+            await RefreshStandardUsageAsync();
         }
     }
 
@@ -868,14 +857,10 @@ public partial class DownloadViewModel : ObservableObject
     private DiffRow ToDiffRow(LuaEntry e)
     {
         var d = _depotsById.GetValueOrDefault(e.Id);
-        bool isDlc = d?.IsDlc ?? false;
-        bool isShared = d?.IsShared ?? false;
+        bool isDlc = d?.IsDlc == true;
+        bool isShared = d?.IsShared == true;
 
-        string title = DiffDisplayName(e)
-            ?? (isDlc ? string.Format(Resources.Strings.Manage_DlcName, d!.DlcAppId)
-                : isShared ? Resources.Strings.Manage_SharedDepot
-                : e.HasKey ? Resources.Strings.Manage_Depot
-                : string.Format(Resources.Strings.Manage_DlcName, e.Id));
+        string title = DiffDisplayName(e) ?? GetFallbackTitle(e, d, isDlc, isShared);
 
         var meta = new List<string> { e.Id.ToString() };
         if (d is { Size: > 0 }) meta.Add(FormatSize(d.Size));
@@ -887,6 +872,14 @@ public partial class DownloadViewModel : ObservableObject
             : $"https://steamdb.info/depot/{e.Id}/";
 
         return new DiffRow(title, string.Join("  ·  ", meta), isDlc, isShared, url);
+    }
+
+    private static string GetFallbackTitle(LuaEntry e, ContentDepot? d, bool isDlc, bool isShared)
+    {
+        if (isDlc) return string.Format(Resources.Strings.Manage_DlcName, d!.DlcAppId);
+        if (isShared) return Resources.Strings.Manage_SharedDepot;
+        if (e.HasKey) return Resources.Strings.Manage_Depot;
+        return string.Format(Resources.Strings.Manage_DlcName, e.Id);
     }
 
     [RelayCommand]
