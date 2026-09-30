@@ -53,12 +53,12 @@ $PluginJsonFile = "src/DataJackUIPlugin/plugin.json"
 
 # Clean publish directory
 if (Test-Path $PublishDir) {
-    Remove-Item -Recurse -Force $PublishDir
+    Remove-Item -Recurse -Force $PublishDir -ErrorAction SilentlyContinue
 }
 
 # Clean releases directory
 if (Test-Path $ReleasesDir) {
-    Remove-Item -Recurse -Force $ReleasesDir
+    Remove-Item -Recurse -Force $ReleasesDir -ErrorAction SilentlyContinue
 }
 New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
 
