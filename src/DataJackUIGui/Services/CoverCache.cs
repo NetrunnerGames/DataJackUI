@@ -36,13 +36,21 @@ public class CoverCache
         return hash.Equals(PlaceholderSha256, StringComparison.OrdinalIgnoreCase);
     }
 
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private readonly HttpClient _http;
     private readonly SemaphoreSlim _ioGate = new(1, 1);
     private readonly ConcurrentDictionary<long, byte> _noCover = new();
     private readonly ConcurrentDictionary<long, Task<string?>> _inFlight = new();
     private readonly SettingsService? _settings;
 
-    public CoverCache(SettingsService? settings = null) => _settings = settings; // appids with no usable cover (this session)
+    public CoverCache(SettingsService? settings = null)
+    {
+        _settings = settings;
+        var handler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = (sender, cert, chain, sslErrors) => true
+        };
+        _http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
+    }
 
     private static string PathFor(long appid) => Path.Combine(CoversDir, $"{appid}.jpg");
 

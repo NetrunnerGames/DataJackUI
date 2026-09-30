@@ -37,6 +37,10 @@ public class DataJackUIApiClient
         var doh = new DohResolver();
         var handler = new SocketsHttpHandler
         {
+            SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+            {
+                RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
+            },
             ConnectCallback = async (context, cancellationToken) =>
             {
                 string mode = _settings.DnsMode; // "Auto" | "Always" | "Never"
@@ -135,16 +139,16 @@ public class DataJackUIApiClient
                     var items = new List<SteamFeaturedItem>();
                     foreach (var aid in appIds)
                     {
-                        string name = _appList.GetName(aid)
-                            ?? (await _appInfo.ResolveAsync(aid, ct))?.Name
-                            ?? aid.ToString();
+                        var info = _appInfo.GetCached(aid) ?? await _appInfo.ResolveAsync(aid, ct);
+                        string name = _appList.GetName(aid) ?? info?.Name ?? aid.ToString();
+                        string imgUrl = await ResolveAndCacheCoverUrlAsync(aid, null, ct);
 
                         items.Add(new SteamFeaturedItem
                         {
                             Id = aid,
                             Name = name,
                             Type = 0,
-                            LargeCapsuleImage = $"https://cdn.cloudflare.steamstatic.com/steam/apps/{aid}/header.jpg"
+                            LargeCapsuleImage = imgUrl
                         });
                     }
                     return items;
@@ -182,16 +186,16 @@ public class DataJackUIApiClient
                     var items = new List<SteamFeaturedItem>();
                     foreach (var aid in appIds)
                     {
-                        string name = _appList.GetName(aid)
-                            ?? (await _appInfo.ResolveAsync(aid, ct))?.Name
-                            ?? aid.ToString();
+                        var info = _appInfo.GetCached(aid) ?? await _appInfo.ResolveAsync(aid, ct);
+                        string name = _appList.GetName(aid) ?? info?.Name ?? aid.ToString();
+                        string imgUrl = await ResolveAndCacheCoverUrlAsync(aid, null, ct);
 
                         items.Add(new SteamFeaturedItem
                         {
                             Id = aid,
                             Name = name,
                             Type = 0,
-                            LargeCapsuleImage = $"https://cdn.cloudflare.steamstatic.com/steam/apps/{aid}/header.jpg"
+                            LargeCapsuleImage = imgUrl
                         });
                     }
                     return items;
@@ -214,8 +218,7 @@ public class DataJackUIApiClient
                     {
                         if (i.Type == 0 && i.Id > 0)
                         {
-                            string imgUrl = SteamCdnUrl.Sanitize(i.LargeCapsuleImage)
-                                ?? $"https://cdn.cloudflare.steamstatic.com/steam/apps/{i.Id}/header.jpg";
+                            string imgUrl = await ResolveAndCacheCoverUrlAsync(i.Id, i.LargeCapsuleImage, ct);
 
                             items.Add(new SteamFeaturedItem
                             {
@@ -234,6 +237,23 @@ public class DataJackUIApiClient
         catch { }
 
         return await FetchSearchCategoryAsync("filter=popularnew&sort_by=Released_DESC", ct);
+    }
+
+    private async Task<string> ResolveAndCacheCoverUrlAsync(long appId, string? fallbackUrl, CancellationToken ct)
+    {
+        try
+        {
+            var info = _appInfo.GetCached(appId) ?? await _appInfo.ResolveAsync(appId, ct);
+            string rawUrl = info?.HeaderImage ?? fallbackUrl ?? SteamAppInfoCache.GuessHeaderImageUrl(appId);
+            string sanitizedUrl = SteamCdnUrl.Sanitize(rawUrl) ?? rawUrl;
+            string? localPath = await _covers.EnsureAsync(appId, sanitizedUrl, ct);
+            return localPath ?? sanitizedUrl;
+        }
+        catch
+        {
+            string fallback = SteamAppInfoCache.GuessHeaderImageUrl(appId);
+            return SteamCdnUrl.Sanitize(fallback) ?? fallback;
+        }
     }
 
     private async Task<List<SteamFeaturedItem>> FetchSearchCategoryAsync(string queryParams, CancellationToken ct)
@@ -261,12 +281,13 @@ public class DataJackUIApiClient
                 if (long.TryParse(m.Groups[1].Value, out long appId))
                 {
                     string name = WebUtility.HtmlDecode(m.Groups[2].Value).Trim();
+                    string imgUrl = await ResolveAndCacheCoverUrlAsync(appId, null, ct);
                     items.Add(new SteamFeaturedItem
                     {
                         Id = appId,
                         Name = name,
                         Type = 0,
-                        LargeCapsuleImage = $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/header.jpg"
+                        LargeCapsuleImage = imgUrl
                     });
                 }
             }
@@ -392,7 +413,7 @@ public class DataJackUIApiClient
 
     // ── Denuvo fixes ────────────────────────────────────────────────
 
-    /// <summary>Public. Every game that has at least one Denuvo fix, plus the tag catalogue. Supports Ryuu, DepotBox, and self-hosted endpoints.</summary>
+    /// <summary>Public. Every game that has at least one Denuvo fix, plus the tag catalogue. Supports Ryuu, DepotBox, Cloudflare Workers, and mirror endpoints.</summary>
     public async Task<DenuvoListingsResponse?> GetDenuvoListingsAsync(CancellationToken ct = default)
     {
         List<DenuvoGameListing> allGames = [];
@@ -400,26 +421,31 @@ public class DataJackUIApiClient
 
         var endpoints = new[]
         {
-            "/api/denuvo/listings",
             "https://generator.ryuu.lol/api/denuvo/listings",
-            "https://depotbox.org/api/denuvo/listings"
+            "https://generator.ryuu.lol/files/fixes.json",
+            "https://depotbox.org/api/denuvo/listings",
+            "https://depotbox.pages.dev/api/denuvo/listings",
+            "https://raw.githubusercontent.com/NetrunnerGames/DataJackUI/main/fixes.json",
+            "https://ghproxy.net/https://generator.ryuu.lol/api/denuvo/listings"
         };
 
         foreach (var endpoint in endpoints)
         {
             try
             {
-                var res = await _http.GetAsync(endpoint, ct);
+                var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                using var res = await _http.SendAsync(req, ct);
                 if (res.IsSuccessStatusCode)
                 {
-                    var data = await ReadJsonAsync<DenuvoListingsResponse>(res, ct);
+                    var json = await res.Content.ReadAsStringAsync(ct);
+                    var data = ParseDenuvoListings(json);
                     if (data?.Games is { Count: > 0 })
                     {
                         allGames.AddRange(data.Games);
-                    }
-                    if (data?.Tags is { Count: > 0 })
-                    {
-                        allTags.AddRange(data.Tags);
+                        if (data.Tags is { Count: > 0 })
+                        {
+                            allTags.AddRange(data.Tags);
+                        }
                     }
                 }
             }
@@ -434,7 +460,36 @@ public class DataJackUIApiClient
         return new DenuvoListingsResponse { Games = mergedGames, Tags = mergedTags };
     }
 
-    /// <summary>Public. One game's fixes (id/title/desc/tags + which download slots exist). Supports Ryuu, DepotBox, and self-hosted endpoints.</summary>
+    private static DenuvoListingsResponse? ParseDenuvoListings(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("games", out var gamesProp) && gamesProp.ValueKind == JsonValueKind.Array)
+                {
+                    var games = JsonSerializer.Deserialize<List<DenuvoGameListing>>(gamesProp.GetRawText(), JsonOpts) ?? [];
+                    var tags = root.TryGetProperty("tags", out var tagsProp) && tagsProp.ValueKind == JsonValueKind.Array
+                        ? JsonSerializer.Deserialize<List<DenuvoTag>>(tagsProp.GetRawText(), JsonOpts) ?? []
+                        : [];
+                    if (games.Count > 0)
+                        return new DenuvoListingsResponse { Games = games, Tags = tags };
+                }
+            }
+            else if (root.ValueKind == JsonValueKind.Array)
+            {
+                var games = JsonSerializer.Deserialize<List<DenuvoGameListing>>(json, JsonOpts);
+                if (games is { Count: > 0 })
+                    return new DenuvoListingsResponse { Games = games, Tags = [] };
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>Public. One game's fixes (id/title/desc/tags + which download slots exist). Supports Ryuu, DepotBox, Cloudflare Workers, and mirror endpoints.</summary>
     public async Task<DenuvoFixesResponse?> GetDenuvoFixesAsync(string appid, CancellationToken ct = default)
     {
         string? name = null;
@@ -443,23 +498,26 @@ public class DataJackUIApiClient
 
         var endpoints = new[]
         {
-            $"/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
             $"https://generator.ryuu.lol/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
-            $"https://depotbox.org/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}"
+            $"https://depotbox.org/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
+            $"https://depotbox.pages.dev/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
+            $"https://ghproxy.net/https://generator.ryuu.lol/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}"
         };
 
         foreach (var endpoint in endpoints)
         {
             try
             {
-                var res = await _http.GetAsync(endpoint, ct);
+                var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                using var res = await _http.SendAsync(req, ct);
                 if (res.IsSuccessStatusCode)
                 {
-                    var data = await ReadJsonAsync<DenuvoFixesResponse>(res, ct);
+                    var json = await res.Content.ReadAsStringAsync(ct);
+                    var data = ParseDenuvoFixes(json, appid);
                     if (data is not null)
                     {
-                        name ??= data.Name;
-                        headerImage ??= data.HeaderImage;
+                        if (!string.IsNullOrEmpty(data.Name) && data.Name != appid) name ??= data.Name;
+                        if (!string.IsNullOrEmpty(data.HeaderImage)) headerImage ??= data.HeaderImage;
                         if (data.Fixes is { Count: > 0 })
                         {
                             allFixes.AddRange(data.Fixes);
@@ -480,6 +538,33 @@ public class DataJackUIApiClient
             HeaderImage = headerImage,
             Fixes = mergedFixes
         };
+    }
+
+    private static DenuvoFixesResponse? ParseDenuvoFixes(string json, string appid)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
+                {
+                    var fixes = JsonSerializer.Deserialize<List<DenuvoFix>>(fixesProp.GetRawText(), JsonOpts) ?? [];
+                    string? name = root.TryGetProperty("name", out var n) ? n.GetString() : null;
+                    string? img = root.TryGetProperty("header_image", out var hi) ? hi.GetString() : null;
+                    return new DenuvoFixesResponse { AppId = appid, Name = name ?? appid, HeaderImage = img, Fixes = fixes };
+                }
+            }
+            else if (root.ValueKind == JsonValueKind.Array)
+            {
+                var fixes = JsonSerializer.Deserialize<List<DenuvoFix>>(json, JsonOpts);
+                if (fixes is { Count: > 0 })
+                    return new DenuvoFixesResponse { AppId = appid, Name = appid, HeaderImage = null, Fixes = fixes };
+            }
+        }
+        catch { }
+        return null;
     }
 
     /// <summary>

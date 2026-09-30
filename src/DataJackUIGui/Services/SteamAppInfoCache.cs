@@ -66,7 +66,7 @@ public class SteamAppInfoCache
     // (the fast in-RAM index below) are derived from these on demand; there is no separate appinfo.json.
     private static readonly string DetailsDir = Path.Combine(Dir, "details");
 
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(15) };
+    private readonly HttpClient _http;
     // In-memory fast path for name/header-image. Populated by network resolves, and lazily rehydrated from
     // the /details blobs on a GetCached miss. A null value means "looked, no usable details" (negative
     // cache) so we don't re-read a missing/empty blob on every grid render.
@@ -87,6 +87,11 @@ public class SteamAppInfoCache
     public SteamAppInfoCache(CacheService cache)
     {
         _cache2 = cache;
+        var handler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = (sender, cert, chain, sslErrors) => true
+        };
+        _http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
         // Restore the rolling window from a previous run so we don't burst fresh into a counting window.
         var now = DateTime.UtcNow;
         foreach (long ms in _cache2.GetSteamApiRequestTimes())
