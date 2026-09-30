@@ -6,7 +6,7 @@
 
 A modern desktop interface for Steam manifest management, native hook injection, and store plugin integration.
 
-<a href="https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0"><img src="https://img.shields.io/badge/DataJackUI-v2.00.0-090a0f?style=for-the-badge&labelColor=090a0f&logo=github&logoColor=00ffff" height="42" alt="DataJackUI Release" /></a>
+<a href="https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.1"><img src="https://img.shields.io/badge/DataJackUI-v2.00.1-090a0f?style=for-the-badge&labelColor=090a0f&logo=github&logoColor=00ffff" height="42" alt="DataJackUI Release" /></a>
 <a href="https://github.com/NetrunnerGames/Jack-in/releases/tag/v1.0"><img src="https://img.shields.io/badge/Jack--in_Plugin-v1.0-090a0f?style=for-the-badge&labelColor=090a0f&logo=steam&logoColor=00adf0" height="42" alt="Jack-in Plugin" /></a>
 <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/Framework-.NET_8.0_WPF-090a0f?style=for-the-badge&labelColor=090a0f&logo=dotnet&logoColor=512bd4" height="42" alt="Framework" /></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-090a0f?style=for-the-badge&labelColor=090a0f&logo=open-source-initiative&logoColor=3da639" height="42" alt="License" /></a>
@@ -35,8 +35,8 @@ DataJackUI provides an interface for Steam manifest acquisition, native DLL hook
 > [!TIP]
 > For standard installation, use the standalone installer (`DataJackUI-win-Setup.exe`). Portable builds are also available for zero-installation deployment.
 
-* **Installer**: Download `DataJackUI-win-Setup.exe` from [Releases](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0).
-* **Portable**: Download `DataJackUI-win-Portable.zip` from [Releases](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.0).
+* **Installer**: Download `DataJackUI-win-Setup.exe` from [Releases](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.1).
+* **Portable**: Download `DataJackUI-win-Portable.zip` from [Releases](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.00.1).
 * **Steam CEF Plugin**: Download `plugin.zip` from the [Jack-in Repository](https://github.com/NetrunnerGames/Jack-in/releases/tag/v1.0) and extract it into your Steam client plugins directory.
 
 ## Building from Source
@@ -57,7 +57,7 @@ cd DataJackUI
 ### Packaging Release Packages
 ```powershell
 # Compiles framework-dependent binaries and generates Velopack installer packages
-.\build_release.ps1 -d 2.00.0 -p 1.0
+.\build_release.ps1 -d 2.00.1 -p 1.0
 ```
 
 ## Acknowledgments

@@ -51,11 +51,18 @@ $PublishDir = "bin/PublishFrameworkDependent"
 $ReleasesDir = "Releases"
 $PluginJsonFile = "src/DataJackUIPlugin/plugin.json"
 
-if (-not (Test-Path $ReleasesDir)) {
-    New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
+# Clean publish directory
+if (Test-Path $PublishDir) {
+    Remove-Item -Recurse -Force $PublishDir
 }
 
-# 1. Update plugin.json version property
+# Clean releases directory
+if (Test-Path $ReleasesDir) {
+    Remove-Item -Recurse -Force $ReleasesDir
+}
+New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
+
+# 1. Update plugin.json version property (if plugin source exists locally)
 if (Test-Path $PluginJsonFile) {
     $jsonText = [System.IO.File]::ReadAllText($PluginJsonFile)
     $jsonObj = $jsonText | ConvertFrom-Json
@@ -71,13 +78,15 @@ dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --se
 Write-Host "`n2. Packaging Velopack Installer & Delta Updates..." -ForegroundColor Yellow
 vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe --framework net8-x64-desktop -o $ReleasesDir
 
-# 4. Package Plugin (Jack-in) into plugin.zip
-Write-Host "`n3. Packaging DataJackUI Plugin (v$PluginVersion for NetrunnerGames/Jack-in)..." -ForegroundColor Yellow
-$PluginSrc = Resolve-Path "src/DataJackUIPlugin"
-$ZipTarget = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/plugin.zip"
+# 4. Package Plugin (Jack-in) into plugin.zip (if plugin source exists)
+if (Test-Path "src/DataJackUIPlugin") {
+    Write-Host "`n3. Packaging DataJackUI Plugin (v$PluginVersion for NetrunnerGames/Jack-in)..." -ForegroundColor Yellow
+    $PluginSrc = Resolve-Path "src/DataJackUIPlugin"
+    $ZipTarget = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/plugin.zip"
 
-if (Test-Path $ZipTarget) { Remove-Item -Force $ZipTarget }
-[System.IO.Compression.ZipFile]::CreateFromDirectory($PluginSrc, $ZipTarget)
+    if (Test-Path $ZipTarget) { Remove-Item -Force $ZipTarget }
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($PluginSrc, $ZipTarget)
+}
 
 Write-Host "`n====================================================" -ForegroundColor Green
 Write-Host " Successfully Created All Release Artifacts in '$ReleasesDir':" -ForegroundColor Green
