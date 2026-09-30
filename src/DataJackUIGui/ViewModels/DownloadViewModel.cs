@@ -71,11 +71,39 @@ public partial class SourceRowViewModel : ObservableObject
 /// <summary>One row in the overwrite-confirm diff (a depot/DLC the new lua adds or removes).</summary>
 public record DiffRow(string Title, string Meta, bool IsDlc, bool IsShared, string SteamDbUrl);
 
-/// <summary>A featured-game card on the Add page (Steam top-sellers / new-releases strips). Clicking it
-/// loads that appid's details just like picking a search result.</summary>
+/// <summary>A featured-game card on the Add page (Steam top-sellers / new-releases strips).</summary>
 public record FeaturedItem(long AppId, string Name, string? Image);
 
-public partial class DownloadViewModel : ObservableObject
+/// <summary>A game card in the Add tab search results grid.</summary>
+public partial class AddGameCardVm : ObservableObject
+{
+    public long AppId { get; }
+    public string Name { get; }
+    public string HeaderImage => $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{AppId}/header.jpg";
+
+    [ObservableProperty] private string? _cover;
+    private int _resolving;
+
+    public AddGameCardVm(SteamSearchResult r)
+    {
+        AppId = r.AppId;
+        Name = r.Name;
+    }
+
+    public async Task EnsureCoverAsync(CoverCache covers)
+    {
+        if (Cover is not null) return;
+        if (Interlocked.Exchange(ref _resolving, 1) == 1) return;
+        try
+        {
+            string? local = covers.GetLocalPath(AppId) ?? await covers.EnsureAsync(AppId, HeaderImage);
+            if (local is not null) Cover = local;
+        }
+        finally { Interlocked.Exchange(ref _resolving, 0); }
+    }
+}
+
+public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 {
     private readonly DataJackUIApiClient _api;
     private readonly HubcapService _hubcap;
@@ -89,6 +117,7 @@ public partial class DownloadViewModel : ObservableObject
     private readonly HardwareAppIdService _hardware;
     private readonly DownloadQueue _queue;
     private readonly ManifestJobFactory _jobs;
+    private readonly CoverCache _covers;
     private CancellationTokenSource? _searchCts;
     private CancellationTokenSource? _detailsCts;
 
@@ -101,7 +130,6 @@ public partial class DownloadViewModel : ObservableObject
     /// <summary>Set by App: navigate to Manage and open this appid's detail (the install banner's "Reveal").</summary>
     public Action<long>? NavigateToGame { get; set; }
 
-    public ObservableCollection<SteamSearchResult> SearchResults { get; } = [];
     public ObservableCollection<SourceRowViewModel> Sources { get; } = [];
     public ObservableCollection<DlcDepot> DlcDepots { get; } = [];
 
@@ -113,18 +141,11 @@ public partial class DownloadViewModel : ObservableObject
     public bool HasTopSellers => TopSellers.Count > 0;
     public bool HasNewReleases => NewReleases.Count > 0;
 
-    /// <summary>Show the featured strips only when the user hasn't started anything, no text typed, no
-    /// results open, no game loaded, no install banner. Once they search or pick a game, the strips hide.</summary>
-    public bool ShowFeatured =>
-        (TopSellers.Count > 0 || NewReleases.Count > 0)
-        && string.IsNullOrWhiteSpace(SearchText)
-        && !HasDetails && !HasSources && !HasInstallResult;
+    public bool ShowFeatured => false;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowFeatured))]
     private string _searchText = "";
     [ObservableProperty] private bool _isSearching;
-    [ObservableProperty] private bool _isResultsOpen;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasDetails))]
@@ -191,7 +212,6 @@ public partial class DownloadViewModel : ObservableObject
         SearchText = appId.ToString();
         _suppressSearch = false;
         ResetResults();
-        IsResultsOpen = false;
 
         try
         {
@@ -241,7 +261,6 @@ public partial class DownloadViewModel : ObservableObject
         SearchText = appId.ToString();
         _suppressSearch = false;
         ResetResults();
-        IsResultsOpen = false;
         InstallStatus = null;
         Error = null;
         try
@@ -323,7 +342,7 @@ public partial class DownloadViewModel : ObservableObject
         AuthService auth, ToastService toast, LuaInstaller installer,
         SteamAppListCache appList, SteamAppInfoCache appInfo, SteamDepotInfo depotInfo,
         HardwareAppIdService hardware, DropInstallViewModel drop,
-        DownloadQueue queue, ManifestJobFactory jobs)
+        DownloadQueue queue, ManifestJobFactory jobs, CoverCache covers)
     {
         _api = api;
         _hubcap = hubcap;
@@ -337,14 +356,21 @@ public partial class DownloadViewModel : ObservableObject
         _hardware = hardware;
         _queue = queue;
         _jobs = jobs;
+        _covers = covers;
         Drop = drop;
         _fastFetch = settings.FastFetch;
+        InitPageSize(settings.AddPageSize);
+    }
+
+    protected override void SavePageSizeSetting(int size) => _settings.AddPageSize = size;
+
+    protected override void OnPageSliced(IReadOnlyList<AddGameCardVm> slice)
+    {
+        foreach (var g in slice) _ = g.EnsureCoverAsync(_covers);
     }
 
     /// <summary>
-    /// Pre-fill from the Manage page "Update" action and fetch the app's details directly. The appid
-    /// is authoritative here, so resolve it straight away. Don't route through search (bare numbers
-    /// are now treated as title queries, not appids, so the text path would search instead of resolve).
+    /// Pre-fill from the Manage page "Update" action and fetch the app's details directly.
     /// </summary>
     public void SeedSearch(long appId)
     {
@@ -354,7 +380,7 @@ public partial class DownloadViewModel : ObservableObject
 
         ResetResults();
         Details = null;
-        IsResultsOpen = false;
+        _ = SearchDebouncedAsync(appId.ToString());
         _ = FetchDetailsDebouncedAsync(appId.ToString());
     }
 
@@ -377,17 +403,20 @@ public partial class DownloadViewModel : ObservableObject
         ResetResults();
         Details = null;
 
-        // Cleared the box → back to the idle/featured state: dismiss the leftover install banner
-        // (ResetResults already cleared Error). Otherwise HasInstallResult keeps the featured strips hidden.
         if (string.IsNullOrWhiteSpace(value))
+        {
+            _searchCts?.Cancel();
+            SetFiltered([]);
             InstallStatus = null;
+            Error = null;
+            IsSearching = false;
+            return;
+        }
 
         string? appid = ExtractAppId(value);
         if (appid is not null)
         {
-            IsResultsOpen = false;
             _ = FetchDetailsDebouncedAsync(appid);
-            return;
         }
 
         _ = SearchDebouncedAsync(value);
@@ -400,25 +429,50 @@ public partial class DownloadViewModel : ObservableObject
         try
         {
             await Task.Delay(350, cts.Token);
-            if (string.IsNullOrWhiteSpace(query) || query.Length > 100)
+            string q = query.Trim();
+            if (string.IsNullOrWhiteSpace(q))
             {
-                SearchResults.Clear();
-                IsResultsOpen = false;
+                SetFiltered([]);
+                IsSearching = false;
                 return;
             }
 
             IsSearching = true;
-            var results = await _api.SearchAsync(query.Trim(), cts.Token);
+            var results = await _api.SearchAsync(q, cts.Token);
             if (cts.Token.IsCancellationRequested) return;
 
-            SearchResults.Clear();
-            foreach (var r in results)
-                if (!_hardware.IsBlacklisted(r.AppId)) SearchResults.Add(r); // hide Steam hardware
-            IsResultsOpen = SearchResults.Count > 0;
+            var cards = results
+                .Where(r => !_hardware.IsBlacklisted(r.AppId))
+                .Select(r => new AddGameCardVm(r))
+                .ToList();
+
+            string? appid = ExtractAppId(q);
+            if (appid is not null && long.TryParse(appid, out long parsedAppId))
+            {
+                if (!cards.Any(c => c.AppId == parsedAppId))
+                {
+                    try
+                    {
+                        var details = await _api.GetDetailsAsync(appid, cts.Token);
+                        if (details is not null && !_hardware.IsBlacklisted(details.AppId))
+                        {
+                            cards.Insert(0, new AddGameCardVm(new SteamSearchResult
+                            {
+                                AppId = details.AppId,
+                                Name = details.Name
+                            }));
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            SetFiltered(cards);
+            if (cards.Count == 0) EmptyMessage = Resources.Strings.Fixes_Empty_None;
         }
-        catch (OperationCanceledException) { /* superseded by newer input */ }
-        catch (ApiException ex) { Error = ex.Message; }
-        catch { /* network hiccup during typing. Ignore */ }
+        catch (OperationCanceledException) { }
+        catch (ApiException ex) { Error = ex.Message; SetFiltered([]); }
+        catch { SetFiltered([]); }
         finally
         {
             if (_searchCts == cts) IsSearching = false;
@@ -440,20 +494,16 @@ public partial class DownloadViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task SelectResultAsync(SteamSearchResult result)
+    private async Task SelectResultAsync(AddGameCardVm card)
     {
-        _suppressSearch = true;
-        SearchText = result.Name;
-        _suppressSearch = false;
-
-        IsResultsOpen = false;
+        if (card is null) return;
         ResetResults();
 
         _detailsCts?.Cancel();
         var cts = _detailsCts = new CancellationTokenSource();
         try
         {
-            Details = await _api.GetDetailsAsync(result.AppId.ToString(), cts.Token);
+            Details = await _api.GetDetailsAsync(card.AppId.ToString(), cts.Token);
             OnPropertyChanged(nameof(GenresText));
         }
         catch (OperationCanceledException) { }
@@ -465,11 +515,6 @@ public partial class DownloadViewModel : ObservableObject
     private async Task SelectFeaturedAsync(FeaturedItem item)
     {
         if (item is null) return;
-        _suppressSearch = true;
-        SearchText = item.Name;
-        _suppressSearch = false;
-
-        IsResultsOpen = false;
         ResetResults();
 
         _detailsCts?.Cancel();
@@ -501,7 +546,7 @@ public partial class DownloadViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CloseResults() => IsResultsOpen = false;
+    private void CloseResults() => SetFiltered([]);
 
     // ── Fetch (sources or DLC info, depending on app type) ─────────
 

@@ -26,6 +26,23 @@ public partial class FixGameCardVm(DenuvoGameListing g) : ObservableObject
     public bool Matches(string q) =>
         Name.Contains(q, StringComparison.OrdinalIgnoreCase) || AppId.Contains(q);
 
+    public bool MatchesTag(string tagIdOrSlug)
+    {
+        if (TagIds.Any(t => string.Equals(t, tagIdOrSlug, StringComparison.OrdinalIgnoreCase))) return true;
+        
+        return g.Tags.Any(t =>
+            string.Equals(t.Id, tagIdOrSlug, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(t.Slug, tagIdOrSlug, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(t.Name, tagIdOrSlug, StringComparison.OrdinalIgnoreCase)) ||
+            (tagIdOrSlug == "generic" && (Name.Contains("Generic", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("Generic", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("Rockstar", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("Ubisoft", StringComparison.OrdinalIgnoreCase)))) ||
+            (tagIdOrSlug == "rockstar" && (Name.Contains("Rockstar", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("Rockstar", StringComparison.OrdinalIgnoreCase)))) ||
+            (tagIdOrSlug == "ubisoft" && (Name.Contains("Ubisoft", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("Ubisoft", StringComparison.OrdinalIgnoreCase)))) ||
+            (tagIdOrSlug == "denuvowo" && (Name.Contains("Denuvo", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("Denuvo", StringComparison.OrdinalIgnoreCase)))) ||
+            (tagIdOrSlug == "voices38" && (Name.Contains("voices38", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("voices38", StringComparison.OrdinalIgnoreCase)))) ||
+            (tagIdOrSlug == "online-fix" && (Name.Contains("Online", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("Online", StringComparison.OrdinalIgnoreCase)))) ||
+            (tagIdOrSlug == "steamtools-achievements" && (Name.Contains("SteamTools", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("SteamTools", StringComparison.OrdinalIgnoreCase))));
+    }
+
     /// <summary>Cache the header image to disk once (CoverCache, keyed by appid), then expose its path.</summary>
     public async Task EnsureCoverAsync(CoverCache covers)
     {
@@ -246,8 +263,31 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
             }
 
             _allGames = data.Games.Select(g => new FixGameCardVm(g)).ToList();
+
+            var tagList = new List<DenuvoTag>(data.Tags);
+            var requiredTags = new (string id, string name, string slug)[]
+            {
+                ("denuvowo", "DenuvOwO", "denuvowo"),
+                ("generic", "Generic", "generic"),
+                ("online-fix", "Online Fix", "online-fix"),
+                ("rockstar", "Rockstar Games", "rockstar"),
+                ("steamtools-achievements", "SteamTools Achievements Fix", "steamtools-achievements"),
+                ("ubisoft", "Ubisoft", "ubisoft"),
+                ("voices38", "voices38 (crack)", "voices38")
+            };
+
+            foreach (var req in requiredTags)
+            {
+                if (!tagList.Any(t => string.Equals(t.Id, req.id, StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(t.Slug, req.slug, StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(t.Name, req.name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    tagList.Add(new DenuvoTag { Id = req.id, Name = req.name, Slug = req.slug });
+                }
+            }
+
             Tags.Clear();
-            foreach (var t in data.Tags) Tags.Add(new TagPillVm(t));
+            foreach (var t in tagList) Tags.Add(new TagPillVm(t));
 
             // "My games" filter source: the same stplug-in scan the Manage page uses, so the toggle
             // shows only games the user actually added. Scanned once per listing load.
@@ -294,7 +334,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     {
         string q = SearchText.Trim();
         IEnumerable<FixGameCardVm> shown = _allGames;
-        if (SelectedTagId is { } tag) shown = shown.Where(g => g.TagIds.Contains(tag));
+        if (SelectedTagId is { } tag) shown = shown.Where(g => g.MatchesTag(tag));
         if (MyGamesOnly) shown = shown.Where(g => long.TryParse(g.AppId, out long id) && _installedAppIds.Contains(id));
         if (q.Length > 0) shown = shown.Where(g => g.Matches(q));
 

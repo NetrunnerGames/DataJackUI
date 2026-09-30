@@ -34,6 +34,9 @@ public class AppSettings
     // list is a narrow sidebar, so a size that suits the Manage grid rarely suits both.
     public int? BuildsPageSize { get; set; }
 
+    // Add-page search results-per-page. 0 = "All".
+    public int? AddPageSize { get; set; }
+
     // UI language as a BCP-47 tag ("en", "zh-Hans"). Null = follow the Windows display language.
     public string? Language { get; set; }
 
@@ -125,6 +128,13 @@ public class SettingsService
     {
         get => _settings.BuildsPageSize ?? 10; // default 10
         set { _settings.BuildsPageSize = value; Save(); }
+    }
+
+    /// <summary>Add-page search results-per-page (default 12). 0 = "All".</summary>
+    public int AddPageSize
+    {
+        get => _settings.AddPageSize ?? 12; // default 12
+        set { _settings.AddPageSize = value; Save(); }
     }
 
     /// <summary>UI language tag ("en" | "zh-Hans"), or null to follow the Windows display language.</summary>
