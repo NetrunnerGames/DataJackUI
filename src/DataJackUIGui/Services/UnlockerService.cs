@@ -32,11 +32,11 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
 
     public IReadOnlyList<ModeDefinition> Modes { get; } =
     [
-        // IceBreaker: DataJack native single-DLL Steam hook (version.dll)
+        // IceBreaker: DataJack native single-DLL Steam hook (version.dll) from NetrunnerGames/IceBreaker
         new(UnlockerMode.IceBreaker, "IceBreaker",
             Description: Resources.Strings.Mode_Desc_IceBreaker,
             Kind: ModeKind.Zip,
-            Owner: "", Repo: "",
+            Owner: "NetrunnerGames", Repo: "IceBreaker",
             FixedTag: null,
             PlaceFiles: ["version.dll"],
             ZipAssetPattern: null),
@@ -95,12 +95,21 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         if (root is null || !steam.IsValid)
             return new ModeState(mode, ModeStatus.Unknown, active, null);
 
-        // IceBreaker: bundled version.dll resource.
+        // IceBreaker: NetrunnerGames/IceBreaker releases (version.dll)
         if (mode == UnlockerMode.IceBreaker)
         {
             string local = Path.Combine(root, "version.dll");
             bool installed = File.Exists(local);
-            return new ModeState(mode, installed ? ModeStatus.UpToDate : ModeStatus.NotInstalled, active, "v1.0.0");
+            var release = await FetchReleaseAsync(def, forceRefresh, ct);
+            string? latestTag = release?.TagName ?? "v1.0a";
+            ModeStatus status = !installed ? ModeStatus.NotInstalled : ModeStatus.UpToDate;
+            if (installed && release is not null)
+            {
+                string? wanted = AssetDigest(release, "version.dll");
+                if (wanted is not null && !AssetHash.OfFile(local).Equals(wanted, StringComparison.OrdinalIgnoreCase))
+                    status = ModeStatus.UpdateAvailable;
+            }
+            return new ModeState(mode, status, active, latestTag);
         }
 
         // OST: recognise BOTH channels. An exact match against the nightly release means up to date;
@@ -204,7 +213,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
             return ModeInstallResult.Fail(Resources.Strings.Err_SteamNotFound);
 
         if (mode == UnlockerMode.IceBreaker)
-            return InstallIceBreakerMode(root, mode);
+            return await InstallIceBreakerFromReleaseAsync(root, def, progress, ct);
 
         var (version, zipUrl, zipName, wantedZipDigest, manifest) = await ResolveReleaseAsync(def, ct);
         if (version is null)
@@ -234,25 +243,58 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         finally { try { Directory.Delete(staging, recursive: true); } catch { } }
     }
 
-    private ModeInstallResult InstallIceBreakerMode(string root, UnlockerMode mode)
+    private async Task<ModeInstallResult> InstallIceBreakerFromReleaseAsync(
+        string root, ModeDefinition def, IProgress<double?>? progress, CancellationToken ct)
     {
-        string srcDll = Path.Combine(AppContext.BaseDirectory, "Resources", "version.dll");
-        if (!File.Exists(srcDll))
-            return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_DownloadMissingFiles, "Resources/version.dll"));
-
-        string dest = Path.Combine(root, "version.dll");
+        var release = await FetchReleaseAsync(def, forceRefresh: true, ct);
+        string staging = Path.Combine(Path.GetTempPath(), "DataJackUIGui", "icebreaker", Guid.NewGuid().ToString("N"));
         try
         {
-            File.Copy(srcDll, dest, overwrite: true);
+            Directory.CreateDirectory(staging);
+            string dest = Path.Combine(root, "version.dll");
+
+            if (release is not null)
+            {
+                var dllAsset = FindAsset(release, "version.dll");
+                var zipAsset = FindZipAsset(def, release);
+
+                if (dllAsset is not null)
+                {
+                    string tmp = Path.Combine(staging, "version.dll");
+                    await DownloadToFileAsync(dllAsset.DownloadUrl, tmp, progress, ct);
+                    File.Copy(tmp, dest, overwrite: true);
+                }
+                else if (zipAsset is not null)
+                {
+                    string zipPath = Path.Combine(staging, zipAsset.Name);
+                    await DownloadToFileAsync(zipAsset.DownloadUrl, zipPath, progress, ct);
+                    var staged = ExtractWanted(zipPath, def.PlaceFiles, staging);
+                    if (!staged.TryGetValue("version.dll", out string? stagedDll))
+                        return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_DownloadMissingFiles, "version.dll"));
+                    File.Copy(stagedDll, dest, overwrite: true);
+                }
+                else
+                {
+                    string localFallback = Path.Combine(AppContext.BaseDirectory, "Resources", "version.dll");
+                    if (File.Exists(localFallback)) File.Copy(localFallback, dest, overwrite: true);
+                    else return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_ReleaseMissingFile, "version.dll"));
+                }
+            }
+            else
+            {
+                string localFallback = Path.Combine(AppContext.BaseDirectory, "Resources", "version.dll");
+                if (File.Exists(localFallback)) File.Copy(localFallback, dest, overwrite: true);
+                else return ModeInstallResult.Fail(Resources.Strings.Err_GithubUnreachable);
+            }
+
             StampNow(dest);
-            settings.SelectedMode = mode.ToString();
+            settings.SelectedMode = UnlockerMode.IceBreaker.ToString();
             try { EnsureOpenSteamToolLuaPath(root); } catch { }
             return ModeInstallResult.Ok();
         }
-        catch
-        {
-            return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_WriteFailedFile, "version.dll"));
-        }
+        catch (OperationCanceledException) { return ModeInstallResult.Fail(Resources.Strings.Err_Cancelled); }
+        catch (Exception ex) { return ModeInstallResult.Fail(ex.Message); }
+        finally { try { Directory.Delete(staging, recursive: true); } catch { } }
     }
 
     private async Task<(string? version, string urlOrError, string zipName, string? wantedZipDigest, UpdateManifest? manifest)> ResolveReleaseAsync(ModeDefinition def, CancellationToken ct)
