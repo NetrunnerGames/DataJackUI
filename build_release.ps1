@@ -76,7 +76,7 @@ dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --se
 
 # 3. Pack Application with Velopack
 Write-Host "`n2. Packaging Velopack Installer & Delta Updates..." -ForegroundColor Yellow
-vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe --framework net8-x64-desktop -o $ReleasesDir
+vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop -o $ReleasesDir
 
 # 4. Package Plugin (Jack-in) into plugin.zip (if plugin source exists)
 if (Test-Path "src/DataJackUIPlugin") {
