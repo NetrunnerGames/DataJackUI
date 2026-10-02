@@ -434,27 +434,45 @@ public class DataJackUIApiClient
 
     // ── Denuvo fixes ────────────────────────────────────────────────
 
-    /// <summary>Public. Every game that has at least one Denuvo fix, plus the tag catalogue. Supports Ryuu, DepotBox, Cloudflare Workers, and mirror endpoints.</summary>
+    private async Task<string> GetDepotBoxApiKeyAsync()
+    {
+        try
+        {
+            string token = await _auth.GetValidAccessTokenAsync();
+            if (!string.IsNullOrWhiteSpace(token)) return token;
+        }
+        catch { }
+        return AppConfig.ManifestBackendUserAgent;
+    }
+
+    // ── DepotBox game fixes ─────────────────────────────────────────
+
+    /// <summary>DepotBox game fixes endpoint. Returns game listings and the 3 DepotBox tags (Bypass, Online, Hypervisor).</summary>
     public async Task<DenuvoListingsResponse?> GetDenuvoListingsAsync(CancellationToken ct = default)
     {
         List<DenuvoGameListing> allGames = [];
-        List<DenuvoTag> allTags = [];
+        var tags = new List<DenuvoTag>
+        {
+            new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" },
+            new DenuvoTag { Id = "online", Name = "Online", Slug = "online" },
+            new DenuvoTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }
+        };
 
         var endpoints = new[]
         {
-            "https://generator.ryuu.lol/api/denuvo/listings",
-            "https://generator.ryuu.lol/files/fixes.json",
-            "https://depotbox.org/api/denuvo/listings",
-            "https://depotbox.pages.dev/api/denuvo/listings",
-            "https://raw.githubusercontent.com/NetrunnerGames/DataJackUI/main/fixes.json",
-            "https://ghproxy.net/https://generator.ryuu.lol/api/denuvo/listings"
+            "https://depotbox.org/api/game-fixes?tag=bypass,online,hypervisor",
+            "https://depotbox.pages.dev/api/game-fixes?tag=bypass,online,hypervisor",
+            "http://167.235.229.108/api/game-fixes?tag=bypass,online,hypervisor"
         };
+
+        string apiKey = await GetDepotBoxApiKeyAsync();
 
         foreach (var endpoint in endpoints)
         {
             try
             {
                 var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                req.Headers.TryAddWithoutValidation("X-API-Key", apiKey);
                 using var res = await _http.SendAsync(req, ct);
                 if (res.IsSuccessStatusCode)
                 {
@@ -463,22 +481,14 @@ public class DataJackUIApiClient
                     if (data?.Games is { Count: > 0 })
                     {
                         allGames.AddRange(data.Games);
-                        if (data.Tags is { Count: > 0 })
-                        {
-                            allTags.AddRange(data.Tags);
-                        }
                     }
                 }
             }
             catch { }
         }
 
-        if (allGames.Count == 0) return null;
-
         var mergedGames = allGames.DistinctBy(g => g.AppId).ToList();
-        var mergedTags = allTags.DistinctBy(t => t.Id).ToList();
-
-        return new DenuvoListingsResponse { Games = mergedGames, Tags = mergedTags };
+        return new DenuvoListingsResponse { Games = mergedGames, Tags = tags };
     }
 
     private static DenuvoListingsResponse? ParseDenuvoListings(string json)
@@ -510,7 +520,7 @@ public class DataJackUIApiClient
         return null;
     }
 
-    /// <summary>Public. One game's fixes (id/title/desc/tags + which download slots exist). Supports Ryuu, DepotBox, Cloudflare Workers, and mirror endpoints.</summary>
+    /// <summary>Fetches a game's fixes from DepotBox /api/game-fixes?q=appid.</summary>
     public async Task<DenuvoFixesResponse?> GetDenuvoFixesAsync(string appid, CancellationToken ct = default)
     {
         string? name = _appList.GetName(long.TryParse(appid, out long aid) ? aid : 0);
@@ -519,18 +529,19 @@ public class DataJackUIApiClient
 
         var endpoints = new[]
         {
-            $"https://generator.ryuu.lol/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
-            $"https://depotbox.org/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
-            $"https://depotbox.pages.dev/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
-            $"https://ghproxy.net/https://generator.ryuu.lol/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
-            $"http://167.235.229.108/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}"
+            $"https://depotbox.org/api/game-fixes?q={Uri.EscapeDataString(appid)}",
+            $"https://depotbox.pages.dev/api/game-fixes?q={Uri.EscapeDataString(appid)}",
+            $"http://167.235.229.108/api/game-fixes?q={Uri.EscapeDataString(appid)}"
         };
+
+        string apiKey = await GetDepotBoxApiKeyAsync();
 
         foreach (var endpoint in endpoints)
         {
             try
             {
                 var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                req.Headers.TryAddWithoutValidation("X-API-Key", apiKey);
                 using var res = await _http.SendAsync(req, ct);
                 if (res.IsSuccessStatusCode)
                 {
@@ -570,6 +581,7 @@ public class DataJackUIApiClient
         long.TryParse(appid, out long aid);
         string name = gameName ?? (aid > 0 ? $"App {aid}" : appid);
         string headerImage = aid > 0 ? SteamAppInfoCache.GuessHeaderImageUrl(aid) : "";
+        string cleanName = name.Replace(' ', '_');
 
         return new DenuvoFixesResponse
         {
@@ -580,16 +592,16 @@ public class DataJackUIApiClient
             {
                 new DenuvoFix
                 {
-                    Id = appid,
-                    Title = $"{name} Fix",
-                    Description = "Manifest & game fix release for this title.",
+                    Id = $"{appid}_bypass",
+                    Title = $"{name} Bypass Fix",
+                    Description = "Bypass game fix release for this title.",
                     HasManifest = true,
                     HasFix = true,
                     ManifestFilename = $"{appid}.zip",
-                    FixFilename = $"{appid}_fix.zip",
+                    FixFilename = $"{cleanName}_bypass.zip",
                     Tags = new List<DenuvoTag>
                     {
-                        new DenuvoTag { Id = "generic", Name = "Generic Fix", Slug = "generic" }
+                        new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }
                     }
                 }
             }
@@ -623,23 +635,35 @@ public class DataJackUIApiClient
         return null;
     }
 
-    /// <summary>
-    /// Auth: download a fix's "manifest" or "fix" slot. The endpoint returns a short-lived signed
-    /// R2 URL (counts toward 25/day); we then fetch the file from that URL. Caller must be signed in.
-    /// </summary>
+    /// <summary>Downloads a fix archive from DepotBox /api/game-fixes/download or a manifest zip.</summary>
     public async Task<DownloadedFile> DownloadDenuvoAsync(
         string fixId, string slot, string fallbackName,
         IProgress<DownloadProgress>? progress, CancellationToken ct = default)
     {
-        // 1. Ask the API for a signed URL (auth + daily-limit gate live here).
-        var res = await SendAsync(HttpMethod.Get,
-            $"/api/denuvo/download?fix={Uri.EscapeDataString(fixId)}&slot={Uri.EscapeDataString(slot)}", ct);
-        var signed = await ReadJsonAsync<DenuvoDownloadResponse>(res, ct);
-        if (string.IsNullOrWhiteSpace(signed?.Url))
-            throw new ApiException(Resources.Strings.Api_Err_EmptyDownloadLink);
+        string apiKey = await GetDepotBoxApiKeyAsync();
 
-        // 2. Fetch the file from R2 (no auth header: the signed URL carries its own credentials).
-        return await DownloadFromUrlAsync(signed.Url, fallbackName, progress, ct);
+        if (slot == "manifest")
+        {
+            string manifestUrl = $"{AppConfig.ApiBaseUrl}/api/manifest/download?appid={Uri.EscapeDataString(fixId)}";
+            return await DownloadFileAsync(manifestUrl, $"{fixId}.zip", progress, ct);
+        }
+
+        string downloadUrl = $"https://depotbox.org/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
+            req.Headers.TryAddWithoutValidation("X-API-Key", apiKey);
+            var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (res.IsSuccessStatusCode)
+            {
+                return await HttpFileDownloader.SaveResponseAsync(res, fallbackName, progress, ct);
+            }
+        }
+        catch { }
+
+        // Fallback endpoint using query param key
+        string fallbackUrl = $"https://depotbox.pages.dev/api/game-fixes/download?file={Uri.EscapeDataString(fallbackName)}&api_key={Uri.EscapeDataString(apiKey)}";
+        return await DownloadFromUrlAsync(fallbackUrl, fallbackName, progress, ct);
     }
 
     // ── Plumbing ────────────────────────────────────────────────────

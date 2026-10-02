@@ -29,18 +29,41 @@ public partial class FixGameCardVm(DenuvoGameListing g) : ObservableObject
     public bool MatchesTag(string tagIdOrSlug)
     {
         if (TagIds.Any(t => string.Equals(t, tagIdOrSlug, StringComparison.OrdinalIgnoreCase))) return true;
-        
-        return g.Tags.Any(t =>
-            string.Equals(t.Id, tagIdOrSlug, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(t.Slug, tagIdOrSlug, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(t.Name, tagIdOrSlug, StringComparison.OrdinalIgnoreCase)) ||
-            (tagIdOrSlug == "generic" && (Name.Contains("Generic", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("Generic", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("Rockstar", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("Ubisoft", StringComparison.OrdinalIgnoreCase)))) ||
-            (tagIdOrSlug == "rockstar" && (Name.Contains("Rockstar", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("Rockstar", StringComparison.OrdinalIgnoreCase)))) ||
-            (tagIdOrSlug == "ubisoft" && (Name.Contains("Ubisoft", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("Ubisoft", StringComparison.OrdinalIgnoreCase)))) ||
-            (tagIdOrSlug == "denuvowo" && (Name.Contains("Denuvo", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("Denuvo", StringComparison.OrdinalIgnoreCase)))) ||
-            (tagIdOrSlug == "voices38" && (Name.Contains("voices38", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("voices38", StringComparison.OrdinalIgnoreCase)))) ||
-            (tagIdOrSlug == "online-fix" && (Name.Contains("Online", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("Online", StringComparison.OrdinalIgnoreCase)))) ||
-            (tagIdOrSlug == "steamtools-achievements" && (Name.Contains("SteamTools", StringComparison.OrdinalIgnoreCase) || g.Tags.Any(t => t.Name.Contains("SteamTools", StringComparison.OrdinalIgnoreCase))));
+
+        string tag = tagIdOrSlug.ToLowerInvariant();
+        if (tag == "bypass")
+        {
+            return g.Tags.Any(t => t.Id.Contains("bypass", StringComparison.OrdinalIgnoreCase)
+                                || t.Name.Contains("bypass", StringComparison.OrdinalIgnoreCase)
+                                || t.Slug.Contains("bypass", StringComparison.OrdinalIgnoreCase)
+                                || t.Id.Contains("voices38", StringComparison.OrdinalIgnoreCase)
+                                || t.Id.Contains("rockstar", StringComparison.OrdinalIgnoreCase)
+                                || t.Id.Contains("ubisoft", StringComparison.OrdinalIgnoreCase)
+                                || t.Id.Contains("generic", StringComparison.OrdinalIgnoreCase))
+                || Name.Contains("Bypass", StringComparison.OrdinalIgnoreCase)
+                || Name.Contains("voices38", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (tag == "online")
+        {
+            return g.Tags.Any(t => t.Id.Contains("online", StringComparison.OrdinalIgnoreCase)
+                                || t.Name.Contains("online", StringComparison.OrdinalIgnoreCase)
+                                || t.Slug.Contains("online", StringComparison.OrdinalIgnoreCase))
+                || Name.Contains("Online", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (tag == "hypervisor")
+        {
+            return g.Tags.Any(t => t.Id.Contains("hypervisor", StringComparison.OrdinalIgnoreCase)
+                                || t.Name.Contains("hypervisor", StringComparison.OrdinalIgnoreCase)
+                                || t.Slug.Contains("hypervisor", StringComparison.OrdinalIgnoreCase)
+                                || t.Id.Contains("denuvowo", StringComparison.OrdinalIgnoreCase)
+                                || t.Id.Contains("denuvo", StringComparison.OrdinalIgnoreCase))
+                || Name.Contains("Denuvo", StringComparison.OrdinalIgnoreCase)
+                || Name.Contains("DenuvOwO", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
     }
 
     /// <summary>Cache the header image to disk once (CoverCache, keyed by appid), then expose its path.</summary>
@@ -276,30 +299,10 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
 
             _allGames = data.Games.Select(g => new FixGameCardVm(g)).ToList();
 
-            var tagList = new List<DenuvoTag>(data.Tags);
-            var requiredTags = new (string id, string name, string slug)[]
-            {
-                ("denuvowo", "DenuvOwO", "denuvowo"),
-                ("generic", "Generic", "generic"),
-                ("online-fix", "Online Fix", "online-fix"),
-                ("rockstar", "Rockstar Games", "rockstar"),
-                ("steamtools-achievements", "SteamTools Achievements Fix", "steamtools-achievements"),
-                ("ubisoft", "Ubisoft", "ubisoft"),
-                ("voices38", "voices38 (crack)", "voices38")
-            };
-
-            foreach (var req in requiredTags)
-            {
-                if (!tagList.Any(t => string.Equals(t.Id, req.id, StringComparison.OrdinalIgnoreCase)
-                                   || string.Equals(t.Slug, req.slug, StringComparison.OrdinalIgnoreCase)
-                                   || string.Equals(t.Name, req.name, StringComparison.OrdinalIgnoreCase)))
-                {
-                    tagList.Add(new DenuvoTag { Id = req.id, Name = req.name, Slug = req.slug });
-                }
-            }
-
             Tags.Clear();
-            foreach (var t in tagList) Tags.Add(new TagPillVm(t));
+            Tags.Add(new TagPillVm(new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }));
+            Tags.Add(new TagPillVm(new DenuvoTag { Id = "online", Name = "Online", Slug = "online" }));
+            Tags.Add(new TagPillVm(new DenuvoTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }));
 
             // "My games" filter source: the same stplug-in scan the Manage page uses, so the toggle
             // shows only games the user actually added. Scanned once per listing load.
