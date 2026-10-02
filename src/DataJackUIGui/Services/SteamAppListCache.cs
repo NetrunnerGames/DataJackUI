@@ -35,8 +35,64 @@ public class SteamAppListCache
 
     public string? GetName(long appid) => _names.TryGetValue(appid, out var n) ? n : null;
 
+    public void AddOrUpdate(long appId, string name)
+    {
+        if (appId > 0 && !string.IsNullOrWhiteSpace(name)) _names[appId] = name;
+    }
+
     /// <summary>Ensure the name list is loaded (from disk, or downloaded once). Safe to call repeatedly.</summary>
     public Task EnsureLoadedAsync() => _loadTask ??= LoadAsync();
+
+    /// <summary>
+    /// Searches cached app names for matches to query terms or AppID.
+    /// Returns matches sorted by exact match -> starts with -> contains, then title length.
+    /// </summary>
+    public List<DataJackUIGui.Models.SteamSearchResult> Search(string query, int maxResults = 12)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return [];
+        query = query.Trim();
+
+        bool isNumeric = long.TryParse(query, out long targetAppId);
+        var matches = new List<(long AppId, string Name, int Rank, int Length)>();
+
+        foreach (var (appId, name) in _names)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+
+            int rank = -1;
+
+            if (isNumeric && appId == targetAppId)
+            {
+                rank = 0; // Direct AppID match
+            }
+            else if (name.Equals(query, StringComparison.OrdinalIgnoreCase))
+            {
+                rank = 0; // Exact title match
+            }
+            else if (name.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+            {
+                rank = 1; // Starts with query
+            }
+            else if (name.Contains(query, StringComparison.OrdinalIgnoreCase))
+            {
+                rank = 2; // Contains query
+            }
+
+            if (rank >= 0)
+            {
+                matches.Add((appId, name, rank, name.Length));
+            }
+        }
+
+        return matches
+            .OrderBy(m => m.Rank)
+            .ThenBy(m => m.Length)
+            .ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(maxResults)
+            .Select(m => new DataJackUIGui.Models.SteamSearchResult { AppId = m.AppId, Name = m.Name })
+            .ToList();
+    }
+
 
     private async Task LoadAsync()
     {

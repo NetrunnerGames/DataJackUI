@@ -89,15 +89,36 @@ public class DataJackUIApiClient
 
     public async Task<List<SteamSearchResult>> SearchAsync(string query, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(query)) return [];
+
+        try
+        {
+            await _appList.EnsureLoadedAsync();
+        }
+        catch { /* best effort */ }
+
+        var localResults = _appList.Search(query, maxResults: 12);
+
+        List<SteamSearchResult> storeResults = [];
         var url = $"{AppConfig.SteamStoreSearchUrl}?term={Uri.EscapeDataString(query)}&l=english&cc=US";
         try
         {
             var res = await _http.GetAsync(url, ct);
-            if (!res.IsSuccessStatusCode) return [];
-            var data = await ReadJsonAsync<SteamStoreSearchResponse>(res, ct);
-            return (data?.Items ?? []).Take(8).Select(i => new SteamSearchResult { AppId = i.Id, Name = i.Name }).ToList();
+            if (res.IsSuccessStatusCode)
+            {
+                var data = await ReadJsonAsync<SteamStoreSearchResponse>(res, ct);
+                storeResults = (data?.Items ?? []).Take(8).Select(i => new SteamSearchResult { AppId = i.Id, Name = i.Name }).ToList();
+            }
         }
-        catch { return []; }
+        catch { }
+
+        var combined = localResults
+            .Concat(storeResults)
+            .DistinctBy(r => r.AppId)
+            .Take(12)
+            .ToList();
+
+        return combined;
     }
 
     /// <summary>Steam's top sellers (from global charts) and new releases lists for the Add page strips.

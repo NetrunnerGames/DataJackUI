@@ -90,4 +90,23 @@ public class TaskRequirementsTests
         var results = await client.SearchAsync("grand theft auto v");
         Assert.NotNull(results);
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SearchGames_IncludesLegacyAndDelistedAppIds()
+    {
+        var settings = new SettingsService();
+        var cache = new CacheService();
+        var auth = new AuthService();
+        var appList = new SteamAppListCache();
+        appList.AddOrUpdate(271590, "Grand Theft Auto V");
+        appList.AddOrUpdate(3240220, "Grand Theft Auto V (Enhanced)");
+
+        var appInfo = new SteamAppInfoCache(cache);
+        var covers = new CoverCache(settings);
+        var client = new DataJackUIApiClient(auth, appInfo, appList, covers, settings);
+
+        var results = await client.SearchAsync("Grand Theft Auto V");
+        Assert.NotNull(results);
+        Assert.Contains(results, r => r.AppId == 271590);
+    }
 }
