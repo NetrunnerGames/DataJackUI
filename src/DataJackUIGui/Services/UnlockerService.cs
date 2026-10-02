@@ -465,7 +465,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         string tomlPath = Path.Combine(steamRoot, "opensteamtool.toml");
         if (!File.Exists(tomlPath))
         {
-            File.WriteAllText(tomlPath, $"[lua]\npaths = [\"{OstLuaPath}\"]\n");
+            File.WriteAllText(tomlPath, $"[lua]\npaths = [\"{OstLuaPath}\"]\n\n[cloud]\nenabled = false\n");
             return;
         }
 
