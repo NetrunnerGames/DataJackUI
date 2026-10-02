@@ -361,6 +361,7 @@ public partial class ModeViewModel : ObservableObject
         IsBusy = true;
         IsProgressIndeterminate = true;
         Progress = 0;
+        bool wasRunning = false;
         try
         {
             var prog = new Progress<double?>(p =>
@@ -369,24 +370,27 @@ public partial class ModeViewModel : ObservableObject
                 if (p is not null) Progress = p.Value * 100;
             });
 
-            // Correct order: kill Steam → write the files → relaunch Steam.
-            // (Files can't be overwritten while Steam holds them open. CloudRedirect's CLI also closes
-            //  Steam itself, but stopping first is harmless and keeps all modes consistent.)
-            await Task.Run(_steam.StopSteam);
+            wasRunning = SteamService.IsSteamRunning();
+            if (wasRunning)
+            {
+                await Task.Run(_steam.StopSteam);
+            }
 
             var result = await _unlocker.InstallAsync(mode, prog);
 
             if (result.Success)
             {
-                bool started = await Task.Run(_steam.StartSteam);
+                bool started = wasRunning && await Task.Run(_steam.StartSteam);
                 _toast.Show(Resources.Strings.Mode_Toast_Updated, started
                     ? string.Format(Resources.Strings.Mode_Toast_Updated_Restarting, mode)
                     : string.Format(Resources.Strings.Mode_Toast_Updated_Start, mode));
             }
             else
             {
-                // Install failed: bring Steam back up anyway so the user isn't left without it.
-                await Task.Run(_steam.StartSteam);
+                if (wasRunning)
+                {
+                    await Task.Run(_steam.StartSteam);
+                }
                 _toast.Show(Resources.Strings.Mode_Toast_InstallFailed, result.Error ?? Resources.Strings.Mode_Toast_InstallFailed_Body, error: true);
             }
 
