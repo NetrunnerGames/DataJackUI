@@ -183,8 +183,7 @@ public partial class HomeViewModel : ObservableObject
     /// so App can call it from LuaInstaller.Installed to refresh live after any add.</summary>
     public async Task RefreshLibraryAsync()
     {
-        string? dir = _steam.StPlugInDir;
-        if (dir is null || !Directory.Exists(dir))
+        if (!_steam.IsValid)
         {
             GameCount = 0;
             Recent = [];
@@ -194,17 +193,15 @@ public partial class HomeViewModel : ObservableObject
         await _appList.EnsureLoadedAsync();
 
         var tiles = await Task.Run(() =>
-            Directory.EnumerateFiles(dir, "*.lua")
-                .Select(path => (path, name: Path.GetFileNameWithoutExtension(path)))
-                .Where(f => long.TryParse(f.name, out long id) && _auth.IsAppAllowed(id))
+            LuaInstaller.EnumerateInstalled(_steam)
+                .Where(f => _auth.IsAppAllowed(f.AppId))
                 .Select(f =>
                 {
-                    long appid = long.Parse(f.name);
-                    var info = new FileInfo(f.path);
+                    long appid = f.AppId;
+                    var info = new FileInfo(f.Path);
                     string? name = _appList.GetName(appid) ?? _appInfo.GetCached(appid)?.Name;
-                    // Base = when added to the folder; if edited since (LastWrite later), use that. Newer is more relevant.
                     var added = info.LastWriteTime > info.CreationTime ? info.LastWriteTime : info.CreationTime;
-                    return new LuaTileViewModel(appid, f.path, added, name ?? string.Format(Resources.Strings.Common_AppFallback, appid), name is null);
+                    return new LuaTileViewModel(appid, f.Path, added, name ?? string.Format(Resources.Strings.Common_AppFallback, appid), name is null);
                 })
                 .OrderByDescending(t => t.AddedAt)
                 .ToList());
