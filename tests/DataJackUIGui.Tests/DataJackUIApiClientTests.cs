@@ -216,10 +216,9 @@ public class DataJackUIApiClientTests
         }
         """;
 
-        StubHttpHandler? stub = null;
-        stub = new StubHttpHandler(req =>
+        var stub = new StubHttpHandler(req =>
         {
-            Assert.True(req.Headers.Contains("X-API-Key"));
+            Assert.Contains("/api/game-fixes", req.RequestUri?.ToString());
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(json)

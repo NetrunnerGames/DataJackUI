@@ -442,11 +442,6 @@ public class DataJackUIApiClient
         return DownloadFileAsync(url, $"{appid}.lua", progress, ct);
     }
 
-    // ── Denuvo fixes ────────────────────────────────────────────────
-
-    private Task<string> GetDepotBoxApiKeyAsync()
-        => Task.FromResult(AppConfig.DepotBoxApiKey);
-
     // ── DepotBox game fixes ─────────────────────────────────────────
 
     /// <summary>DepotBox game fixes endpoint. Returns game listings and the 3 DepotBox tags (Bypass, Online, Hypervisor).</summary>
@@ -462,19 +457,16 @@ public class DataJackUIApiClient
 
         var endpoints = new[]
         {
+            $"{AppConfig.DepotBoxProxyUrl}/api/game-fixes?tag=bypass,online,hypervisor",
             "https://depotbox.org/api/game-fixes?tag=bypass,online,hypervisor",
-            "https://depotbox.pages.dev/api/game-fixes?tag=bypass,online,hypervisor",
-            "http://167.235.229.108/api/game-fixes?tag=bypass,online,hypervisor"
+            "https://depotbox.pages.dev/api/game-fixes?tag=bypass,online,hypervisor"
         };
-
-        string apiKey = await GetDepotBoxApiKeyAsync();
 
         foreach (var endpoint in endpoints)
         {
             try
             {
                 var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
-                req.Headers.TryAddWithoutValidation("X-API-Key", apiKey);
                 using var res = await _http.SendAsync(req, ct);
                 if (res.IsSuccessStatusCode)
                 {
@@ -648,19 +640,16 @@ public class DataJackUIApiClient
 
         var endpoints = new[]
         {
+            $"{AppConfig.DepotBoxProxyUrl}/api/game-fixes?q={Uri.EscapeDataString(appid)}",
             $"https://depotbox.org/api/game-fixes?q={Uri.EscapeDataString(appid)}",
-            $"https://depotbox.pages.dev/api/game-fixes?q={Uri.EscapeDataString(appid)}",
-            $"http://167.235.229.108/api/game-fixes?q={Uri.EscapeDataString(appid)}"
+            $"https://depotbox.pages.dev/api/game-fixes?q={Uri.EscapeDataString(appid)}"
         };
-
-        string apiKey = await GetDepotBoxApiKeyAsync();
 
         foreach (var endpoint in endpoints)
         {
             try
             {
                 var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
-                req.Headers.TryAddWithoutValidation("X-API-Key", apiKey);
                 using var res = await _http.SendAsync(req, ct);
                 if (res.IsSuccessStatusCode)
                 {
@@ -865,19 +854,16 @@ public class DataJackUIApiClient
         string fixId, string slot, string fallbackName,
         IProgress<DownloadProgress>? progress, CancellationToken ct = default)
     {
-        string apiKey = await GetDepotBoxApiKeyAsync();
-
         if (slot == "manifest")
         {
             string manifestUrl = $"{AppConfig.ApiBaseUrl}/api/manifest/download?appid={Uri.EscapeDataString(fixId)}";
             return await DownloadFileAsync(manifestUrl, $"{fixId}.zip", progress, ct);
         }
 
-        string downloadUrl = $"https://depotbox.org/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
+        string downloadUrl = $"{AppConfig.DepotBoxProxyUrl}/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
         try
         {
             var req = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
-            req.Headers.TryAddWithoutValidation("X-API-Key", apiKey);
             var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
             if (res.IsSuccessStatusCode)
             {
@@ -886,8 +872,8 @@ public class DataJackUIApiClient
         }
         catch { }
 
-        // Fallback endpoint using query param key
-        string fallbackUrl = $"https://depotbox.pages.dev/api/game-fixes/download?file={Uri.EscapeDataString(fallbackName)}&api_key={Uri.EscapeDataString(apiKey)}";
+        // Upstream fallback
+        string fallbackUrl = $"https://depotbox.org/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
         return await DownloadFromUrlAsync(fallbackUrl, fallbackName, progress, ct);
     }
 
