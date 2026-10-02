@@ -422,6 +422,15 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         _ = SearchDebouncedAsync(value);
     }
 
+    private static void RunOnUi(Action action)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+            dispatcher.Invoke(action);
+        else
+            action();
+    }
+
     private async Task SearchDebouncedAsync(string query)
     {
         _searchCts?.Cancel();
@@ -433,11 +442,11 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
             if (string.IsNullOrWhiteSpace(q))
             {
                 SetFiltered([]);
-                IsSearching = false;
+                RunOnUi(() => IsSearching = false);
                 return;
             }
 
-            IsSearching = true;
+            RunOnUi(() => IsSearching = true);
             var results = await _api.SearchAsync(q, cts.Token);
             if (cts.Token.IsCancellationRequested) return;
 
@@ -468,14 +477,14 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
             }
 
             SetFiltered(cards);
-            if (cards.Count == 0) EmptyMessage = Resources.Strings.Fixes_Empty_None;
+            if (cards.Count == 0) RunOnUi(() => EmptyMessage = Resources.Strings.Fixes_Empty_None);
         }
         catch (OperationCanceledException) { }
-        catch (ApiException ex) { Error = ex.Message; SetFiltered([]); }
+        catch (ApiException ex) { RunOnUi(() => Error = ex.Message); SetFiltered([]); }
         catch { SetFiltered([]); }
         finally
         {
-            if (_searchCts == cts) IsSearching = false;
+            if (_searchCts == cts) RunOnUi(() => IsSearching = false);
         }
     }
 
@@ -486,11 +495,15 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         try
         {
             await Task.Delay(400, cts.Token);
-            Details = await _api.GetDetailsAsync(appid, cts.Token);
-            OnPropertyChanged(nameof(GenresText));
+            var details = await _api.GetDetailsAsync(appid, cts.Token);
+            RunOnUi(() =>
+            {
+                Details = details;
+                OnPropertyChanged(nameof(GenresText));
+            });
         }
         catch (OperationCanceledException) { }
-        catch { Details = null; }
+        catch { RunOnUi(() => Details = null); }
     }
 
     [RelayCommand]

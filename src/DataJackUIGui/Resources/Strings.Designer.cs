@@ -319,6 +319,7 @@ public static class Strings
     public static string Add_Title => Get(nameof(Add_Title));
     public static string Add_Subtitle => Get(nameof(Add_Subtitle));
     public static string Add_SearchPlaceholder => Get(nameof(Add_SearchPlaceholder));
+    public static string Add_Searching => Get(nameof(Add_Searching));
     public static string Add_Featured_TopSellers => Get(nameof(Add_Featured_TopSellers));
     public static string Add_Featured_NewReleases => Get(nameof(Add_Featured_NewReleases));
     public static string Add_Released => Get(nameof(Add_Released));

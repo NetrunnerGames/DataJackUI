@@ -131,6 +131,13 @@ public abstract partial class PagedListViewModel<T> : ObservableObject
     /// clamped into range.</param>
     protected void SetFiltered(IEnumerable<T> filtered, bool resetPage = true)
     {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(() => SetFiltered(filtered, resetPage));
+            return;
+        }
+
         _suppressPageSlice = true;
         if (resetPage) CurrentPage = 1;
 

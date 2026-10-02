@@ -167,7 +167,7 @@
                 Orientation="Horizontal"
                 Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}">
                 <ui:ProgressRing Width="20" Height="20" IsIndeterminate="True" />
-                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" Foreground="#9ca3af" Text="{x:Static res:Strings.Fixes_Loading}" />
+                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" Foreground="#9ca3af" Text="{x:Static res:Strings.Add_Searching}" />
             </StackPanel>
 
             <!-- Search result game grid -->
