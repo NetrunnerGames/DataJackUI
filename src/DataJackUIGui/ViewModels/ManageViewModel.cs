@@ -561,7 +561,6 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
 
             var tiles = await Task.Run(() =>
                 LuaInstaller.EnumerateInstalled(_steam) // shared scan rule across datalua, stplug-in, and lua
-                    .Where(f => _auth.IsAppAllowed(f.AppId))
                     .Select(f =>
                     {
                         var info = new FileInfo(f.Path);

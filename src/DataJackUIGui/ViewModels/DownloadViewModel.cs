@@ -81,8 +81,12 @@ public partial class AddGameCardVm : ObservableObject
     public string Name { get; }
     public string HeaderImage => $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{AppId}/header.jpg";
 
-    [ObservableProperty] private string? _cover;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Cover))]
+    private string? _localCover;
     private int _resolving;
+
+    public string Cover => LocalCover ?? HeaderImage;
 
     public AddGameCardVm(SteamSearchResult r)
     {
@@ -92,7 +96,7 @@ public partial class AddGameCardVm : ObservableObject
 
     public async Task EnsureCoverAsync(CoverCache covers)
     {
-        if (Cover is not null) return;
+        if (LocalCover is not null) return;
         if (Interlocked.Exchange(ref _resolving, 1) == 1) return;
         try
         {
@@ -101,9 +105,9 @@ public partial class AddGameCardVm : ObservableObject
             {
                 var dispatcher = System.Windows.Application.Current?.Dispatcher;
                 if (dispatcher is not null && !dispatcher.CheckAccess())
-                    dispatcher.Invoke(() => Cover = local);
+                    dispatcher.Invoke(() => LocalCover = local);
                 else
-                    Cover = local;
+                    LocalCover = local;
             }
         }
         catch { }

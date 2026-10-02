@@ -194,7 +194,6 @@ public partial class HomeViewModel : ObservableObject
 
         var tiles = await Task.Run(() =>
             LuaInstaller.EnumerateInstalled(_steam)
-                .Where(f => _auth.IsAppAllowed(f.AppId))
                 .Select(f =>
                 {
                     long appid = f.AppId;
