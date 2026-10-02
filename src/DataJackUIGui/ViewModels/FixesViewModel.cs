@@ -416,9 +416,17 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         try
         {
             var data = await api.GetDenuvoFixesAsync(game.AppId);
-            if (data is not null) await ProcessGameDataAsync(game, data);
+            if (data is null || data.Fixes.Count == 0)
+            {
+                data = DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
+            }
+            await ProcessGameDataAsync(game, data);
         }
-        catch { }
+        catch
+        {
+            var fallback = DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
+            await ProcessGameDataAsync(game, fallback);
+        }
         finally { IsLoadingFixes = false; }
     }
 

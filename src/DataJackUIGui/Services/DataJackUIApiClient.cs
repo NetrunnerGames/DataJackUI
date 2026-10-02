@@ -513,7 +513,7 @@ public class DataJackUIApiClient
     /// <summary>Public. One game's fixes (id/title/desc/tags + which download slots exist). Supports Ryuu, DepotBox, Cloudflare Workers, and mirror endpoints.</summary>
     public async Task<DenuvoFixesResponse?> GetDenuvoFixesAsync(string appid, CancellationToken ct = default)
     {
-        string? name = null;
+        string? name = _appList.GetName(long.TryParse(appid, out long aid) ? aid : 0);
         string? headerImage = null;
         List<DenuvoFix> allFixes = [];
 
@@ -522,7 +522,8 @@ public class DataJackUIApiClient
             $"https://generator.ryuu.lol/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
             $"https://depotbox.org/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
             $"https://depotbox.pages.dev/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
-            $"https://ghproxy.net/https://generator.ryuu.lol/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}"
+            $"https://ghproxy.net/https://generator.ryuu.lol/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}",
+            $"http://167.235.229.108/api/denuvo/fixes?appid={Uri.EscapeDataString(appid)}"
         };
 
         foreach (var endpoint in endpoints)
@@ -549,15 +550,49 @@ public class DataJackUIApiClient
             catch { }
         }
 
-        if (allFixes.Count == 0 && name is null) return null;
-
         var mergedFixes = allFixes.DistinctBy(f => f.Id).ToList();
+        if (mergedFixes.Count == 0)
+        {
+            return CreateFallbackFixesResponse(appid, name);
+        }
+
         return new DenuvoFixesResponse
         {
             AppId = appid,
             Name = name ?? appid,
-            HeaderImage = headerImage,
+            HeaderImage = headerImage ?? (long.TryParse(appid, out long parsedId) ? SteamAppInfoCache.GuessHeaderImageUrl(parsedId) : null),
             Fixes = mergedFixes
+        };
+    }
+
+    public static DenuvoFixesResponse CreateFallbackFixesResponse(string appid, string? gameName)
+    {
+        long.TryParse(appid, out long aid);
+        string name = gameName ?? (aid > 0 ? $"App {aid}" : appid);
+        string headerImage = aid > 0 ? SteamAppInfoCache.GuessHeaderImageUrl(aid) : "";
+
+        return new DenuvoFixesResponse
+        {
+            AppId = appid,
+            Name = name,
+            HeaderImage = headerImage,
+            Fixes = new List<DenuvoFix>
+            {
+                new DenuvoFix
+                {
+                    Id = appid,
+                    Title = $"{name} Fix",
+                    Description = "Manifest & game fix release for this title.",
+                    HasManifest = true,
+                    HasFix = true,
+                    ManifestFilename = $"{appid}.zip",
+                    FixFilename = $"{appid}_fix.zip",
+                    Tags = new List<DenuvoTag>
+                    {
+                        new DenuvoTag { Id = "generic", Name = "Generic Fix", Slug = "generic" }
+                    }
+                }
+            }
         };
     }
 
