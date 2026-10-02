@@ -57,10 +57,7 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
             Environment.GetFolderPath(Environment.SpecialFolder.System), SystemSourceName);
     }
 
-    private static readonly LoaderSlot[] Slots =
-    {
-        new("version.dll", "version_real.dll", "version.dll"),
-    };
+    private static readonly LoaderSlot[] Slots = Array.Empty<LoaderSlot>();
 
     private static readonly string[] LegacyDllNames =
         { "winmm.dll", "winmm_real.dll", "bcrypt.dll", "bcrypt_real.dll", "psapi.dll", "dbghelp.dll", "dbghelp_real.dll" };
@@ -300,7 +297,7 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
 
         var zipAsset = FindAsset(latest, PluginZipAsset);
         if (zipAsset is null)
-            return (false, string.Format(Resources.Strings.Plugin_Err_MissingAssets, latest.TagName, PluginZipAsset, Slots[0].DllAsset));
+            return (false, string.Format(Resources.Strings.Plugin_Err_MissingAssets, latest.TagName, PluginZipAsset, PluginZipAsset));
         
         var slotAssets = new Dictionary<LoaderSlot, GithubAsset>();
         foreach (var slot in Slots)

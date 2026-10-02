@@ -103,12 +103,11 @@ public partial class HomeViewModel : ObservableObject
     private async Task InstallPlugin()
     {
         if (IsInstallingPlugin) return;
-        var confirm = System.Windows.MessageBox.Show(
-            Resources.Strings.Plugin_Confirm_RestartBody,
+        bool confirmed = await UiMessageBox.ShowConfirmAsync(
             Resources.Strings.Plugin_Confirm_RestartCaption,
-            System.Windows.MessageBoxButton.OKCancel,
-            System.Windows.MessageBoxImage.Warning);
-        if (confirm != System.Windows.MessageBoxResult.OK) return;
+            Resources.Strings.Plugin_Confirm_RestartBody,
+            confirmText: "OK", cancelText: Resources.Strings.Mode_Cancel);
+        if (!confirmed) return;
 
         IsInstallingPlugin = true;
         PluginStatusText = Resources.Strings.Plugin_Checking;

@@ -99,15 +99,11 @@ public partial class PluginViewModel : ObservableObject
             : null;
     }
 
-    private bool ConfirmSteamRestart()
-    {
-        var result = System.Windows.MessageBox.Show(
-            Resources.Strings.Plugin_Confirm_RestartBody,
+    private Task<bool> ConfirmSteamRestartAsync() =>
+        UiMessageBox.ShowConfirmAsync(
             Resources.Strings.Plugin_Confirm_RestartCaption,
-            System.Windows.MessageBoxButton.OKCancel,
-            System.Windows.MessageBoxImage.Warning);
-        return result == System.Windows.MessageBoxResult.OK;
-    }
+            Resources.Strings.Plugin_Confirm_RestartBody,
+            confirmText: "OK", cancelText: Resources.Strings.Mode_Cancel);
 
     private IProgress<double?> MakeProgress() => new Progress<double?>(p =>
     {
@@ -119,7 +115,7 @@ public partial class PluginViewModel : ObservableObject
     private async Task Install()
     {
         if (IsBusy) return;
-        if (!ConfirmSteamRestart()) return;
+        if (!await ConfirmSteamRestartAsync()) return;
 
         IsBusy = true;
         IsProgressIndeterminate = true;
@@ -142,7 +138,7 @@ public partial class PluginViewModel : ObservableObject
     private async Task Uninstall()
     {
         if (IsBusy || !IsInstalled) return;
-        if (!ConfirmSteamRestart()) return;
+        if (!await ConfirmSteamRestartAsync()) return;
 
         IsBusy = true;
         IsProgressIndeterminate = true;
