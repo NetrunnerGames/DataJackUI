@@ -444,16 +444,8 @@ public class DataJackUIApiClient
 
     // ── Denuvo fixes ────────────────────────────────────────────────
 
-    private async Task<string> GetDepotBoxApiKeyAsync()
-    {
-        try
-        {
-            string token = await _auth.GetValidAccessTokenAsync();
-            if (!string.IsNullOrWhiteSpace(token)) return token;
-        }
-        catch { }
-        return AppConfig.ManifestBackendUserAgent;
-    }
+    private Task<string> GetDepotBoxApiKeyAsync()
+        => Task.FromResult(AppConfig.DepotBoxApiKey);
 
     // ── DepotBox game fixes ─────────────────────────────────────────
 
@@ -504,7 +496,7 @@ public class DataJackUIApiClient
             .Select(group =>
             {
                 var first = group.First();
-                int fixCount = group.Sum(g => g.Fixes.Count > 0 ? g.Fixes.Count : Math.Max(1, g.FixCount));
+                int fixCount = group.Sum(g => g.Fixes.Count > 0 ? g.Fixes.Count : g.FixCount);
                 first.FixCount = fixCount;
                 var allTags = group.SelectMany(g => g.Tags).DistinctBy(t => t.Id.ToLowerInvariant()).ToList();
                 if (allTags.Count > 0) first.Tags = allTags;
@@ -572,15 +564,24 @@ public class DataJackUIApiClient
 
         if (elem.TryGetProperty("header_image", out var ip)) item.HeaderImage = ip.GetString();
         else if (elem.TryGetProperty("headerImage", out var ip2)) item.HeaderImage = ip2.GetString();
-        else if (elem.TryGetProperty("image", out var ip3)) item.HeaderImage = ip3.GetString();
+        else if (elem.TryGetProperty("capsuleImage", out var ip3)) item.HeaderImage = ip3.GetString();
+        else if (elem.TryGetProperty("image", out var ip4)) item.HeaderImage = ip4.GetString();
 
+        // Parse the inline fixes array (DepotBox returns fixes[] inside each game element)
+        if (elem.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var fixElem in fixesProp.EnumerateArray())
+                item.Fixes.Add(ParseGameFixElement(fixElem));
+        }
+
+        // Fix count: explicit property → inline fixes array length → 0
         if (elem.TryGetProperty("fixCount", out var fc) && fc.TryGetInt32(out int f1)) item.FixCount = f1;
         else if (elem.TryGetProperty("fix_count", out var fc2) && fc2.TryGetInt32(out int f2)) item.FixCount = f2;
         else if (elem.TryGetProperty("fixes_count", out var fc3) && fc3.TryGetInt32(out int f3)) item.FixCount = f3;
         else if (elem.TryGetProperty("count", out var fc4) && fc4.TryGetInt32(out int f4)) item.FixCount = f4;
+        else item.FixCount = item.Fixes.Count; // derive from parsed fixes
 
-        if (item.FixCount == 0) item.FixCount = item.Fixes.Count > 0 ? item.Fixes.Count : 1;
-
+        // Tags: game-level first, then aggregate from parsed fixes if empty
         var tags = new List<GameFixTag>();
         if (elem.TryGetProperty("tags", out var tp))
         {
@@ -615,6 +616,17 @@ public class DataJackUIApiClient
                 tags.Add(new GameFixTag { Id = s.ToLowerInvariant(), Name = s, Slug = s.ToLowerInvariant() });
         }
 
+        // If no game-level tags found, aggregate from the parsed fixes
+        if (tags.Count == 0 && item.Fixes.Count > 0)
+        {
+            tags = item.Fixes
+                .SelectMany(f => f.Tags)
+                .GroupBy(t => t.Id.ToLowerInvariant())
+                .Select(g => g.First())
+                .ToList();
+        }
+
+        // Last resort: infer from the name
         if (tags.Count == 0)
         {
             string combo = (item.Name + " " + item.AppId).ToLowerInvariant();
@@ -725,11 +737,39 @@ public class DataJackUIApiClient
 
             if (root.ValueKind == JsonValueKind.Object)
             {
-                if (root.TryGetProperty("name", out var n)) name = n.GetString();
-                if (root.TryGetProperty("header_image", out var hi)) img = hi.GetString();
-
-                if (root.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
+                // DepotBox ?q= returns { success, games: [{ appid, name, fixes: [...] }] }
+                if (root.TryGetProperty("games", out var gamesProp) && gamesProp.ValueKind == JsonValueKind.Array)
                 {
+                    foreach (var gameElem in gamesProp.EnumerateArray())
+                    {
+                        // Match on appid (the ?q= search may return multiple games)
+                        string? elemAppId = gameElem.TryGetProperty("appid", out var eid) ? eid.ToString() : null;
+                        if (elemAppId is not null && elemAppId != appid) continue;
+
+                        if (name is null && gameElem.TryGetProperty("name", out var gn)) name = gn.GetString();
+                        if (img is null)
+                        {
+                            if (gameElem.TryGetProperty("headerImage", out var ghi)) img = ghi.GetString();
+                            else if (gameElem.TryGetProperty("header_image", out var ghi2)) img = ghi2.GetString();
+                            else if (gameElem.TryGetProperty("capsuleImage", out var gci)) img = gci.GetString();
+                        }
+
+                        if (gameElem.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var elem in fixesProp.EnumerateArray())
+                                fixes.Add(ParseGameFixElement(elem));
+                        }
+
+                        if (elemAppId == appid) break; // exact match found
+                    }
+                }
+                // Fallback: direct { name, fixes: [...] } format
+                else if (root.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
+                {
+                    if (root.TryGetProperty("name", out var n)) name = n.GetString();
+                    if (root.TryGetProperty("header_image", out var hi)) img = hi.GetString();
+                    else if (root.TryGetProperty("headerImage", out var hi2)) img = hi2.GetString();
+
                     foreach (var elem in fixesProp.EnumerateArray())
                         fixes.Add(ParseGameFixElement(elem));
                 }
@@ -755,9 +795,20 @@ public class DataJackUIApiClient
         if (elem.TryGetProperty("id", out var id)) fix.Id = id.GetString() ?? "";
         if (elem.TryGetProperty("title", out var t)) fix.Title = t.GetString() ?? fix.Id;
         else if (elem.TryGetProperty("name", out var n)) fix.Title = n.GetString() ?? fix.Id;
+
+        // DepotBox uses downloadName / filename for the file to download
+        string? downloadName = null;
+        if (elem.TryGetProperty("downloadName", out var dn)) downloadName = dn.GetString();
+        else if (elem.TryGetProperty("filename", out var fn)) downloadName = fn.GetString();
+
+        if (string.IsNullOrEmpty(fix.Title) && !string.IsNullOrEmpty(downloadName))
+            fix.Title = downloadName.Replace(".zip", "").Replace(".rar", "").Replace('_', ' ');
         if (string.IsNullOrEmpty(fix.Title)) fix.Title = fix.Id;
 
         if (elem.TryGetProperty("description", out var d)) fix.Description = d.GetString();
+        // Include size in description if available
+        if (elem.TryGetProperty("size", out var sz) && !string.IsNullOrEmpty(sz.GetString()))
+            fix.Description = string.IsNullOrEmpty(fix.Description) ? $"Size: {sz.GetString()}" : $"{fix.Description} (Size: {sz.GetString()})";
 
         fix.HasManifest = !elem.TryGetProperty("hasManifest", out var hm) || hm.GetBoolean();
         fix.HasFix = !elem.TryGetProperty("hasFix", out var hf) || hf.GetBoolean();
@@ -765,6 +816,9 @@ public class DataJackUIApiClient
         if (elem.TryGetProperty("manifestFilename", out var mf)) fix.ManifestFilename = mf.GetString();
         if (elem.TryGetProperty("fixFilename", out var ff)) fix.FixFilename = ff.GetString();
         else if (elem.TryGetProperty("file", out var ffile)) fix.FixFilename = ffile.GetString();
+        // DepotBox: use downloadName as the fix filename if not already set
+        if (string.IsNullOrEmpty(fix.FixFilename) && !string.IsNullOrEmpty(downloadName))
+            fix.FixFilename = downloadName;
 
         var tags = new List<GameFixTag>();
         if (elem.TryGetProperty("tags", out var tp))

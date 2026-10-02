@@ -82,6 +82,10 @@ public static class AppConfig
     public const string ManifestBackendUrl = "http://167.235.229.108";
     public const string ManifestBackendUserAgent = "secretgoonpoon";
 
+    // DepotBox: game-fixes API (bypass / online / hypervisor). Requires its own API key,
+    // separate from the Supabase/Discord auth token. Buy / rotate at https://depotbox.org/dashboard.
+    public const string DepotBoxApiKey = "7031bee8-3db4-4c30-9021-e3a0b2685bd7";
+
     // The donate-keys endpoint gates on a DIFFERENT User-Agent than the manifest backend (it 403s
     // otherwise). This matches the DataJackUI plugin's config.USER_AGENT.
     public const string DonateKeysUserAgent = "discord(dot)gg/datajackui";
