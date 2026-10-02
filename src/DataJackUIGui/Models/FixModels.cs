@@ -2,15 +2,15 @@ using System.Text.Json.Serialization;
 
 namespace DataJackUIGui.Models;
 
-// ── /api/denuvo/listings (public). The game grid ───────────────────
+// ── /api/game-fixes listings (public). The game grid ───────────────────
 
-public class DenuvoListingsResponse
+public class GameFixListingsResponse
 {
-    [JsonPropertyName("games")] public List<DenuvoGameListing> Games { get; set; } = [];
-    [JsonPropertyName("tags")] public List<DenuvoTag> Tags { get; set; } = [];
+    [JsonPropertyName("games")] public List<GameFixListing> Games { get; set; } = [];
+    [JsonPropertyName("tags")] public List<GameFixTag> Tags { get; set; } = [];
 }
 
-public class DenuvoGameListing
+public class GameFixListing
 {
     private int _fixCount;
 
@@ -31,10 +31,10 @@ public class DenuvoGameListing
     [JsonPropertyName("fixes_count")]
     public int FixCountAlt2 { set => _fixCount = value; }
 
-    [JsonPropertyName("tags")] public List<DenuvoTag> Tags { get; set; } = [];
+    [JsonPropertyName("tags")] public List<GameFixTag> Tags { get; set; } = [];
 }
 
-public class DenuvoTag
+public class GameFixTag
 {
     [JsonPropertyName("id")] public string Id { get; set; } = "";
     [JsonPropertyName("name")] public string Name { get; set; } = "";
@@ -42,22 +42,22 @@ public class DenuvoTag
     [JsonPropertyName("color")] public string? Color { get; set; }
 }
 
-// ── /api/denuvo/fixes?appid= (public). Per-game fix detail ──────────
+// ── /api/game-fixes?q= (public). Per-game fix detail ──────────
 
-public class DenuvoFixesResponse
+public class GameFixesResponse
 {
     [JsonPropertyName("appid")] public string AppId { get; set; } = "";
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("header_image")] public string? HeaderImage { get; set; }
-    [JsonPropertyName("fixes")] public List<DenuvoFix> Fixes { get; set; } = [];
+    [JsonPropertyName("fixes")] public List<GameFix> Fixes { get; set; } = [];
 }
 
-public class DenuvoFix
+public class GameFix
 {
     [JsonPropertyName("id")] public string Id { get; set; } = "";
     [JsonPropertyName("title")] public string Title { get; set; } = "";
     [JsonPropertyName("description")] public string? Description { get; set; }
-    [JsonPropertyName("tags")] public List<DenuvoTag> Tags { get; set; } = [];
+    [JsonPropertyName("tags")] public List<GameFixTag> Tags { get; set; } = [];
     [JsonPropertyName("hasManifest")] public bool HasManifest { get; set; }
     [JsonPropertyName("hasFix")] public bool HasFix { get; set; }
     [JsonPropertyName("manifestFilename")] public string? ManifestFilename { get; set; }
@@ -65,9 +65,7 @@ public class DenuvoFix
     [JsonPropertyName("createdAt")] public string? CreatedAt { get; set; }
 }
 
-// ── /api/denuvo/download?fix=&slot= (auth). Returns a signed URL ────
-
-public class DenuvoDownloadResponse
+public class GameFixDownloadResponse
 {
     [JsonPropertyName("url")] public string Url { get; set; } = "";
 }
@@ -93,15 +91,15 @@ public class DenuvoDownloadResponse
 /// Older records predate the hashes and leave them null. Those revert exactly as they always did — an
 /// absent hash means "cannot verify", never "verification failed".
 /// </remarks>
-public class DenuvoFixRecord
+public class FixRecord
 {
     [JsonPropertyName("appId")] public long AppId { get; set; }
     [JsonPropertyName("fixId")] public string FixId { get; set; } = "";
     [JsonPropertyName("appliedAt")] public string AppliedAt { get; set; } = "";
-    [JsonPropertyName("files")] public List<DenuvoFixRecordEntry> Files { get; set; } = [];
+    [JsonPropertyName("files")] public List<FixRecordEntry> Files { get; set; } = [];
 }
 
-public class DenuvoFixRecordEntry
+public class FixRecordEntry
 {
     [JsonPropertyName("relativePath")] public string RelativePath { get; set; } = "";
     [JsonPropertyName("action")] public string Action { get; set; } = ""; // "modified" or "added"
@@ -109,7 +107,7 @@ public class DenuvoFixRecordEntry
 
     /// <summary>
     /// SHA-256 of the file as the fix left it. Lets a revert prove the file on disk is still the one this
-    /// fix wrote before touching it — see <c>DenuvoFixRecord</c> for why that matters.
+    /// fix wrote before touching it — see <c>FixRecord</c> for why that matters.
     /// </summary>
     [JsonPropertyName("hashAfter")] public string? HashAfter { get; set; }
 

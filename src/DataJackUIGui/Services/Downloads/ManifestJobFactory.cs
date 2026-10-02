@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.IO.Compression;
 using DataJackUIGui.Models;
 
@@ -75,38 +75,33 @@ public class ManifestJobFactory(
     }
 
     /// <summary>
-    /// A Denuvo fix slot. "manifest" installs force-locked into Steam (fixes must stay version-pinned);
+    /// A fix slot. "manifest" installs force-locked into Steam (fixes must stay version-pinned);
     /// "fix" extracts the zip into the game's install folder. Neither restarts Steam.
     /// </summary>
-    public DownloadJob CreateDenuvoJob(
+    public DownloadJob CreateFixJob(
         string fixId, string slot, string fallbackName,
         long appId, string gameName, string fixTitle,
         Action<DownloadItem, JobResult?>? onFinished = null)
     {
         bool isManifestSlot = slot == "manifest";
         return new DownloadJob(
-            isManifestSlot ? DownloadKind.DenuvoManifest : DownloadKind.DenuvoFix,
-            $"denuvo:{fixId}:{slot}",
+            isManifestSlot ? DownloadKind.FixManifest : DownloadKind.Fix,
+            $"fix:{fixId}:{slot}",
             appId,
             gameName,
             fixTitle,
             covers.GetLocalPath(appId),
             (_, progress, ct) =>
             {
-                // Verify the game is on disk BEFORE the request. /api/denuvo/download spends a slot of
-                // the server-side daily limit and the fix zip is game binaries, so discovering "not
-                // installed" in the install phase (where ApplyDenuvoFix still checks, as a backstop)
-                // costs a slot and a full download for nothing. The Fixes page disables the button for
-                // uninstalled games, but a queued fix can outlive that check if the user uninstalls
-                // while it waits its turn.
+                // Verify the game is on disk BEFORE the request.
                 if (!isManifestSlot && library.GetInstallDir(appId) is null)
                     throw new DownloadAbortedException(
                         string.Format(Resources.Strings.Fixes_Toast_GameNotFound_Body, gameName));
-                return api.DownloadDenuvoAsync(fixId, slot, fallbackName, progress, ct);
+                return api.DownloadGameFixAsync(fixId, slot, fallbackName, progress, ct);
             },
             (file, _, _) => Task.FromResult(isManifestSlot
-                ? InstallDenuvoManifest(file, appId, gameName)
-                : ApplyDenuvoFix(file, appId, fixId, gameName)),
+                ? InstallFixManifest(file, appId, gameName)
+                : ApplyFix(file, appId, fixId, gameName)),
             ConfirmAsync: null,
             OnFinished: onFinished);
     }
@@ -474,7 +469,7 @@ public class ManifestJobFactory(
     /// the lua directories listed in <c>opensteamtool.toml</c>'s <c>[lua] paths</c> — which includes the
     /// <c>config/stplug-in</c> we just wrote to — so the write itself applies the change live.
     /// </remarks>
-    private JobResult InstallDenuvoManifest(DownloadedFile file, long appId, string gameName)
+    private JobResult InstallFixManifest(DownloadedFile file, long appId, string gameName)
     {
         try
         {
@@ -500,30 +495,9 @@ public class ManifestJobFactory(
         }
     }
 
-    /// <summary>Denuvo fix slot: extract into the game folder. Only possible if the game is installed.
+    /// <summary>Fix slot: extract into the game folder. Only possible if the game is installed.
     /// Existing files are backed up as .bak inside .datajackui-fix/ so the fix can be reverted.</summary>
-    /// <remarks>
-    /// Runs in four phases, because the revert record is the ONLY thing that makes a fix undoable and
-    /// <c>FixesViewModel</c> keys the Revert button off that file existing:
-    ///
-    /// <list type="number">
-    /// <item><b>Plan</b> — decide modified-vs-added from <c>File.Exists</c> alone. Nothing is written.</item>
-    /// <item><b>Commit</b> — write a provisional record listing every planned entry. If this fails the
-    /// apply stops here, untouched. Previously the record was written LAST inside an empty
-    /// <c>catch {}</c>, so a locked or unwritable path silently "succeeded" and left .bak files with
-    /// nothing indexing them and no Revert button that would ever appear.</item>
-    /// <item><b>Apply</b> — back up, extract, and build the real entry list with hashes.</item>
-    /// <item><b>Settle</b> — rewrite the record with what actually happened.</item>
-    /// </list>
-    ///
-    /// Phase 4 is not tidiness. The provisional record describes INTENT, and an entry whose backup threw
-    /// would claim a <c>.bak</c> that was never written — which the revert now (correctly) treats as a
-    /// hard error, making a partial apply permanently un-revertable. It is also the only place
-    /// <c>HashAfter</c> can come from, since that is unknowable until the file has been extracted.
-    /// So the record starts as a promise and ends as a fact, and a crash in between still leaves
-    /// something the user can revert.
-    /// </remarks>
-    private JobResult ApplyDenuvoFix(DownloadedFile file, long appId, string fixId, string gameName)
+    private JobResult ApplyFix(DownloadedFile file, long appId, string fixId, string gameName)
     {
         try
         {
@@ -539,7 +513,7 @@ public class ManifestJobFactory(
             string fixDir = Path.Combine(installDir, FixRecordDir);
             string recordPath = Path.Combine(fixDir, $"{fixKey}.json");
 
-            var record = new DenuvoFixRecord { AppId = appId, FixId = fixId, AppliedAt = DateTimeOffset.UtcNow.ToString("o") };
+            var record = new FixRecord { AppId = appId, FixId = fixId, AppliedAt = DateTimeOffset.UtcNow.ToString("o") };
             using var archive = ZipFile.OpenRead(file.FilePath);
             var plan = new List<(string RelPath, string Dest, string? BakRel, ZipArchiveEntry Entry)>();
             int failed = 0;
@@ -553,7 +527,7 @@ public class ManifestJobFactory(
             }
 
             foreach (var (relPath, _, bakRel, _) in plan)
-                record.Files.Add(new DenuvoFixRecordEntry { RelativePath = relPath, Action = bakRel is null ? "added" : "modified", BackupPath = bakRel });
+                record.Files.Add(new FixRecordEntry { RelativePath = relPath, Action = bakRel is null ? "added" : "modified", BackupPath = bakRel });
 
             try
             {
@@ -566,7 +540,7 @@ public class ManifestJobFactory(
                 return new JobResult(false, ex.Message);
             }
 
-            var applied = new List<DenuvoFixRecordEntry>(plan.Count);
+            var applied = new List<FixRecordEntry>(plan.Count);
             foreach (var step in plan)
             {
                 try
@@ -600,9 +574,9 @@ public class ManifestJobFactory(
         finally { DeleteStaged(file.FilePath); }
     }
 
-    private DenuvoFixRecordEntry ApplySingleFixFile(string relPath, string dest, string? bakRel, ZipArchiveEntry entry, string fixDir)
+    private FixRecordEntry ApplySingleFixFile(string relPath, string dest, string? bakRel, ZipArchiveEntry entry, string fixDir)
     {
-        DenuvoFixRecordEntry recordEntry;
+        FixRecordEntry recordEntry;
         if (bakRel is not null)
         {
             string bakAbs = Path.Combine(fixDir, bakRel);
@@ -611,11 +585,11 @@ public class ManifestJobFactory(
                 Directory.CreateDirectory(Path.GetDirectoryName(bakAbs)!);
                 File.Copy(dest, bakAbs, overwrite: false);
             }
-            recordEntry = new DenuvoFixRecordEntry { RelativePath = relPath, Action = "modified", BackupPath = bakRel, HashBefore = FileHash.Sha256(dest) };
+            recordEntry = new FixRecordEntry { RelativePath = relPath, Action = "modified", BackupPath = bakRel, HashBefore = FileHash.Sha256(dest) };
         }
         else
         {
-            recordEntry = new DenuvoFixRecordEntry { RelativePath = relPath, Action = "added" };
+            recordEntry = new FixRecordEntry { RelativePath = relPath, Action = "added" };
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
@@ -631,7 +605,7 @@ public class ManifestJobFactory(
     internal const string FixRecordDir = ".datajackui-fix";
 
     /// <summary>The revert record's on-disk form. Indented because users do open these by hand.</summary>
-    private static string SerializeRecord(DenuvoFixRecord record) =>
+    private static string SerializeRecord(FixRecord record) =>
         System.Text.Json.JsonSerializer.Serialize(
             record, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
 
@@ -672,28 +646,22 @@ public class ManifestJobFactory(
     }
 
     /// <summary>Read a fix's revert record from disk, or null if it doesn't exist.</summary>
-    internal static DenuvoFixRecord? ReadFixRecord(string recordPath)
+    internal static FixRecord? ReadFixRecord(string recordPath)
     {
         try
         {
             if (!File.Exists(recordPath)) return null;
             string json = File.ReadAllText(recordPath);
-            return System.Text.Json.JsonSerializer.Deserialize<DenuvoFixRecord>(json, JsonOpts);
+            return System.Text.Json.JsonSerializer.Deserialize<FixRecord>(json, JsonOpts);
         }
         catch { return null; }
     }
 
     /// <summary>
-    /// Revert a previously applied Denuvo fix: restore .bak files for modified entries, delete added
+    /// Revert a previously applied fix: restore .bak files for modified entries, delete added
     /// files, then clean up the backup directory and the revert record.
     /// </summary>
-    /// <remarks>
-    /// This method is the SOLE emitter of revert feedback — done, partial, conflict, game-not-found,
-    /// no-record and the catch-all — matching the apply path. Callers must not add a toast of their own:
-    /// the view model used to show one on any failure, so every partial revert (the common case, from a
-    /// locked file while the game is running) fired two toasts for a single action.
-    /// </remarks>
-    public JobResult RevertDenuvoFix(long appId, string fixId, string gameName)
+    public JobResult RevertFix(long appId, string fixId, string gameName)
     {
         try
         {
@@ -753,7 +721,7 @@ public class ManifestJobFactory(
         }
     }
 
-    private void RevertSingleEntry(DenuvoFixRecordEntry entry, string installDir, ref int restored, ref int deleted, ref int errors, ref int conflicts, ref string? conflictFile)
+    private void RevertSingleEntry(FixRecordEntry entry, string installDir, ref int restored, ref int deleted, ref int errors, ref int conflicts, ref string? conflictFile)
     {
         if (ResolveInside(installDir, entry.RelativePath) is not { } dest) { errors++; return; }
 

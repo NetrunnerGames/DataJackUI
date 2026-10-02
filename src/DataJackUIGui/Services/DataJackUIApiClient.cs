@@ -448,14 +448,14 @@ public class DataJackUIApiClient
     // ── DepotBox game fixes ─────────────────────────────────────────
 
     /// <summary>DepotBox game fixes endpoint. Returns game listings and the 3 DepotBox tags (Bypass, Online, Hypervisor).</summary>
-    public async Task<DenuvoListingsResponse?> GetDenuvoListingsAsync(CancellationToken ct = default)
+    public async Task<GameFixListingsResponse?> GetGameFixListingsAsync(CancellationToken ct = default)
     {
-        List<DenuvoGameListing> allGames = [];
-        var tags = new List<DenuvoTag>
+        List<GameFixListing> allGames = [];
+        var tags = new List<GameFixTag>
         {
-            new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" },
-            new DenuvoTag { Id = "online", Name = "Online", Slug = "online" },
-            new DenuvoTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }
+            new GameFixTag { Id = "bypass", Name = "Bypass", Slug = "bypass" },
+            new GameFixTag { Id = "online", Name = "Online", Slug = "online" },
+            new GameFixTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }
         };
 
         var endpoints = new[]
@@ -477,7 +477,7 @@ public class DataJackUIApiClient
                 if (res.IsSuccessStatusCode)
                 {
                     var json = await res.Content.ReadAsStringAsync(ct);
-                    var data = ParseDenuvoListings(json);
+                    var data = ParseGameFixListings(json);
                     if (data?.Games is { Count: > 0 })
                     {
                         allGames.AddRange(data.Games);
@@ -488,10 +488,10 @@ public class DataJackUIApiClient
         }
 
         var mergedGames = allGames.DistinctBy(g => g.AppId).ToList();
-        return new DenuvoListingsResponse { Games = mergedGames, Tags = tags };
+        return new GameFixListingsResponse { Games = mergedGames, Tags = tags };
     }
 
-    private static DenuvoListingsResponse? ParseDenuvoListings(string json)
+    private static GameFixListingsResponse? ParseGameFixListings(string json)
     {
         try
         {
@@ -501,19 +501,19 @@ public class DataJackUIApiClient
             {
                 if (root.TryGetProperty("games", out var gamesProp) && gamesProp.ValueKind == JsonValueKind.Array)
                 {
-                    var games = JsonSerializer.Deserialize<List<DenuvoGameListing>>(gamesProp.GetRawText(), JsonOpts) ?? [];
+                    var games = JsonSerializer.Deserialize<List<GameFixListing>>(gamesProp.GetRawText(), JsonOpts) ?? [];
                     var tags = root.TryGetProperty("tags", out var tagsProp) && tagsProp.ValueKind == JsonValueKind.Array
-                        ? JsonSerializer.Deserialize<List<DenuvoTag>>(tagsProp.GetRawText(), JsonOpts) ?? []
+                        ? JsonSerializer.Deserialize<List<GameFixTag>>(tagsProp.GetRawText(), JsonOpts) ?? []
                         : [];
                     if (games.Count > 0)
-                        return new DenuvoListingsResponse { Games = games, Tags = tags };
+                        return new GameFixListingsResponse { Games = games, Tags = tags };
                 }
             }
             else if (root.ValueKind == JsonValueKind.Array)
             {
-                var games = JsonSerializer.Deserialize<List<DenuvoGameListing>>(json, JsonOpts);
+                var games = JsonSerializer.Deserialize<List<GameFixListing>>(json, JsonOpts);
                 if (games is { Count: > 0 })
-                    return new DenuvoListingsResponse { Games = games, Tags = [] };
+                    return new GameFixListingsResponse { Games = games, Tags = [] };
             }
         }
         catch { }
@@ -521,11 +521,11 @@ public class DataJackUIApiClient
     }
 
     /// <summary>Fetches a game's fixes from DepotBox /api/game-fixes?q=appid.</summary>
-    public async Task<DenuvoFixesResponse?> GetDenuvoFixesAsync(string appid, CancellationToken ct = default)
+    public async Task<GameFixesResponse?> GetGameFixesAsync(string appid, CancellationToken ct = default)
     {
         string? name = _appList.GetName(long.TryParse(appid, out long aid) ? aid : 0);
         string? headerImage = null;
-        List<DenuvoFix> allFixes = [];
+        List<GameFix> allFixes = [];
 
         var endpoints = new[]
         {
@@ -546,7 +546,7 @@ public class DataJackUIApiClient
                 if (res.IsSuccessStatusCode)
                 {
                     var json = await res.Content.ReadAsStringAsync(ct);
-                    var data = ParseDenuvoFixes(json, appid);
+                    var data = ParseGameFixes(json, appid);
                     if (data is not null)
                     {
                         if (!string.IsNullOrEmpty(data.Name) && data.Name != appid) name ??= data.Name;
@@ -567,7 +567,7 @@ public class DataJackUIApiClient
             return CreateFallbackFixesResponse(appid, name);
         }
 
-        return new DenuvoFixesResponse
+        return new GameFixesResponse
         {
             AppId = appid,
             Name = name ?? appid,
@@ -576,21 +576,21 @@ public class DataJackUIApiClient
         };
     }
 
-    public static DenuvoFixesResponse CreateFallbackFixesResponse(string appid, string? gameName)
+    public static GameFixesResponse CreateFallbackFixesResponse(string appid, string? gameName)
     {
         long.TryParse(appid, out long aid);
         string name = gameName ?? (aid > 0 ? $"App {aid}" : appid);
         string headerImage = aid > 0 ? SteamAppInfoCache.GuessHeaderImageUrl(aid) : "";
         string cleanName = name.Replace(' ', '_');
 
-        return new DenuvoFixesResponse
+        return new GameFixesResponse
         {
             AppId = appid,
             Name = name,
             HeaderImage = headerImage,
-            Fixes = new List<DenuvoFix>
+            Fixes = new List<GameFix>
             {
-                new DenuvoFix
+                new GameFix
                 {
                     Id = $"{appid}_bypass",
                     Title = $"{name} Bypass Fix",
@@ -599,16 +599,16 @@ public class DataJackUIApiClient
                     HasFix = true,
                     ManifestFilename = $"{appid}.zip",
                     FixFilename = $"{cleanName}_bypass.zip",
-                    Tags = new List<DenuvoTag>
+                    Tags = new List<GameFixTag>
                     {
-                        new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }
+                        new GameFixTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }
                     }
                 }
             }
         };
     }
 
-    private static DenuvoFixesResponse? ParseDenuvoFixes(string json, string appid)
+    private static GameFixesResponse? ParseGameFixes(string json, string appid)
     {
         try
         {
@@ -618,17 +618,17 @@ public class DataJackUIApiClient
             {
                 if (root.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
                 {
-                    var fixes = JsonSerializer.Deserialize<List<DenuvoFix>>(fixesProp.GetRawText(), JsonOpts) ?? [];
+                    var fixes = JsonSerializer.Deserialize<List<GameFix>>(fixesProp.GetRawText(), JsonOpts) ?? [];
                     string? name = root.TryGetProperty("name", out var n) ? n.GetString() : null;
                     string? img = root.TryGetProperty("header_image", out var hi) ? hi.GetString() : null;
-                    return new DenuvoFixesResponse { AppId = appid, Name = name ?? appid, HeaderImage = img, Fixes = fixes };
+                    return new GameFixesResponse { AppId = appid, Name = name ?? appid, HeaderImage = img, Fixes = fixes };
                 }
             }
             else if (root.ValueKind == JsonValueKind.Array)
             {
-                var fixes = JsonSerializer.Deserialize<List<DenuvoFix>>(json, JsonOpts);
+                var fixes = JsonSerializer.Deserialize<List<GameFix>>(json, JsonOpts);
                 if (fixes is { Count: > 0 })
-                    return new DenuvoFixesResponse { AppId = appid, Name = appid, HeaderImage = null, Fixes = fixes };
+                    return new GameFixesResponse { AppId = appid, Name = appid, HeaderImage = null, Fixes = fixes };
             }
         }
         catch { }
@@ -636,7 +636,7 @@ public class DataJackUIApiClient
     }
 
     /// <summary>Downloads a fix archive from DepotBox /api/game-fixes/download or a manifest zip.</summary>
-    public async Task<DownloadedFile> DownloadDenuvoAsync(
+    public async Task<DownloadedFile> DownloadGameFixAsync(
         string fixId, string slot, string fallbackName,
         IProgress<DownloadProgress>? progress, CancellationToken ct = default)
     {

@@ -1,10 +1,10 @@
-﻿namespace DataJackUIGui.Services.Downloads;
+namespace DataJackUIGui.Services.Downloads;
 
 /// <summary>What a queued download is for. Drives the row icon and the history label.</summary>
-public enum DownloadKind { Manifest, Dlc, DenuvoManifest, DenuvoFix, Depot, Tool }
+public enum DownloadKind { Manifest, Dlc, FixManifest, Fix, Depot, Tool }
 
 /// <summary>
-/// A job refused to start for a reason the user can act on — e.g. the game a Denuvo fix targets isn't
+/// A job refused to start for a reason the user can act on — e.g. the game a fix targets isn't
 /// installed. Carries a ready-to-display, already-localized message.
 /// </summary>
 /// <remarks>
