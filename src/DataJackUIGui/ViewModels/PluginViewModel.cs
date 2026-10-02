@@ -84,10 +84,10 @@ public partial class PluginViewModel : ObservableObject
         LatestVersion = st.Offline ? Resources.Strings.Plugin_Version_Offline : (st.LatestTag ?? "—");
         FrontendInstalled = st.FrontendInstalled;
         FrontendStatus = st.FrontendInstalled ? Resources.Strings.Plugin_Status_Installed : Resources.Strings.Plugin_Status_NotInstalled;
-        DllOk = st.FrontendInstalled;
+        DllOk = st.DllInstalled;
         DllOutOfDate = false;
-        DllNotInstalled = !st.FrontendInstalled;
-        DllStatus = st.FrontendInstalled ? Resources.Strings.Plugin_Status_UpToDate : Resources.Strings.Plugin_Status_NotInstalled;
+        DllNotInstalled = !st.DllInstalled;
+        DllStatus = st.DllInstalled ? Resources.Strings.Plugin_Status_Installed : Resources.Strings.Plugin_Status_NotInstalled;
         UpdateAvailable = st.UpdateAvailable;
         MillenniumCoexisting = st.MillenniumPresent;
         // Offline takes priority (it's the more actionable/common case); the port warning is secondary and

@@ -1,4 +1,4 @@
-﻿<UserControl
+<UserControl
     x:Class="DataJackUIGui.Views.ManageView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -266,6 +266,16 @@
                                                         <Setter Property="Opacity" Value="1" />
                                                         <Setter Property="Background" Value="#cc16a34a" />
                                                     </DataTrigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#e614161c" />
+                                                    </Trigger>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsSelected}" Value="True" />
+                                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Background" Value="#e616a34a" />
+                                                    </MultiDataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </ui:Button.Style>
@@ -275,7 +285,6 @@
                                         Padding="6"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Top"
-                                        Background="#cc1f1417"
                                         Command="{Binding DataContext.DeleteCommand, ElementName=Root}"
                                         CommandParameter="{Binding}"
                                         Icon="{ui:SymbolIcon Delete24}"
@@ -283,11 +292,15 @@
                                         <ui:Button.Style>
                                             <Style BasedOn="{StaticResource {x:Type ui:Button}}" TargetType="ui:Button">
                                                 <Setter Property="Opacity" Value="0" />
+                                                <Setter Property="Background" Value="#cc1f1417" />
                                                 <Style.Triggers>
                                                     <!-- Reveal on tile hover -->
                                                     <DataTrigger Binding="{Binding IsMouseOver, ElementName=TileRoot}" Value="True">
                                                         <Setter Property="Opacity" Value="1" />
                                                     </DataTrigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#e61f1417" />
+                                                    </Trigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </ui:Button.Style>

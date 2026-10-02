@@ -246,7 +246,9 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
     public async Task<PluginStatus> GetStatusAsync(bool force = false, CancellationToken ct = default)
     {
         bool frontend = File.Exists(DataJackUIJsPath);
-        bool dllInstalled = SteamDir is { } s && File.Exists(Path.Combine(s, "version.dll"));
+        bool dllInstalled = (SteamDir is { } s && File.Exists(Path.Combine(s, "version.dll")))
+            || File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "version.dll"))
+            || File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "version.dll"));
 
         if ((frontend || dllInstalled) && CdpMarkerPath is { } liveMarkerPath)
             CreateCdpMarkerJunction(liveMarkerPath);

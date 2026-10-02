@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 namespace DataJackUIGui.Models;
 
@@ -12,10 +12,25 @@ public class DenuvoListingsResponse
 
 public class DenuvoGameListing
 {
+    private int _fixCount;
+
     [JsonPropertyName("appid")] public string AppId { get; set; } = "";
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("header_image")] public string? HeaderImage { get; set; }
-    [JsonPropertyName("fixCount")] public int FixCount { get; set; }
+
+    [JsonPropertyName("fixCount")]
+    public int FixCount
+    {
+        get => _fixCount > 0 ? _fixCount : 1;
+        set => _fixCount = value;
+    }
+
+    [JsonPropertyName("fix_count")]
+    public int FixCountAlt1 { set => _fixCount = value; }
+
+    [JsonPropertyName("fixes_count")]
+    public int FixCountAlt2 { set => _fixCount = value; }
+
     [JsonPropertyName("tags")] public List<DenuvoTag> Tags { get; set; } = [];
 }
 

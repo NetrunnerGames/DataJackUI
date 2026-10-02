@@ -46,12 +46,16 @@ public partial class FixGameCardVm(DenuvoGameListing g) : ObservableObject
     /// <summary>Cache the header image to disk once (CoverCache, keyed by appid), then expose its path.</summary>
     public async Task EnsureCoverAsync(CoverCache covers)
     {
-        if (Cover is not null || string.IsNullOrWhiteSpace(HeaderImage)) return;
+        if (Cover is not null) return;
         if (!long.TryParse(AppId, out long appid)) return;
         if (Interlocked.Exchange(ref _resolving, 1) == 1) return;
         try
         {
-            string? local = covers.GetLocalPath(appid) ?? await covers.EnsureAsync(appid, HeaderImage!);
+            string rawUrl = !string.IsNullOrWhiteSpace(HeaderImage)
+                ? HeaderImage!
+                : SteamAppInfoCache.GuessHeaderImageUrl(appid);
+            string sanitized = SteamCdnUrl.Sanitize(rawUrl) ?? rawUrl;
+            string? local = covers.GetLocalPath(appid) ?? await covers.EnsureAsync(appid, sanitized);
             if (local is not null)
             {
                 var dispatcher = System.Windows.Application.Current?.Dispatcher;
