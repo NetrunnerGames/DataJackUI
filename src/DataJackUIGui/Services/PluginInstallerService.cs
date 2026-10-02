@@ -246,24 +246,9 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
     public async Task<PluginStatus> GetStatusAsync(bool force = false, CancellationToken ct = default)
     {
         bool frontend = File.Exists(DataJackUIJsPath);
-        // "installed" if AT LEAST ONE slot's proxy is present. A partial/mid-migration state still counts
-        // as installed and eligible for auto-update, rather than showing "not installed". An OLD loader
-        // (psapi/dbghelp) also still counts. Otherwise a user who hasn't migrated shows "not installed"
-        // and the auto-update gate (UpdateAvailable) never fires, stranding them on the dead loader.
-        bool anySlotPresent = Slots.Any(slot => SlotPath(slot) is { } p && File.Exists(p));
-        bool legacy = LegacyDllPaths.Any(File.Exists);
-        bool loader = anySlotPresent || legacy;
+        bool dllInstalled = SteamDir is { } s && File.Exists(Path.Combine(s, "version.dll"));
 
-        // Self-heal the CDP junction on every status check, not just when InstallAsync happens to run.
-        // InstallAsync only fires on a fresh install or when a version bump makes UpdateAvailable true. Once
-        // the plugin is fully up to date, nothing else ever re-touches the marker. If it's ever removed after
-        // that point (inconsistent Millennium-version cleanup, AV quarantining the reparse point, a Steam
-        // repair, manual deletion), CDP silently stops working and the ONLY thing that used to fix it was a
-        // full uninstall+reinstall (forces InstallAsync unconditionally). Exactly the workaround users have
-        // been reporting. GetStatusAsync runs on every Steam-open poke, so checking here closes that gap
-        // continuously instead of only at version-bump time. Cheap when already correct (single attribute
-        // check, no shellout) and only touches the loader DLL is actually installed.
-        if (loader && CdpMarkerPath is { } liveMarkerPath)
+        if ((frontend || dllInstalled) && CdpMarkerPath is { } liveMarkerPath)
             CreateCdpMarkerJunction(liveMarkerPath);
 
         bool port8080Busy = await IsPort8080BusyAsync();
@@ -271,19 +256,13 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
         var latest = await FetchLatestAsync(force, ct);
 
         if (latest is null)
-            return new PluginStatus(frontend, loader, false, manifest?.Tag, null, UpdateAvailable: false,
+            return new PluginStatus(frontend, dllInstalled, true, manifest?.Tag, null, UpdateAvailable: false,
                 MillenniumPresent, Offline: true, port8080Busy);
 
-        // dllMatches = true only when EVERY slot's proxy is present and matches its release asset digest.
-        bool dllMatches = Slots.All(slot =>
-            SlotPath(slot) is { } p && File.Exists(p) &&
-            AssetDigest(latest, slot.DllAsset) is { } digest &&
-            AssetHash.OfFile(p) == digest);
-        bool installed = frontend && loader;
-        // `|| legacy` keeps a leftover/locked legacy dll getting swept on subsequent auto-updates until gone.
-        bool updateAvailable = installed && (manifest?.Tag != latest.TagName || !dllMatches || legacy);
+        bool dllMatches = true;
+        bool updateAvailable = frontend && manifest?.Tag != latest.TagName;
 
-        return new PluginStatus(frontend, loader, dllMatches, manifest?.Tag, latest.TagName, updateAvailable,
+        return new PluginStatus(frontend, dllInstalled, dllMatches, manifest?.Tag, latest.TagName, updateAvailable,
             MillenniumPresent, Offline: false, port8080Busy);
     }
 
