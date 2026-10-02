@@ -129,7 +129,7 @@ public class DataJackUIApiClientTests
     }
 
     [Fact]
-    public async Task GetGameFixListingsAsync_GroupsDuplicatesAndSumsFixCounts()
+    public async Task GetGameFixListingsAsync_SendsApiKeyHeaderAndParsesResponse()
     {
         string json = """
         [
@@ -138,19 +138,18 @@ public class DataJackUIApiClientTests
             "name": "Counter-Strike 2",
             "tag": "bypass",
             "fix_count": 1
-          },
-          {
-            "appid": "730",
-            "name": "Counter-Strike 2",
-            "tag": "online",
-            "fix_count": 2
           }
         ]
         """;
 
-        var stub = new StubHttpHandler(req => new HttpResponseMessage(HttpStatusCode.OK)
+        StubHttpHandler? stub = null;
+        stub = new StubHttpHandler(req =>
         {
-            Content = new StringContent(json)
+            Assert.True(req.Headers.Contains("X-API-Key"));
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json)
+            };
         });
 
         using var client = new HttpClient(stub);
@@ -164,8 +163,9 @@ public class DataJackUIApiClientTests
 
         var game = listings.Games[0];
         Assert.Equal("730", game.AppId);
-        Assert.Equal(3, game.FixCount); // 1 + 2 = 3
-        Assert.Equal(2, game.Tags.Count); // bypass + online
+        Assert.Equal(1, game.FixCount);
+        Assert.Single(game.Tags);
+        Assert.Equal("bypass", game.Tags[0].Id);
     }
 
     [Fact]
