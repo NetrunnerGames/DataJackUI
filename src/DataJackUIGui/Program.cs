@@ -41,6 +41,7 @@ public static class Program
         string? protocolUrl = null;
         bool startMinimized = false;
         bool trayLocked = false;
+        bool force = false;
         if (args is { Length: > 0 })
         {
             foreach (var arg in args)
@@ -57,7 +58,28 @@ public static class Program
                 {
                     trayLocked = true;
                 }
+                else if (arg.Equals("--force", StringComparison.OrdinalIgnoreCase) || arg.Equals("-f", StringComparison.OrdinalIgnoreCase))
+                {
+                    force = true;
+                }
             }
+        }
+
+        if (force)
+        {
+            try
+            {
+                int currentPid = Environment.ProcessId;
+                foreach (var proc in System.Diagnostics.Process.GetProcessesByName("DataJackUI"))
+                {
+                    if (proc.Id != currentPid)
+                    {
+                        proc.Kill();
+                        proc.WaitForExit(2000);
+                    }
+                }
+            }
+            catch { }
         }
 
         // Only one instance may run: two copies share %AppData%\DataJackUIGui (auth.dat,
