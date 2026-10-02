@@ -15,9 +15,13 @@ public partial class FixGameCardVm(GameFixListing g) : ObservableObject
     public string AppId { get; } = g.AppId;
     public string Name { get; } = g.Name;
     public string? HeaderImage { get; } = g.HeaderImage;
-    public int FixCount { get; } = g.FixCount;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FixCountLabel))]
+    private int _fixCount = g.FixCount;
+
     public IReadOnlyList<string> TagIds { get; } = g.Tags.Select(t => t.Id).ToList();
-    public string FixCountLabel => string.Format(Resources.Strings.Fixes_Count, FixCount);
+    public string FixCountLabel => FixCount == 1 ? "1 fix" : string.Format(Resources.Strings.Fixes_Count, FixCount);
 
     /// <summary>Local cached cover path (set after CoverCache resolves it); bound via ImagePathToSource.</summary>
     [ObservableProperty] private string? _cover;
@@ -436,6 +440,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     private async Task ProcessGameDataAsync(FixGameCardVm game, GameFixesResponse data)
     {
         _allFixes = data.Fixes.Select(f => new FixItemVm(f)).ToList();
+        game.FixCount = _allFixes.Count;
         
         long gameAppId = 0;
         long.TryParse(game.AppId, out gameAppId);

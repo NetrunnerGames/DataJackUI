@@ -21,7 +21,7 @@ public class GameFixListing
     [JsonPropertyName("fixCount")]
     public int FixCount
     {
-        get => _fixCount > 0 ? _fixCount : 1;
+        get => _fixCount > 0 ? _fixCount : (Fixes.Count > 0 ? Fixes.Count : 0);
         set => _fixCount = value;
     }
 
@@ -30,6 +30,8 @@ public class GameFixListing
 
     [JsonPropertyName("fixes_count")]
     public int FixCountAlt2 { set => _fixCount = value; }
+
+    [JsonPropertyName("fixes")] public List<GameFix> Fixes { get; set; } = [];
 
     [JsonPropertyName("tags")] public List<GameFixTag> Tags { get; set; } = [];
 }

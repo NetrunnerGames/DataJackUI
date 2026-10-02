@@ -487,7 +487,19 @@ public class DataJackUIApiClient
             catch { }
         }
 
-        var mergedGames = allGames.DistinctBy(g => g.AppId).ToList();
+        var mergedGames = allGames
+            .GroupBy(g => g.AppId)
+            .Select(group =>
+            {
+                var first = group.First();
+                int fixCount = group.Sum(g => g.Fixes.Count > 0 ? g.Fixes.Count : (g.FixCount > 0 ? g.FixCount : 1));
+                first.FixCount = fixCount;
+                var allTags = group.SelectMany(g => g.Tags).DistinctBy(t => t.Id).ToList();
+                if (allTags.Count > 0) first.Tags = allTags;
+                return first;
+            })
+            .ToList();
+
         return new GameFixListingsResponse { Games = mergedGames, Tags = tags };
     }
 
