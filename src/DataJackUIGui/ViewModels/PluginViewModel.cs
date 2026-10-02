@@ -79,17 +79,15 @@ public partial class PluginViewModel : ObservableObject
     private async Task RefreshAsync(bool force)
     {
         var st = await _installer.GetStatusAsync(force);
-        IsInstalled = st.FrontendInstalled && st.DllInstalled;
+        IsInstalled = st.FrontendInstalled;
         InstalledVersion = st.InstalledTag ?? (IsInstalled ? Resources.Strings.Plugin_Version_Unknown : "—");
         LatestVersion = st.Offline ? Resources.Strings.Plugin_Version_Offline : (st.LatestTag ?? "—");
         FrontendInstalled = st.FrontendInstalled;
         FrontendStatus = st.FrontendInstalled ? Resources.Strings.Plugin_Status_Installed : Resources.Strings.Plugin_Status_NotInstalled;
-        DllOk = st.DllInstalled && st.DllMatches;
-        DllOutOfDate = st.DllInstalled && !st.DllMatches;
-        DllNotInstalled = !st.DllInstalled;
-        DllStatus = !st.DllInstalled
-            ? Resources.Strings.Plugin_Status_NotInstalled
-            : st.DllMatches ? Resources.Strings.Plugin_Status_UpToDate : Resources.Strings.Plugin_Status_OutOfDate;
+        DllOk = st.FrontendInstalled;
+        DllOutOfDate = false;
+        DllNotInstalled = !st.FrontendInstalled;
+        DllStatus = st.FrontendInstalled ? Resources.Strings.Plugin_Status_UpToDate : Resources.Strings.Plugin_Status_NotInstalled;
         UpdateAvailable = st.UpdateAvailable;
         MillenniumCoexisting = st.MillenniumPresent;
         // Offline takes priority (it's the more actionable/common case); the port warning is secondary and

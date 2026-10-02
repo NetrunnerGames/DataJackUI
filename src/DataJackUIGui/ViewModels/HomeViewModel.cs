@@ -114,7 +114,19 @@ public partial class HomeViewModel : ObservableObject
         PluginStatusColor = "#9ca3af";
         try
         {
-            var (ok, error) = await _plugin.InstallAsync(progress: null);
+            var prog = new Progress<double?>(p =>
+            {
+                if (p is null)
+                {
+                    PluginStatusText = Resources.Strings.Plugin_Checking;
+                }
+                else
+                {
+                    PluginStatusText = $"Installing... {p.Value * 100:0}%";
+                }
+            });
+
+            var (ok, error) = await _plugin.InstallAsync(prog);
             _toast.Show(Resources.Strings.Plugin_Toast_Title, ok
                 ? Resources.Strings.Plugin_Toast_Installed
                 : string.Format(Resources.Strings.Plugin_Toast_InstallFailed, error), error: !ok);
@@ -142,7 +154,7 @@ public partial class HomeViewModel : ObservableObject
         try
         {
             var st = await _plugin.GetStatusAsync(force: false);
-            bool installed = st.FrontendInstalled && st.DllInstalled;
+            bool installed = st.FrontendInstalled;
             ShowPluginInstall = !installed;
             (PluginStatusText, PluginStatusColor) =
                 !installed ? (Resources.Strings.Plugin_Status_NotInstalled, "#9ca3af")
