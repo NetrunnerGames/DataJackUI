@@ -488,13 +488,14 @@ public class DataJackUIApiClient
         }
 
         var mergedGames = allGames
-            .GroupBy(g => g.AppId)
+            .Where(g => !string.IsNullOrWhiteSpace(g.AppId) || !string.IsNullOrWhiteSpace(g.Name))
+            .GroupBy(g => !string.IsNullOrWhiteSpace(g.AppId) ? g.AppId : g.Name)
             .Select(group =>
             {
                 var first = group.First();
-                int fixCount = group.Sum(g => g.Fixes.Count > 0 ? g.Fixes.Count : (g.FixCount > 0 ? g.FixCount : 1));
+                int fixCount = group.Sum(g => g.Fixes.Count > 0 ? g.Fixes.Count : Math.Max(1, g.FixCount));
                 first.FixCount = fixCount;
-                var allTags = group.SelectMany(g => g.Tags).DistinctBy(t => t.Id).ToList();
+                var allTags = group.SelectMany(g => g.Tags).DistinctBy(t => t.Id.ToLowerInvariant()).ToList();
                 if (allTags.Count > 0) first.Tags = allTags;
                 return first;
             })
@@ -509,27 +510,108 @@ public class DataJackUIApiClient
         {
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
+            var games = new List<GameFixListing>();
+
             if (root.ValueKind == JsonValueKind.Object)
             {
                 if (root.TryGetProperty("games", out var gamesProp) && gamesProp.ValueKind == JsonValueKind.Array)
                 {
-                    var games = JsonSerializer.Deserialize<List<GameFixListing>>(gamesProp.GetRawText(), JsonOpts) ?? [];
-                    var tags = root.TryGetProperty("tags", out var tagsProp) && tagsProp.ValueKind == JsonValueKind.Array
-                        ? JsonSerializer.Deserialize<List<GameFixTag>>(tagsProp.GetRawText(), JsonOpts) ?? []
-                        : [];
-                    if (games.Count > 0)
-                        return new GameFixListingsResponse { Games = games, Tags = tags };
+                    foreach (var elem in gamesProp.EnumerateArray())
+                        games.Add(ParseGameFixListingElement(elem));
                 }
             }
             else if (root.ValueKind == JsonValueKind.Array)
             {
-                var games = JsonSerializer.Deserialize<List<GameFixListing>>(json, JsonOpts);
-                if (games is { Count: > 0 })
-                    return new GameFixListingsResponse { Games = games, Tags = [] };
+                foreach (var elem in root.EnumerateArray())
+                    games.Add(ParseGameFixListingElement(elem));
+            }
+
+            if (games.Count > 0)
+            {
+                var tags = new List<GameFixTag>
+                {
+                    new GameFixTag { Id = "bypass", Name = "Bypass", Slug = "bypass" },
+                    new GameFixTag { Id = "online", Name = "Online", Slug = "online" },
+                    new GameFixTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }
+                };
+                return new GameFixListingsResponse { Games = games, Tags = tags };
             }
         }
         catch { }
         return null;
+    }
+
+    private static GameFixListing ParseGameFixListingElement(JsonElement elem)
+    {
+        var item = new GameFixListing();
+
+        if (elem.TryGetProperty("appid", out var ap)) item.AppId = ap.ToString();
+        else if (elem.TryGetProperty("app_id", out var ap2)) item.AppId = ap2.ToString();
+        else if (elem.TryGetProperty("appId", out var ap3)) item.AppId = ap3.ToString();
+        else if (elem.TryGetProperty("id", out var ap4) && long.TryParse(ap4.ToString(), out _)) item.AppId = ap4.ToString();
+
+        if (elem.TryGetProperty("name", out var np) && !string.IsNullOrWhiteSpace(np.GetString())) item.Name = np.GetString()!;
+        else if (elem.TryGetProperty("title", out var np2) && !string.IsNullOrWhiteSpace(np2.GetString())) item.Name = np2.GetString()!;
+        else if (elem.TryGetProperty("game", out var np3) && !string.IsNullOrWhiteSpace(np3.GetString())) item.Name = np3.GetString()!;
+        else if (elem.TryGetProperty("game_name", out var np4) && !string.IsNullOrWhiteSpace(np4.GetString())) item.Name = np4.GetString()!;
+        else if (elem.TryGetProperty("file", out var np5) && !string.IsNullOrWhiteSpace(np5.GetString()))
+        {
+            item.Name = np5.GetString()!.Replace(".zip", "", StringComparison.OrdinalIgnoreCase).Replace('_', ' ');
+        }
+
+        if (elem.TryGetProperty("header_image", out var ip)) item.HeaderImage = ip.GetString();
+        else if (elem.TryGetProperty("headerImage", out var ip2)) item.HeaderImage = ip2.GetString();
+        else if (elem.TryGetProperty("image", out var ip3)) item.HeaderImage = ip3.GetString();
+
+        if (elem.TryGetProperty("fixCount", out var fc) && fc.TryGetInt32(out int f1)) item.FixCount = f1;
+        else if (elem.TryGetProperty("fix_count", out var fc2) && fc2.TryGetInt32(out int f2)) item.FixCount = f2;
+        else if (elem.TryGetProperty("fixes_count", out var fc3) && fc3.TryGetInt32(out int f3)) item.FixCount = f3;
+        else if (elem.TryGetProperty("count", out var fc4) && fc4.TryGetInt32(out int f4)) item.FixCount = f4;
+
+        var tags = new List<GameFixTag>();
+        if (elem.TryGetProperty("tags", out var tp))
+        {
+            if (tp.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var t in tp.EnumerateArray())
+                {
+                    if (t.ValueKind == JsonValueKind.Object)
+                    {
+                        string id = t.TryGetProperty("id", out var tid) ? tid.GetString() ?? "" : "";
+                        string n = t.TryGetProperty("name", out var tn) ? tn.GetString() ?? id : id;
+                        if (!string.IsNullOrEmpty(id)) tags.Add(new GameFixTag { Id = id, Name = n, Slug = id });
+                    }
+                    else if (t.ValueKind == JsonValueKind.String)
+                    {
+                        string val = t.GetString() ?? "";
+                        if (!string.IsNullOrEmpty(val)) tags.Add(new GameFixTag { Id = val.ToLowerInvariant(), Name = val, Slug = val.ToLowerInvariant() });
+                    }
+                }
+            }
+            else if (tp.ValueKind == JsonValueKind.String)
+            {
+                string val = tp.GetString() ?? "";
+                foreach (var s in val.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    tags.Add(new GameFixTag { Id = s.ToLowerInvariant(), Name = s, Slug = s.ToLowerInvariant() });
+            }
+        }
+        else if (elem.TryGetProperty("tag", out var tpSingle))
+        {
+            string val = tpSingle.ToString();
+            foreach (var s in val.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                tags.Add(new GameFixTag { Id = s.ToLowerInvariant(), Name = s, Slug = s.ToLowerInvariant() });
+        }
+
+        if (tags.Count == 0)
+        {
+            string combo = (item.Name + " " + item.AppId).ToLowerInvariant();
+            if (combo.Contains("online")) tags.Add(new GameFixTag { Id = "online", Name = "Online", Slug = "online" });
+            else if (combo.Contains("hypervisor") || combo.Contains("denuvo")) tags.Add(new GameFixTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" });
+            else tags.Add(new GameFixTag { Id = "bypass", Name = "Bypass", Slug = "bypass" });
+        }
+
+        item.Tags = tags;
+        return item;
     }
 
     /// <summary>Fetches a game's fixes from DepotBox /api/game-fixes?q=appid.</summary>
