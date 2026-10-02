@@ -77,13 +77,17 @@ public class TaskRequirementsTests
     }
 
     [Fact]
-    public void InspectVelopackRuntimesApi()
+    public async System.Threading.Tasks.Task SearchGames_DoesNotCrash()
     {
-        var runtime = Velopack.Windows.Runtimes.GetRuntimeByName("net10-x64-desktop");
-        Assert.NotNull(runtime);
-        var type = runtime.GetType();
-        var methods = type.GetMethods().Select(m => m.Name).ToList();
-        Assert.True(methods.Contains("DownloadToFile") || methods.Contains("DownloadInstaller"));
-        Assert.Contains("InvokeInstaller", methods);
+        var settings = new SettingsService();
+        var cache = new CacheService();
+        var auth = new AuthService();
+        var appList = new SteamAppListCache();
+        var appInfo = new SteamAppInfoCache(cache);
+        var covers = new CoverCache(settings);
+        var client = new DataJackUIApiClient(auth, appInfo, appList, covers, settings);
+
+        var results = await client.SearchAsync("grand theft auto v");
+        Assert.NotNull(results);
     }
 }

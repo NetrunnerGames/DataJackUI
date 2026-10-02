@@ -52,8 +52,16 @@ public partial class FixGameCardVm(DenuvoGameListing g) : ObservableObject
         try
         {
             string? local = covers.GetLocalPath(appid) ?? await covers.EnsureAsync(appid, HeaderImage!);
-            if (local is not null) Cover = local;
+            if (local is not null)
+            {
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher is not null && !dispatcher.CheckAccess())
+                    dispatcher.Invoke(() => Cover = local);
+                else
+                    Cover = local;
+            }
         }
+        catch { }
         finally { Interlocked.Exchange(ref _resolving, 0); }
     }
 }

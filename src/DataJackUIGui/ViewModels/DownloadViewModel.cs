@@ -97,8 +97,16 @@ public partial class AddGameCardVm : ObservableObject
         try
         {
             string? local = covers.GetLocalPath(AppId) ?? await covers.EnsureAsync(AppId, HeaderImage);
-            if (local is not null) Cover = local;
+            if (local is not null)
+            {
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher is not null && !dispatcher.CheckAccess())
+                    dispatcher.Invoke(() => Cover = local);
+                else
+                    Cover = local;
+            }
         }
+        catch { }
         finally { Interlocked.Exchange(ref _resolving, 0); }
     }
 }
