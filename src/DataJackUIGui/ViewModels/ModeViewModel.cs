@@ -116,7 +116,9 @@ public partial class ModeViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowCloudRedirectManage))]
     private bool _cloudRedirectEnabled;
 
-    [ObservableProperty] private bool _cloudRedirectInstalled;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCloudRedirectManage))]
+    private bool _cloudRedirectInstalled;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowCloudRedirectUpdate))]
@@ -128,7 +130,7 @@ public partial class ModeViewModel : ObservableObject
         ? Resources.Strings.Mode_CloudRedirect_Disable
         : Resources.Strings.Mode_CloudRedirect_Enable;
     public bool ShowCloudRedirectUpdate => CloudRedirectUnlocked && CloudRedirectUpdateAvailable;
-    public bool ShowCloudRedirectManage => CloudRedirectUnlocked && CloudRedirectEnabled;
+    public bool ShowCloudRedirectManage => CloudRedirectUnlocked && CloudRedirectInstalled && CloudRedirectEnabled;
 
     /// <summary>Refresh the add-on panel state. Reads dll/toml from disk (cheap); checks GitHub for an
     /// update only when unlocked (Nightly active), respecting forceRefresh.</summary>

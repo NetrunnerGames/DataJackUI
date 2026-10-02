@@ -571,7 +571,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
 
         string dll = Path.Combine(root, CloudRedirectDll);
         bool installed = File.Exists(dll);
-        bool enabled = ReadOpenSteamToolCloudEnabled(root);
+        bool enabled = installed && ReadOpenSteamToolCloudEnabled(root);
 
         bool updateAvailable = false;
         string? latest = null;
