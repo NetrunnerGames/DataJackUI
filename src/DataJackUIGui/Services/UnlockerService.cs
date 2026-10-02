@@ -711,6 +711,24 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
     /// <summary>Read datajack.json or opensteamtool.toml's active [cloud] enabled value (false if absent).</summary>
     private static bool ReadOpenSteamToolCloudEnabled(string steamRoot)
     {
+        string tomlPath = Path.Combine(steamRoot, "opensteamtool.toml");
+        if (File.Exists(tomlPath))
+        {
+            var lines = File.ReadAllLines(tomlPath);
+            int header = Array.FindIndex(lines, l => IsActiveTableHeader(l, "cloud"));
+            if (header >= 0)
+            {
+                for (int i = header + 1; i < lines.Length; i++)
+                {
+                    if (IsActiveAnyTableHeader(lines[i])) break;            // next section → done
+                    string t = lines[i].TrimStart();
+                    if (t.StartsWith('#')) continue;                       // commented → ignore
+                    var m = Regex.Match(t, @"^enabled\s*=\s*(\w+)");
+                    if (m.Success) return m.Groups[1].Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+        }
+
         string jsonPath = Path.Combine(steamRoot, "datajack.json");
         if (File.Exists(jsonPath))
         {
@@ -723,24 +741,9 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
                     return enabledProp.GetBoolean();
                 }
             }
-            catch { /* fallback to toml */ }
+            catch { }
         }
 
-        string tomlPath = Path.Combine(steamRoot, "opensteamtool.toml");
-        if (!File.Exists(tomlPath)) return false;
-
-        var lines = File.ReadAllLines(tomlPath);
-        int header = Array.FindIndex(lines, l => IsActiveTableHeader(l, "cloud"));
-        if (header < 0) return false;
-
-        for (int i = header + 1; i < lines.Length; i++)
-        {
-            if (IsActiveAnyTableHeader(lines[i])) break;            // next section → done
-            string t = lines[i].TrimStart();
-            if (t.StartsWith('#')) continue;                       // commented → ignore
-            var m = Regex.Match(t, @"^enabled\s*=\s*(\w+)");
-            if (m.Success) return m.Groups[1].Value.Equals("true", StringComparison.OrdinalIgnoreCase);
-        }
         return false;
     }
 
