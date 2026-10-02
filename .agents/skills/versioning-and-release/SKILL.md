@@ -29,9 +29,18 @@ Determine the appropriate version increment based on the nature of the changes:
 
 ---
 
-## 3. GitHub Release Body Formatting
-When publishing a release to GitHub, format the release description strictly using this structure:
+## 3. GitHub Release Title & Body Formatting
+When publishing a release to GitHub, generate a dynamic, descriptive release title based on the primary focus of the changes, followed by the structured `[+]` / `[-]` changelog body:
 
+### Release Title Format
+`Release v<Version>: <Dynamic Category / Focus Summary>`
+
+Examples:
+- `Release v2.00.5: Bugfixes & UI Thread Safety Improvements`
+- `Release v2.00.6: Hotfix for CloudRedirect Detection`
+- `Release v2.1.0: New Provider Integration`
+
+### Release Body Format
 ```text
 [+] Added / modified feature or bug fix detail
 [+] Additional feature or enhancement
