@@ -33,7 +33,14 @@ public class HardwareAppIdService
         613260,  // Valve Index Base Station
         253980,  // Steam Controller Dongle
         1059550, // Valve Index Headset
-        2138590  // Steam Controller Wireless Receiver
+        2138590, // Steam Controller Wireless Receiver
+        228980,  // Steamworks Common Redistributables
+        1007,    // Steamworks SDK Redistributables
+        7,       // Steam Client
+        1826330, // Steamworks SDK
+        1070560, // Steam Linux Runtime
+        1391110, // Steam Linux Runtime - Soldier
+        1628350  // Steam Linux Runtime - Sniper
     ];
 
     public HardwareAppIdService(GithubProxy gh, CacheService cache)

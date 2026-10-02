@@ -192,15 +192,18 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
     private readonly ManifestJobFactory _jobs;
     private readonly SteamLibraryService _library;
 
+    private readonly HardwareAppIdService _hardware;
+
     public BuildsViewModel(SteamService steam, LuaVault vault, SteamAppListCache appList,
         SteamAppInfoCache appInfo, CoverCache covers, SteamDepotInfo depotInfo, ToastService toast,
         SettingsService settings, DepotDownloaderService depotTool, DownloadQueue queue,
-        ManifestJobFactory jobs, SteamLibraryService library)
+        ManifestJobFactory jobs, SteamLibraryService library, HardwareAppIdService hardware)
     {
         _depotTool = depotTool;
         _queue = queue;
         _jobs = jobs;
         _library = library;
+        _hardware = hardware;
         _steam = steam;
         _vault = vault;
         _appList = appList;
@@ -329,17 +332,24 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
                 foreach (var appId in installedDiskAppIds) appIds.Add(appId);
                 foreach (var (appId, _, _) in _vault.EnumerateLooseBuildLuas()) appIds.Add(appId);
 
-                return appIds
-                    .Select(appId =>
+                appIds.RemoveWhere(id => _hardware.IsBlacklisted(id));
+
+                var list = new List<LuaTileViewModel>();
+                foreach (var appId in appIds)
+                {
+                    string path = installed.TryGetValue(appId, out var p) ? p : Path.Combine(_steam.DataLuaDir ?? "", $"{appId}.lua");
+                    string? name = _appList.GetName(appId) ?? _appInfo.GetCached(appId)?.Name;
+                    if (name is null)
                     {
-                        string path = installed.TryGetValue(appId, out var p) ? p : Path.Combine(_steam.DataLuaDir ?? "", $"{appId}.lua");
-                        string? name = _appList.GetName(appId) ?? _appInfo.GetCached(appId)?.Name;
-                        var added = File.Exists(path) ? File.GetLastWriteTime(path) : DateTime.MinValue;
-                        return new LuaTileViewModel(appId, path, added,
-                            name ?? string.Format(Resources.Strings.Common_AppFallback, appId), name is null);
-                    })
-                    .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                        var info = _appInfo.ResolveAsync(appId).ConfigureAwait(false).GetAwaiter().GetResult();
+                        name = info?.Name;
+                    }
+                    var added = File.Exists(path) ? File.GetLastWriteTime(path) : DateTime.MinValue;
+                    list.Add(new LuaTileViewModel(appId, path, added,
+                        name ?? string.Format(Resources.Strings.Common_AppFallback, appId), name is null));
+                }
+
+                return list.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
             });
 
             _allGames = games;
