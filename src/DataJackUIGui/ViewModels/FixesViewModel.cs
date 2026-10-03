@@ -67,18 +67,34 @@ public partial class FixGameCardVm(DenuvoGameListing g) : ObservableObject
     }
 
     /// <summary>Cache the header image to disk once (CoverCache, keyed by appid), then expose its path.</summary>
-    public async Task EnsureCoverAsync(CoverCache covers)
+    /// <summary>Cache the header image to disk once (CoverCache, keyed by appid), then expose its path.</summary>
+    public async Task EnsureCoverAsync(CoverCache covers, SteamAppInfoCache appInfo)
     {
         if (Cover is not null) return;
         if (!long.TryParse(AppId, out long appid)) return;
         if (Interlocked.Exchange(ref _resolving, 1) == 1) return;
         try
         {
-            string rawUrl = !string.IsNullOrWhiteSpace(HeaderImage)
-                ? HeaderImage!
-                : SteamAppInfoCache.GuessHeaderImageUrl(appid);
-            string sanitized = SteamCdnUrl.Sanitize(rawUrl) ?? rawUrl;
-            string? local = covers.GetLocalPath(appid) ?? await covers.EnsureAsync(appid, sanitized);
+            string? local = covers.GetLocalPath(appid);
+            if (local is null)
+            {
+                string rawUrl = !string.IsNullOrWhiteSpace(HeaderImage)
+                    ? HeaderImage!
+                    : SteamAppInfoCache.GuessHeaderImageUrl(appid);
+                string sanitized = SteamCdnUrl.Sanitize(rawUrl) ?? rawUrl;
+                local = await covers.EnsureAsync(appid, sanitized);
+
+                if (local is null)
+                {
+                    var info = await appInfo.ResolveAsync(appid);
+                    if (!string.IsNullOrWhiteSpace(info?.HeaderImage))
+                    {
+                        string fallbackSanitized = SteamCdnUrl.Sanitize(info.HeaderImage) ?? info.HeaderImage;
+                        local = await covers.EnsureAsync(appid, fallbackSanitized);
+                    }
+                }
+            }
+
             if (local is not null)
             {
                 var dispatcher = System.Windows.Application.Current?.Dispatcher;
@@ -162,6 +178,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     private readonly DataJackUIApiClient api;
     private readonly AuthService auth;
     private readonly CoverCache covers;
+    private readonly SteamAppInfoCache appInfo;
     private readonly ToastService toast;
     private readonly SettingsService settings;
     private readonly DownloadQueue queue;
@@ -170,13 +187,14 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     private readonly SteamService steam;
 
     public FixesViewModel(
-        DataJackUIApiClient api, AuthService auth, CoverCache covers, ToastService toast,
+        DataJackUIApiClient api, AuthService auth, CoverCache covers, SteamAppInfoCache appInfo, ToastService toast,
         SettingsService settings, DownloadQueue queue, ManifestJobFactory jobs,
         SteamLibraryService library, SteamService steam)
     {
         this.api = api;
         this.auth = auth;
         this.covers = covers;
+        this.appInfo = appInfo;
         this.toast = toast;
         this.settings = settings;
         this.queue = queue;
@@ -201,7 +219,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     /// <summary>Warm the cover images for just the freshly-shown page (idempotent, off-UI).</summary>
     protected override void OnPageSliced(IReadOnlyList<FixGameCardVm> slice)
     {
-        foreach (var g in slice) _ = g.EnsureCoverAsync(covers);
+        foreach (var g in slice) _ = g.EnsureCoverAsync(covers, appInfo);
     }
 
     [ObservableProperty] private string _searchText = "";
@@ -407,7 +425,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     private async Task OpenGame(FixGameCardVm game)
     {
         SelectedGame = game;
-        _ = game.EnsureCoverAsync(covers);
+        _ = game.EnsureCoverAsync(covers, appInfo);
         Fixes.Clear();
         _allFixes = [];
         FixTags.Clear();
