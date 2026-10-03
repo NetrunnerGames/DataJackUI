@@ -476,7 +476,7 @@ public class DataJackUIApiClient
                 if (res.IsSuccessStatusCode)
                 {
                     var json = await res.Content.ReadAsStringAsync(ct);
-                    var data = ParseDenuvoListings(json);
+                    var data = ParseDenuvoListings(json, _appList);
                     if (data?.Games is { Count: > 0 })
                     {
                         allGames.AddRange(data.Games);
@@ -486,65 +486,151 @@ public class DataJackUIApiClient
             catch { }
         }
 
-        // Guaranteed fallback catalog if remote endpoints return empty
-        if (allGames.Count == 0)
-        {
-            var fallbackAppIds = new long[]
-            {
-                251570,  // 7 Days to Die
-                271590,  // Grand Theft Auto V
-                431960,  // Wallpaper Engine
-                1174180, // Red Dead Redemption 2
-                1196590, // Cyberpunk 2077
-                1245620, // Elden Ring
-                1546990, // Grand Theft Auto: Vice City – The Definitive Edition
-                3240220  // Grand Theft Auto V (Enhanced)
-            };
-
-            foreach (var aid in fallbackAppIds)
-            {
-                string name = _appList.GetName(aid) ?? $"App {aid}";
-                allGames.Add(new DenuvoGameListing
-                {
-                    AppId = aid.ToString(),
-                    Name = name,
-                    HeaderImage = SteamAppInfoCache.GuessHeaderImageUrl(aid),
-                    FixCount = 1,
-                    Tags = new List<DenuvoTag>
-                    {
-                        new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }
-                    }
-                });
-            }
-        }
-
         var mergedGames = allGames.DistinctBy(g => g.AppId).ToList();
         return new DenuvoListingsResponse { Games = mergedGames, Tags = tags };
     }
 
-    private static DenuvoListingsResponse? ParseDenuvoListings(string json)
+    private static DenuvoListingsResponse? ParseDenuvoListings(string json, SteamAppListCache appList)
     {
         try
         {
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
-            if (root.ValueKind == JsonValueKind.Object)
+            JsonElement arrayElem = default;
+
+            if (root.ValueKind == JsonValueKind.Array)
             {
-                if (root.TryGetProperty("games", out var gamesProp) && gamesProp.ValueKind == JsonValueKind.Array)
+                arrayElem = root;
+            }
+            else if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("games", out var g) && g.ValueKind == JsonValueKind.Array)
+                    arrayElem = g;
+                else if (root.TryGetProperty("fixes", out var f) && f.ValueKind == JsonValueKind.Array)
+                    arrayElem = f;
+                else if (root.TryGetProperty("data", out var d) && d.ValueKind == JsonValueKind.Array)
+                    arrayElem = d;
+                else if (root.TryGetProperty("results", out var r) && r.ValueKind == JsonValueKind.Array)
+                    arrayElem = r;
+            }
+
+            if (arrayElem.ValueKind != JsonValueKind.Array || arrayElem.GetArrayLength() == 0)
+                return null;
+
+            var dict = new Dictionary<string, DenuvoGameListing>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var item in arrayElem.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object) continue;
+
+                string? appid = null;
+                if (item.TryGetProperty("appid", out var ap)) appid = ap.ToString();
+                else if (item.TryGetProperty("appId", out var ap2)) appid = ap2.ToString();
+                else if (item.TryGetProperty("app_id", out var ap3)) appid = ap3.ToString();
+                else if (item.TryGetProperty("id", out var idProp)) appid = idProp.ToString();
+
+                if (string.IsNullOrWhiteSpace(appid)) continue;
+
+                string? name = null;
+                if (item.TryGetProperty("name", out var n)) name = n.GetString();
+                else if (item.TryGetProperty("gameName", out var gn)) name = gn.GetString();
+                else if (item.TryGetProperty("game_name", out var gn2)) name = gn2.GetString();
+                else if (item.TryGetProperty("title", out var t)) name = t.GetString();
+
+                if (long.TryParse(appid, out long aid))
                 {
-                    var games = JsonSerializer.Deserialize<List<DenuvoGameListing>>(gamesProp.GetRawText(), JsonOpts) ?? [];
-                    var tags = root.TryGetProperty("tags", out var tagsProp) && tagsProp.ValueKind == JsonValueKind.Array
-                        ? JsonSerializer.Deserialize<List<DenuvoTag>>(tagsProp.GetRawText(), JsonOpts) ?? []
-                        : [];
-                    if (games.Count > 0)
-                        return new DenuvoListingsResponse { Games = games, Tags = tags };
+                    string? cacheName = appList.GetName(aid);
+                    if (!string.IsNullOrWhiteSpace(cacheName)) name = cacheName;
+                }
+
+                name ??= $"App {appid}";
+
+                string? headerImage = null;
+                if (item.TryGetProperty("header_image", out var hi)) headerImage = hi.GetString();
+                else if (item.TryGetProperty("headerImage", out var hi2)) headerImage = hi2.GetString();
+                else if (item.TryGetProperty("image", out var img)) headerImage = img.GetString();
+
+                if (string.IsNullOrWhiteSpace(headerImage) && long.TryParse(appid, out long aidForImg))
+                {
+                    headerImage = SteamAppInfoCache.GuessHeaderImageUrl(aidForImg);
+                }
+
+                var itemTags = new List<DenuvoTag>();
+                if (item.TryGetProperty("tags", out var tagsProp))
+                {
+                    if (tagsProp.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var tagElem in tagsProp.EnumerateArray())
+                        {
+                            if (tagElem.ValueKind == JsonValueKind.String)
+                            {
+                                string tStr = tagElem.GetString() ?? "";
+                                if (!string.IsNullOrWhiteSpace(tStr))
+                                    itemTags.Add(new DenuvoTag { Id = tStr.ToLower(), Name = tStr, Slug = tStr.ToLower() });
+                            }
+                            else if (tagElem.ValueKind == JsonValueKind.Object)
+                            {
+                                var tagObj = JsonSerializer.Deserialize<DenuvoTag>(tagElem.GetRawText(), JsonOpts);
+                                if (tagObj is not null) itemTags.Add(tagObj);
+                            }
+                        }
+                    }
+                    else if (tagsProp.ValueKind == JsonValueKind.String)
+                    {
+                        string tStr = tagsProp.GetString() ?? "";
+                        foreach (var part in tStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            itemTags.Add(new DenuvoTag { Id = part.ToLower(), Name = part, Slug = part.ToLower() });
+                        }
+                    }
+                }
+
+                if (item.TryGetProperty("tag", out var singleTag) && singleTag.ValueKind == JsonValueKind.String)
+                {
+                    string tStr = singleTag.GetString() ?? "";
+                    if (!string.IsNullOrWhiteSpace(tStr) && !itemTags.Any(t => string.Equals(t.Id, tStr, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        itemTags.Add(new DenuvoTag { Id = tStr.ToLower(), Name = tStr, Slug = tStr.ToLower() });
+                    }
+                }
+
+                if (itemTags.Count == 0)
+                {
+                    itemTags.Add(new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" });
+                }
+
+                if (!dict.TryGetValue(appid, out var listing))
+                {
+                    listing = new DenuvoGameListing
+                    {
+                        AppId = appid,
+                        Name = name,
+                        HeaderImage = headerImage,
+                        FixCount = 1,
+                        Tags = itemTags
+                    };
+                    dict[appid] = listing;
+                }
+                else
+                {
+                    listing.FixCount++;
+                    foreach (var t in itemTags)
+                    {
+                        if (!listing.Tags.Any(x => string.Equals(x.Id, t.Id, StringComparison.OrdinalIgnoreCase)))
+                            listing.Tags.Add(t);
+                    }
                 }
             }
-            else if (root.ValueKind == JsonValueKind.Array)
+
+            if (dict.Count > 0)
             {
-                var games = JsonSerializer.Deserialize<List<DenuvoGameListing>>(json, JsonOpts);
-                if (games is { Count: > 0 })
-                    return new DenuvoListingsResponse { Games = games, Tags = [] };
+                var defaultTags = new List<DenuvoTag>
+                {
+                    new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" },
+                    new DenuvoTag { Id = "online", Name = "Online", Slug = "online" },
+                    new DenuvoTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }
+                };
+                return new DenuvoListingsResponse { Games = dict.Values.ToList(), Tags = defaultTags };
             }
         }
         catch { }

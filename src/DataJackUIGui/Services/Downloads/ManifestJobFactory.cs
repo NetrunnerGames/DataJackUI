@@ -91,19 +91,7 @@ public class ManifestJobFactory(
             gameName,
             fixTitle,
             covers.GetLocalPath(appId),
-            (_, progress, ct) =>
-            {
-                // Verify the game is on disk BEFORE the request. /api/denuvo/download spends a slot of
-                // the server-side daily limit and the fix zip is game binaries, so discovering "not
-                // installed" in the install phase (where ApplyDenuvoFix still checks, as a backstop)
-                // costs a slot and a full download for nothing. The Fixes page disables the button for
-                // uninstalled games, but a queued fix can outlive that check if the user uninstalls
-                // while it waits its turn.
-                if (!isManifestSlot && library.GetInstallDir(appId) is null)
-                    throw new DownloadAbortedException(
-                        string.Format(Resources.Strings.Fixes_Toast_GameNotFound_Body, gameName));
-                return api.DownloadDenuvoAsync(fixId, slot, fallbackName, progress, ct);
-            },
+            (_, progress, ct) => api.DownloadDenuvoAsync(fixId, slot, fallbackName, progress, ct),
             (file, _, _) => Task.FromResult(isManifestSlot
                 ? InstallDenuvoManifest(file, appId, gameName)
                 : ApplyDenuvoFix(file, appId, fixId, gameName)),
@@ -528,11 +516,39 @@ public class ManifestJobFactory(
         try
         {
             string? installDir = library.GetInstallDir(appId);
-            if (installDir is null)
+            if (string.IsNullOrEmpty(installDir) || !Directory.Exists(installDir))
             {
-                string err = string.Format(Resources.Strings.Fixes_Toast_GameNotFound_Body, gameName);
-                toast.Show(Resources.Strings.Fixes_Toast_GameNotFound, err, error: true);
-                return new JobResult(false, err);
+                string? selectedDir = null;
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher is not null)
+                {
+                    dispatcher.Invoke(() =>
+                    {
+                        using var dlg = new System.Windows.Forms.FolderBrowserDialog
+                        {
+                            Description = string.Format(Resources.Strings.Fixes_Toast_GameNotFound_Body, gameName),
+                            UseDescriptionForTitle = true,
+                            ShowNewFolderButton = false
+                        };
+                        if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK && Directory.Exists(dlg.SelectedPath))
+                        {
+                            selectedDir = dlg.SelectedPath;
+                        }
+                    });
+                }
+                installDir = selectedDir;
+            }
+
+            if (string.IsNullOrEmpty(installDir) || !Directory.Exists(installDir))
+            {
+                string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                Directory.CreateDirectory(downloadsFolder);
+                string destZip = Path.Combine(downloadsFolder, file.FileName);
+                File.Copy(file.FilePath, destZip, overwrite: true);
+
+                string fallbackMsg = $"Game folder not found for {gameName}. Fix archive saved to Downloads: {file.FileName}";
+                toast.Show("Fix Downloaded", fallbackMsg);
+                return new JobResult(true, fallbackMsg, destZip);
             }
 
             string fixKey = SafeFixKey(fixId);

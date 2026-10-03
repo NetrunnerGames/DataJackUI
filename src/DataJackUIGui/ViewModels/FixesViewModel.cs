@@ -142,14 +142,11 @@ public partial class FixItemVm(DenuvoFix f) : ObservableObject
     public bool HasApplied => IsApplied;
 
     public bool CanDownloadManifest => HasManifest && ManifestItem?.IsActive != true;
-    public bool CanDownloadFix => HasFix && GameInstalled && !IsApplied && FixItem?.IsActive != true;
+    public bool CanDownloadFix => HasFix && !IsApplied && FixItem?.IsActive != true;
 
-    /// <summary>Why the Fix button is greyed out, or null when it isn't. A null ToolTip shows nothing,
-    /// so this doubles as the "should there be a tooltip at all" test.</summary>
+    /// <summary>Why the Fix button is greyed out, or null when it isn't.</summary>
     public string? FixHint =>
-        IsApplied ? Resources.Strings.Fixes_Applied_Hint
-        : GameInstalled ? null
-        : Resources.Strings.Fixes_NotInstalled_Hint;
+        IsApplied ? Resources.Strings.Fixes_Applied_Hint : null;
 
     private static string FormatDate(string? iso) =>
         DateTimeOffset.TryParse(iso, out var d) ? d.UtcDateTime.ToString("d MMM yyyy") : "";
@@ -529,12 +526,6 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         if (await PromptSignInIfGuestAsync(Resources.Strings.Fixes_SignIn)) return;
         if (SelectedGame is not { } game) return;
         if (!long.TryParse(game.AppId, out long appId)) return;
-
-        if (slot == "fix" && library.GetInstallDir(appId) is null)
-        {
-            toast.Show(Resources.Strings.Fixes_Toast_GameNotFound, string.Format(Resources.Strings.Fixes_Toast_GameNotFound_Body, game.Name), error: true);
-            return;
-        }
 
         EnqueueDownloadJob(fix, slot, game, appId);
     }
