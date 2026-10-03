@@ -93,7 +93,6 @@ public class SteamAppListCache
             .ToList();
     }
 
-
     private async Task LoadAsync()
     {
         // Fresh disk cache → use it.
