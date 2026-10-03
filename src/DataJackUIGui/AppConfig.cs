@@ -82,9 +82,6 @@ public static class AppConfig
     public const string ManifestBackendUrl = "http://167.235.229.108";
     public const string ManifestBackendUserAgent = "secretgoonpoon";
 
-    // DepotBox game-fixes API proxy URL (proxied securely via Cloudflare Worker api.netrunnergames.workers.dev)
-    public const string DepotBoxProxyUrl = "https://api.netrunnergames.workers.dev";
-
     // The donate-keys endpoint gates on a DIFFERENT User-Agent than the manifest backend (it 403s
     // otherwise). This matches the DataJackUI plugin's config.USER_AGENT.
     public const string DonateKeysUserAgent = "discord(dot)gg/datajackui";

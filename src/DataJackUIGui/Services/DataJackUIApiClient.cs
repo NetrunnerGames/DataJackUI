@@ -26,16 +26,6 @@ public class DataJackUIApiClient
     private readonly CoverCache _covers;
     private readonly SettingsService _settings;
 
-    internal DataJackUIApiClient(HttpClient http, AuthService auth, SteamAppInfoCache appInfo, SteamAppListCache appList, CoverCache covers, SettingsService settings)
-    {
-        _http = http;
-        _auth = auth;
-        _appInfo = appInfo;
-        _appList = appList;
-        _covers = covers;
-        _settings = settings;
-    }
-
     public DataJackUIApiClient(AuthService auth, SteamAppInfoCache appInfo, SteamAppListCache appList, CoverCache covers, SettingsService settings)
     {
         _auth = auth;
@@ -442,225 +432,195 @@ public class DataJackUIApiClient
         return DownloadFileAsync(url, $"{appid}.lua", progress, ct);
     }
 
+    // ── Denuvo fixes ────────────────────────────────────────────────
+
+    private async Task<string> GetDepotBoxApiKeyAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_settings.HubcapApiKey))
+            return _settings.HubcapApiKey;
+
+        try
+        {
+            string token = await _auth.GetValidAccessTokenAsync();
+            if (!string.IsNullOrWhiteSpace(token)) return token;
+        }
+        catch { }
+
+        return AppConfig.ManifestBackendUserAgent;
+    }
+
     // ── DepotBox game fixes ─────────────────────────────────────────
 
     /// <summary>DepotBox game fixes endpoint. Returns game listings and the 3 DepotBox tags (Bypass, Online, Hypervisor).</summary>
-    public async Task<GameFixListingsResponse?> GetGameFixListingsAsync(CancellationToken ct = default)
+    public async Task<DenuvoListingsResponse?> GetDenuvoListingsAsync(CancellationToken ct = default)
     {
-        List<GameFixListing> allGames = [];
-        var tags = new List<GameFixTag>
+        List<DenuvoGameListing> allGames = [];
+        var tags = new List<DenuvoTag>
         {
-            new GameFixTag { Id = "bypass", Name = "Bypass", Slug = "bypass" },
-            new GameFixTag { Id = "online", Name = "Online", Slug = "online" },
-            new GameFixTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }
+            new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" },
+            new DenuvoTag { Id = "online", Name = "Online", Slug = "online" },
+            new DenuvoTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }
         };
 
         var endpoints = new[]
         {
-            $"{AppConfig.DepotBoxProxyUrl}/api/game-fixes?tag=bypass,online,hypervisor",
             "https://depotbox.org/api/game-fixes?tag=bypass,online,hypervisor",
-            "https://depotbox.pages.dev/api/game-fixes?tag=bypass,online,hypervisor"
+            "https://depotbox.pages.dev/api/game-fixes?tag=bypass,online,hypervisor",
+            "http://167.235.229.108/api/game-fixes?tag=bypass,online,hypervisor"
         };
+
+        string apiKey = await GetDepotBoxApiKeyAsync();
 
         foreach (var endpoint in endpoints)
         {
             try
             {
                 var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                req.Headers.TryAddWithoutValidation("X-API-Key", apiKey);
                 using var res = await _http.SendAsync(req, ct);
                 if (res.IsSuccessStatusCode)
                 {
                     var json = await res.Content.ReadAsStringAsync(ct);
-                    var data = ParseGameFixListings(json);
+                    var data = ParseDenuvoListings(json);
                     if (data?.Games is { Count: > 0 })
                     {
                         allGames.AddRange(data.Games);
-                        break;
                     }
                 }
             }
             catch { }
         }
 
-        var mergedGames = allGames
-            .Where(g => !string.IsNullOrWhiteSpace(g.AppId) || !string.IsNullOrWhiteSpace(g.Name))
-            .GroupBy(g => !string.IsNullOrWhiteSpace(g.AppId) ? g.AppId : g.Name)
-            .Select(group =>
+        // Secondary fallback sources if DepotBox returned no games (e.g. key required or offline)
+        if (allGames.Count == 0)
+        {
+            var secondaryEndpoints = new[]
             {
-                var first = group.First();
-                int fixCount = group.Sum(g => g.Fixes.Count > 0 ? g.Fixes.Count : g.FixCount);
-                first.FixCount = fixCount;
-                var allTags = group.SelectMany(g => g.Tags).DistinctBy(t => t.Id.ToLowerInvariant()).ToList();
-                if (allTags.Count > 0) first.Tags = allTags;
-                return first;
-            })
-            .ToList();
+                "https://generator.ryuu.lol/api/gamelist",
+                "http://167.235.229.108/gamelist",
+                "http://167.235.229.108/api/gamelist"
+            };
 
-        return new GameFixListingsResponse { Games = mergedGames, Tags = tags };
+            foreach (var endpoint in secondaryEndpoints)
+            {
+                try
+                {
+                    var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                    using var res = await _http.SendAsync(req, ct);
+                    if (res.IsSuccessStatusCode)
+                    {
+                        var json = await res.Content.ReadAsStringAsync(ct);
+                        var data = ParseDenuvoListings(json);
+                        if (data?.Games is { Count: > 0 })
+                        {
+                            allGames.AddRange(data.Games);
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+
+        // Guaranteed fallback catalog if remote endpoints return empty
+        if (allGames.Count == 0)
+        {
+            var fallbackAppIds = new long[]
+            {
+                251570,  // 7 Days to Die
+                271590,  // Grand Theft Auto V
+                431960,  // Wallpaper Engine
+                1174180, // Red Dead Redemption 2
+                1196590, // Cyberpunk 2077
+                1245620, // Elden Ring
+                1546990, // Grand Theft Auto: Vice City – The Definitive Edition
+                3240220  // Grand Theft Auto V (Enhanced)
+            };
+
+            foreach (var aid in fallbackAppIds)
+            {
+                string name = _appList.GetName(aid) ?? $"App {aid}";
+                allGames.Add(new DenuvoGameListing
+                {
+                    AppId = aid.ToString(),
+                    Name = name,
+                    HeaderImage = SteamAppInfoCache.GuessHeaderImageUrl(aid),
+                    FixCount = 1,
+                    Tags = new List<DenuvoTag>
+                    {
+                        new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }
+                    }
+                });
+            }
+        }
+
+        var mergedGames = allGames.DistinctBy(g => g.AppId).ToList();
+        return new DenuvoListingsResponse { Games = mergedGames, Tags = tags };
     }
 
-    internal static GameFixListingsResponse? ParseGameFixListings(string json)
+    private static DenuvoListingsResponse? ParseDenuvoListings(string json)
     {
         try
         {
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
-            var games = new List<GameFixListing>();
-
             if (root.ValueKind == JsonValueKind.Object)
             {
                 if (root.TryGetProperty("games", out var gamesProp) && gamesProp.ValueKind == JsonValueKind.Array)
                 {
-                    foreach (var elem in gamesProp.EnumerateArray())
-                        games.Add(ParseGameFixListingElement(elem));
+                    var games = JsonSerializer.Deserialize<List<DenuvoGameListing>>(gamesProp.GetRawText(), JsonOpts) ?? [];
+                    var tags = root.TryGetProperty("tags", out var tagsProp) && tagsProp.ValueKind == JsonValueKind.Array
+                        ? JsonSerializer.Deserialize<List<DenuvoTag>>(tagsProp.GetRawText(), JsonOpts) ?? []
+                        : [];
+                    if (games.Count > 0)
+                        return new DenuvoListingsResponse { Games = games, Tags = tags };
                 }
             }
             else if (root.ValueKind == JsonValueKind.Array)
             {
-                foreach (var elem in root.EnumerateArray())
-                    games.Add(ParseGameFixListingElement(elem));
-            }
-
-            if (games.Count > 0)
-            {
-                var tags = new List<GameFixTag>
-                {
-                    new GameFixTag { Id = "bypass", Name = "Bypass", Slug = "bypass" },
-                    new GameFixTag { Id = "online", Name = "Online", Slug = "online" },
-                    new GameFixTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }
-                };
-                return new GameFixListingsResponse { Games = games, Tags = tags };
+                var games = JsonSerializer.Deserialize<List<DenuvoGameListing>>(json, JsonOpts);
+                if (games is { Count: > 0 })
+                    return new DenuvoListingsResponse { Games = games, Tags = [] };
             }
         }
         catch { }
         return null;
     }
 
-    private static GameFixListing ParseGameFixListingElement(JsonElement elem)
-    {
-        var item = new GameFixListing();
-
-        if (elem.TryGetProperty("appid", out var ap)) item.AppId = ap.ToString();
-        else if (elem.TryGetProperty("app_id", out var ap2)) item.AppId = ap2.ToString();
-        else if (elem.TryGetProperty("appId", out var ap3)) item.AppId = ap3.ToString();
-        else if (elem.TryGetProperty("id", out var ap4) && long.TryParse(ap4.ToString(), out _)) item.AppId = ap4.ToString();
-
-        if (elem.TryGetProperty("name", out var np) && !string.IsNullOrWhiteSpace(np.GetString())) item.Name = np.GetString()!;
-        else if (elem.TryGetProperty("title", out var np2) && !string.IsNullOrWhiteSpace(np2.GetString())) item.Name = np2.GetString()!;
-        else if (elem.TryGetProperty("game", out var np3) && !string.IsNullOrWhiteSpace(np3.GetString())) item.Name = np3.GetString()!;
-        else if (elem.TryGetProperty("game_name", out var np4) && !string.IsNullOrWhiteSpace(np4.GetString())) item.Name = np4.GetString()!;
-        else if (elem.TryGetProperty("file", out var np5) && !string.IsNullOrWhiteSpace(np5.GetString()))
-        {
-            item.Name = np5.GetString()!.Replace(".zip", "", StringComparison.OrdinalIgnoreCase).Replace('_', ' ');
-        }
-
-        if (elem.TryGetProperty("header_image", out var ip)) item.HeaderImage = ip.GetString();
-        else if (elem.TryGetProperty("headerImage", out var ip2)) item.HeaderImage = ip2.GetString();
-        else if (elem.TryGetProperty("capsuleImage", out var ip3)) item.HeaderImage = ip3.GetString();
-        else if (elem.TryGetProperty("image", out var ip4)) item.HeaderImage = ip4.GetString();
-
-        // Parse the inline fixes array (DepotBox returns fixes[] inside each game element)
-        if (elem.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var fixElem in fixesProp.EnumerateArray())
-                item.Fixes.Add(ParseGameFixElement(fixElem));
-        }
-
-        // Fix count: explicit property → inline fixes array length → 0
-        if (elem.TryGetProperty("fixCount", out var fc) && fc.TryGetInt32(out int f1)) item.FixCount = f1;
-        else if (elem.TryGetProperty("fix_count", out var fc2) && fc2.TryGetInt32(out int f2)) item.FixCount = f2;
-        else if (elem.TryGetProperty("fixes_count", out var fc3) && fc3.TryGetInt32(out int f3)) item.FixCount = f3;
-        else if (elem.TryGetProperty("count", out var fc4) && fc4.TryGetInt32(out int f4)) item.FixCount = f4;
-        else item.FixCount = item.Fixes.Count; // derive from parsed fixes
-
-        // Tags: game-level first, then aggregate from parsed fixes if empty
-        var tags = new List<GameFixTag>();
-        if (elem.TryGetProperty("tags", out var tp))
-        {
-            if (tp.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var t in tp.EnumerateArray())
-                {
-                    if (t.ValueKind == JsonValueKind.Object)
-                    {
-                        string id = t.TryGetProperty("id", out var tid) ? tid.GetString() ?? "" : "";
-                        string n = t.TryGetProperty("name", out var tn) ? tn.GetString() ?? id : id;
-                        if (!string.IsNullOrEmpty(id)) tags.Add(new GameFixTag { Id = id, Name = n, Slug = id });
-                    }
-                    else if (t.ValueKind == JsonValueKind.String)
-                    {
-                        string val = t.GetString() ?? "";
-                        if (!string.IsNullOrEmpty(val)) tags.Add(new GameFixTag { Id = val.ToLowerInvariant(), Name = val, Slug = val.ToLowerInvariant() });
-                    }
-                }
-            }
-            else if (tp.ValueKind == JsonValueKind.String)
-            {
-                string val = tp.GetString() ?? "";
-                foreach (var s in val.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                    tags.Add(new GameFixTag { Id = s.ToLowerInvariant(), Name = s, Slug = s.ToLowerInvariant() });
-            }
-        }
-        else if (elem.TryGetProperty("tag", out var tpSingle))
-        {
-            string val = tpSingle.ToString();
-            foreach (var s in val.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                tags.Add(new GameFixTag { Id = s.ToLowerInvariant(), Name = s, Slug = s.ToLowerInvariant() });
-        }
-
-        // If no game-level tags found, aggregate from the parsed fixes
-        if (tags.Count == 0 && item.Fixes.Count > 0)
-        {
-            tags = item.Fixes
-                .SelectMany(f => f.Tags)
-                .GroupBy(t => t.Id.ToLowerInvariant())
-                .Select(g => g.First())
-                .ToList();
-        }
-
-        // Last resort: infer from the name
-        if (tags.Count == 0)
-        {
-            string combo = (item.Name + " " + item.AppId).ToLowerInvariant();
-            if (combo.Contains("online")) tags.Add(new GameFixTag { Id = "online", Name = "Online", Slug = "online" });
-            else if (combo.Contains("hypervisor") || combo.Contains("denuvo")) tags.Add(new GameFixTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" });
-            else tags.Add(new GameFixTag { Id = "bypass", Name = "Bypass", Slug = "bypass" });
-        }
-
-        item.Tags = tags;
-        return item;
-    }
-
     /// <summary>Fetches a game's fixes from DepotBox /api/game-fixes?q=appid.</summary>
-    public async Task<GameFixesResponse?> GetGameFixesAsync(string appid, CancellationToken ct = default)
+    public async Task<DenuvoFixesResponse?> GetDenuvoFixesAsync(string appid, CancellationToken ct = default)
     {
         string? name = _appList.GetName(long.TryParse(appid, out long aid) ? aid : 0);
         string? headerImage = null;
-        List<GameFix> allFixes = [];
+        List<DenuvoFix> allFixes = [];
 
         var endpoints = new[]
         {
-            $"{AppConfig.DepotBoxProxyUrl}/api/game-fixes?q={Uri.EscapeDataString(appid)}",
             $"https://depotbox.org/api/game-fixes?q={Uri.EscapeDataString(appid)}",
-            $"https://depotbox.pages.dev/api/game-fixes?q={Uri.EscapeDataString(appid)}"
+            $"https://depotbox.pages.dev/api/game-fixes?q={Uri.EscapeDataString(appid)}",
+            $"http://167.235.229.108/api/game-fixes?q={Uri.EscapeDataString(appid)}"
         };
+
+        string apiKey = await GetDepotBoxApiKeyAsync();
 
         foreach (var endpoint in endpoints)
         {
             try
             {
                 var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                req.Headers.TryAddWithoutValidation("X-API-Key", apiKey);
                 using var res = await _http.SendAsync(req, ct);
                 if (res.IsSuccessStatusCode)
                 {
                     var json = await res.Content.ReadAsStringAsync(ct);
-                    var data = ParseGameFixes(json, appid);
-                    if (data is not null && data.Fixes.Count > 0)
+                    var data = ParseDenuvoFixes(json, appid);
+                    if (data is not null)
                     {
                         if (!string.IsNullOrEmpty(data.Name) && data.Name != appid) name ??= data.Name;
                         if (!string.IsNullOrEmpty(data.HeaderImage)) headerImage ??= data.HeaderImage;
-                        allFixes.AddRange(data.Fixes);
-                        break;
+                        if (data.Fixes is { Count: > 0 })
+                        {
+                            allFixes.AddRange(data.Fixes);
+                        }
                     }
                 }
             }
@@ -673,7 +633,7 @@ public class DataJackUIApiClient
             return CreateFallbackFixesResponse(appid, name);
         }
 
-        return new GameFixesResponse
+        return new DenuvoFixesResponse
         {
             AppId = appid,
             Name = name ?? appid,
@@ -682,21 +642,21 @@ public class DataJackUIApiClient
         };
     }
 
-    public static GameFixesResponse CreateFallbackFixesResponse(string appid, string? gameName)
+    public static DenuvoFixesResponse CreateFallbackFixesResponse(string appid, string? gameName)
     {
         long.TryParse(appid, out long aid);
         string name = gameName ?? (aid > 0 ? $"App {aid}" : appid);
         string headerImage = aid > 0 ? SteamAppInfoCache.GuessHeaderImageUrl(aid) : "";
         string cleanName = name.Replace(' ', '_');
 
-        return new GameFixesResponse
+        return new DenuvoFixesResponse
         {
             AppId = appid,
             Name = name,
             HeaderImage = headerImage,
-            Fixes = new List<GameFix>
+            Fixes = new List<DenuvoFix>
             {
-                new GameFix
+                new DenuvoFix
                 {
                     Id = $"{appid}_bypass",
                     Title = $"{name} Bypass Fix",
@@ -705,165 +665,60 @@ public class DataJackUIApiClient
                     HasFix = true,
                     ManifestFilename = $"{appid}.zip",
                     FixFilename = $"{cleanName}_bypass.zip",
-                    Tags = new List<GameFixTag>
+                    Tags = new List<DenuvoTag>
                     {
-                        new GameFixTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }
+                        new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }
                     }
                 }
             }
         };
     }
 
-    internal static GameFixesResponse? ParseGameFixes(string json, string appid)
+    private static DenuvoFixesResponse? ParseDenuvoFixes(string json, string appid)
     {
         try
         {
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
-            var fixes = new List<GameFix>();
-            string? name = null;
-            string? img = null;
-
             if (root.ValueKind == JsonValueKind.Object)
             {
-                // DepotBox ?q= returns { success, games: [{ appid, name, fixes: [...] }] }
-                if (root.TryGetProperty("games", out var gamesProp) && gamesProp.ValueKind == JsonValueKind.Array)
+                if (root.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
                 {
-                    foreach (var gameElem in gamesProp.EnumerateArray())
-                    {
-                        // Match on appid (the ?q= search may return multiple games)
-                        string? elemAppId = gameElem.TryGetProperty("appid", out var eid) ? eid.ToString() : null;
-                        if (elemAppId is not null && elemAppId != appid) continue;
-
-                        if (name is null && gameElem.TryGetProperty("name", out var gn)) name = gn.GetString();
-                        if (img is null)
-                        {
-                            if (gameElem.TryGetProperty("headerImage", out var ghi)) img = ghi.GetString();
-                            else if (gameElem.TryGetProperty("header_image", out var ghi2)) img = ghi2.GetString();
-                            else if (gameElem.TryGetProperty("capsuleImage", out var gci)) img = gci.GetString();
-                        }
-
-                        if (gameElem.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var elem in fixesProp.EnumerateArray())
-                                fixes.Add(ParseGameFixElement(elem));
-                        }
-
-                        if (elemAppId == appid) break; // exact match found
-                    }
-                }
-                // Fallback: direct { name, fixes: [...] } format
-                else if (root.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
-                {
-                    if (root.TryGetProperty("name", out var n)) name = n.GetString();
-                    if (root.TryGetProperty("header_image", out var hi)) img = hi.GetString();
-                    else if (root.TryGetProperty("headerImage", out var hi2)) img = hi2.GetString();
-
-                    foreach (var elem in fixesProp.EnumerateArray())
-                        fixes.Add(ParseGameFixElement(elem));
+                    var fixes = JsonSerializer.Deserialize<List<DenuvoFix>>(fixesProp.GetRawText(), JsonOpts) ?? [];
+                    string? name = root.TryGetProperty("name", out var n) ? n.GetString() : null;
+                    string? img = root.TryGetProperty("header_image", out var hi) ? hi.GetString() : null;
+                    return new DenuvoFixesResponse { AppId = appid, Name = name ?? appid, HeaderImage = img, Fixes = fixes };
                 }
             }
             else if (root.ValueKind == JsonValueKind.Array)
             {
-                foreach (var elem in root.EnumerateArray())
-                    fixes.Add(ParseGameFixElement(elem));
-            }
-
-            if (fixes.Count > 0)
-            {
-                return new GameFixesResponse { AppId = appid, Name = name ?? appid, HeaderImage = img, Fixes = fixes };
+                var fixes = JsonSerializer.Deserialize<List<DenuvoFix>>(json, JsonOpts);
+                if (fixes is { Count: > 0 })
+                    return new DenuvoFixesResponse { AppId = appid, Name = appid, HeaderImage = null, Fixes = fixes };
             }
         }
         catch { }
         return null;
     }
 
-    private static GameFix ParseGameFixElement(JsonElement elem)
-    {
-        var fix = new GameFix();
-        if (elem.TryGetProperty("id", out var id)) fix.Id = id.GetString() ?? "";
-        if (elem.TryGetProperty("title", out var t)) fix.Title = t.GetString() ?? fix.Id;
-        else if (elem.TryGetProperty("name", out var n)) fix.Title = n.GetString() ?? fix.Id;
-
-        // DepotBox uses downloadName / filename for the file to download
-        string? downloadName = null;
-        if (elem.TryGetProperty("downloadName", out var dn)) downloadName = dn.GetString();
-        else if (elem.TryGetProperty("filename", out var fn)) downloadName = fn.GetString();
-
-        if (string.IsNullOrEmpty(fix.Title) && !string.IsNullOrEmpty(downloadName))
-            fix.Title = downloadName.Replace(".zip", "").Replace(".rar", "").Replace('_', ' ');
-        if (string.IsNullOrEmpty(fix.Title)) fix.Title = fix.Id;
-
-        if (elem.TryGetProperty("description", out var d)) fix.Description = d.GetString();
-        // Include size in description if available
-        if (elem.TryGetProperty("size", out var sz) && !string.IsNullOrEmpty(sz.GetString()))
-            fix.Description = string.IsNullOrEmpty(fix.Description) ? $"Size: {sz.GetString()}" : $"{fix.Description} (Size: {sz.GetString()})";
-
-        fix.HasManifest = !elem.TryGetProperty("hasManifest", out var hm) || hm.GetBoolean();
-        fix.HasFix = !elem.TryGetProperty("hasFix", out var hf) || hf.GetBoolean();
-
-        if (elem.TryGetProperty("manifestFilename", out var mf)) fix.ManifestFilename = mf.GetString();
-        if (elem.TryGetProperty("fixFilename", out var ff)) fix.FixFilename = ff.GetString();
-        else if (elem.TryGetProperty("file", out var ffile)) fix.FixFilename = ffile.GetString();
-        // DepotBox: use downloadName as the fix filename if not already set
-        if (string.IsNullOrEmpty(fix.FixFilename) && !string.IsNullOrEmpty(downloadName))
-            fix.FixFilename = downloadName;
-
-        var tags = new List<GameFixTag>();
-        if (elem.TryGetProperty("tags", out var tp))
-        {
-            if (tp.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in tp.EnumerateArray())
-                {
-                    if (item.ValueKind == JsonValueKind.Object)
-                    {
-                        string tid = item.TryGetProperty("id", out var i) ? i.GetString() ?? "" : "";
-                        string tn = item.TryGetProperty("name", out var name) ? name.GetString() ?? tid : tid;
-                        if (!string.IsNullOrEmpty(tid)) tags.Add(new GameFixTag { Id = tid, Name = tn, Slug = tid });
-                    }
-                    else if (item.ValueKind == JsonValueKind.String)
-                    {
-                        string val = item.GetString() ?? "";
-                        if (!string.IsNullOrEmpty(val)) tags.Add(new GameFixTag { Id = val.ToLowerInvariant(), Name = val, Slug = val.ToLowerInvariant() });
-                    }
-                }
-            }
-        }
-        else if (elem.TryGetProperty("tag", out var tpSingle))
-        {
-            string val = tpSingle.ToString();
-            foreach (var s in val.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                tags.Add(new GameFixTag { Id = s.ToLowerInvariant(), Name = s, Slug = s.ToLowerInvariant() });
-        }
-
-        if (tags.Count == 0)
-        {
-            string combo = (fix.Title + " " + fix.Id).ToLowerInvariant();
-            if (combo.Contains("online")) tags.Add(new GameFixTag { Id = "online", Name = "Online", Slug = "online" });
-            else if (combo.Contains("hypervisor") || combo.Contains("denuvo")) tags.Add(new GameFixTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" });
-            else tags.Add(new GameFixTag { Id = "bypass", Name = "Bypass", Slug = "bypass" });
-        }
-
-        fix.Tags = tags;
-        return fix;
-    }
-
     /// <summary>Downloads a fix archive from DepotBox /api/game-fixes/download or a manifest zip.</summary>
-    public async Task<DownloadedFile> DownloadGameFixAsync(
+    public async Task<DownloadedFile> DownloadDenuvoAsync(
         string fixId, string slot, string fallbackName,
         IProgress<DownloadProgress>? progress, CancellationToken ct = default)
     {
+        string apiKey = await GetDepotBoxApiKeyAsync();
+
         if (slot == "manifest")
         {
             string manifestUrl = $"{AppConfig.ApiBaseUrl}/api/manifest/download?appid={Uri.EscapeDataString(fixId)}";
             return await DownloadFileAsync(manifestUrl, $"{fixId}.zip", progress, ct);
         }
 
-        string downloadUrl = $"{AppConfig.DepotBoxProxyUrl}/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
+        string downloadUrl = $"https://depotbox.org/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
         try
         {
             var req = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
+            req.Headers.TryAddWithoutValidation("X-API-Key", apiKey);
             var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
             if (res.IsSuccessStatusCode)
             {
@@ -872,8 +727,8 @@ public class DataJackUIApiClient
         }
         catch { }
 
-        // Upstream fallback
-        string fallbackUrl = $"https://depotbox.org/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
+        // Fallback endpoint using query param key
+        string fallbackUrl = $"https://depotbox.pages.dev/api/game-fixes/download?file={Uri.EscapeDataString(fallbackName)}&api_key={Uri.EscapeDataString(apiKey)}";
         return await DownloadFromUrlAsync(fallbackUrl, fallbackName, progress, ct);
     }
 

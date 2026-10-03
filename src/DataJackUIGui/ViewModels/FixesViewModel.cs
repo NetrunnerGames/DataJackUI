@@ -10,18 +10,14 @@ using DataJackUIGui.Services.Downloads;
 namespace DataJackUIGui.ViewModels;
 
 /// <summary>A game card in the Fixes grid.</summary>
-public partial class FixGameCardVm(GameFixListing g) : ObservableObject
+public partial class FixGameCardVm(DenuvoGameListing g) : ObservableObject
 {
     public string AppId { get; } = g.AppId;
     public string Name { get; } = g.Name;
     public string? HeaderImage { get; } = g.HeaderImage;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FixCountLabel))]
-    private int _fixCount = g.FixCount;
-
+    public int FixCount { get; } = g.FixCount;
     public IReadOnlyList<string> TagIds { get; } = g.Tags.Select(t => t.Id).ToList();
-    public string FixCountLabel => FixCount == 1 ? "1 fix" : string.Format(Resources.Strings.Fixes_Count, FixCount);
+    public string FixCountLabel => string.Format(Resources.Strings.Fixes_Count, FixCount);
 
     /// <summary>Local cached cover path (set after CoverCache resolves it); bound via ImagePathToSource.</summary>
     [ObservableProperty] private string? _cover;
@@ -98,7 +94,7 @@ public partial class FixGameCardVm(GameFixListing g) : ObservableObject
 }
 
 /// <summary>A tag filter pill; IsSelected drives its active highlight.</summary>
-public partial class TagPillVm(GameFixTag t) : ObservableObject
+public partial class TagPillVm(DenuvoTag t) : ObservableObject
 {
     public string Id { get; } = t.Id;
     public string Name { get; } = t.Name;
@@ -106,12 +102,12 @@ public partial class TagPillVm(GameFixTag t) : ObservableObject
 }
 
 /// <summary>One fix (release) in the per-game flyout.</summary>
-public partial class FixItemVm(GameFix f) : ObservableObject
+public partial class FixItemVm(DenuvoFix f) : ObservableObject
 {
     public string Id { get; } = f.Id;
     public string Title { get; } = f.Title;
     public string? Description { get; } = f.Description;
-    public IReadOnlyList<GameFixTag> Tags { get; } = f.Tags;
+    public IReadOnlyList<DenuvoTag> Tags { get; } = f.Tags;
     public bool HasManifest { get; } = f.HasManifest;
     public bool HasFix { get; } = f.HasFix;
     public string? ManifestFilename { get; } = f.ManifestFilename;
@@ -294,7 +290,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         IsLoading = true;
         try
         {
-            var data = await api.GetGameFixListingsAsync();
+            var data = await api.GetDenuvoListingsAsync();
             if (data is null)
             {
                 EmptyMessage = Resources.Strings.Fixes_Err_Load;
@@ -304,9 +300,9 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
             _allGames = data.Games.Select(g => new FixGameCardVm(g)).ToList();
 
             Tags.Clear();
-            Tags.Add(new TagPillVm(new GameFixTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }));
-            Tags.Add(new TagPillVm(new GameFixTag { Id = "online", Name = "Online", Slug = "online" }));
-            Tags.Add(new TagPillVm(new GameFixTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }));
+            Tags.Add(new TagPillVm(new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }));
+            Tags.Add(new TagPillVm(new DenuvoTag { Id = "online", Name = "Online", Slug = "online" }));
+            Tags.Add(new TagPillVm(new DenuvoTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }));
 
             // "My games" filter source: the same stplug-in scan the Manage page uses, so the toggle
             // shows only games the user actually added. Scanned once per listing load.
@@ -422,7 +418,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         IsLoadingFixes = true;
         try
         {
-            var data = await api.GetGameFixesAsync(game.AppId);
+            var data = await api.GetDenuvoFixesAsync(game.AppId);
             if (data is null || data.Fixes.Count == 0)
             {
                 data = DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
@@ -437,10 +433,9 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         finally { IsLoadingFixes = false; }
     }
 
-    private async Task ProcessGameDataAsync(FixGameCardVm game, GameFixesResponse data)
+    private async Task ProcessGameDataAsync(FixGameCardVm game, DenuvoFixesResponse data)
     {
         _allFixes = data.Fixes.Select(f => new FixItemVm(f)).ToList();
-        game.FixCount = _allFixes.Count;
         
         long gameAppId = 0;
         long.TryParse(game.AppId, out gameAppId);
@@ -513,9 +508,9 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         if (pending is not (var fix, var game)) return;
         if (!long.TryParse(game.AppId, out long appId)) return;
 
-        var result = await Task.Run(() => jobs.RevertFix(appId, fix.Id, game.Name));
+        var result = await Task.Run(() => jobs.RevertDenuvoFix(appId, fix.Id, game.Name));
 
-        // RevertFix owns every revert toast (done / partial / conflict / not-found / no-record).
+        // RevertDenuvoFix owns every revert toast (done / partial / conflict / not-found / no-record).
         // Showing another one here meant a failed revert fired two toasts for one action.
         if (result.Ok) fix.IsApplied = false;
     }
@@ -548,7 +543,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     {
         string fallback = slot == "manifest" ? (fix.ManifestFilename ?? $"{game.AppId}.zip") : (fix.FixFilename ?? $"{game.AppId}_fix.zip");
 
-        var job = jobs.CreateFixJob(fix.Id, slot, fallback, appId, game.Name, fix.Title, onFinished: (item, result) =>
+        var job = jobs.CreateDenuvoJob(fix.Id, slot, fallback, appId, game.Name, fix.Title, onFinished: (item, result) =>
         {
             if (result is null && item.Status == DownloadStatus.Failed)
             {
