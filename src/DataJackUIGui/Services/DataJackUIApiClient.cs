@@ -436,9 +436,6 @@ public class DataJackUIApiClient
 
     private async Task<string> GetDepotBoxApiKeyAsync()
     {
-        if (!string.IsNullOrWhiteSpace(_settings.HubcapApiKey))
-            return _settings.HubcapApiKey;
-
         try
         {
             string token = await _auth.GetValidAccessTokenAsync();
@@ -454,6 +451,8 @@ public class DataJackUIApiClient
     /// <summary>DepotBox game fixes endpoint. Returns game listings and the 3 DepotBox tags (Bypass, Online, Hypervisor).</summary>
     public async Task<DenuvoListingsResponse?> GetDenuvoListingsAsync(CancellationToken ct = default)
     {
+        try { await _appList.EnsureLoadedAsync(); } catch { }
+
         List<DenuvoGameListing> allGames = [];
         var tags = new List<DenuvoTag>
         {
@@ -489,36 +488,6 @@ public class DataJackUIApiClient
                 }
             }
             catch { }
-        }
-
-        // Secondary fallback sources if DepotBox returned no games (e.g. key required or offline)
-        if (allGames.Count == 0)
-        {
-            var secondaryEndpoints = new[]
-            {
-                "https://generator.ryuu.lol/api/gamelist",
-                "http://167.235.229.108/gamelist",
-                "http://167.235.229.108/api/gamelist"
-            };
-
-            foreach (var endpoint in secondaryEndpoints)
-            {
-                try
-                {
-                    var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
-                    using var res = await _http.SendAsync(req, ct);
-                    if (res.IsSuccessStatusCode)
-                    {
-                        var json = await res.Content.ReadAsStringAsync(ct);
-                        var data = ParseDenuvoListings(json);
-                        if (data?.Games is { Count: > 0 })
-                        {
-                            allGames.AddRange(data.Games);
-                        }
-                    }
-                }
-                catch { }
-            }
         }
 
         // Guaranteed fallback catalog if remote endpoints return empty
