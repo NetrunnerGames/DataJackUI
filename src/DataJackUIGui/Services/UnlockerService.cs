@@ -84,6 +84,40 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
 
     // ── State query ─────────────────────────────────────────────────
 
+    /// <summary>Synchronous on-disk status check (<1ms, no network I/O).</summary>
+    public ModeState GetLocalState(UnlockerMode mode)
+    {
+        bool active = SelectedMode == mode;
+        string? root = steam.EffectivePath;
+        if (root is null || !steam.IsValid)
+            return new ModeState(mode, ModeStatus.Unknown, active, null);
+
+        if (mode == UnlockerMode.IceBreaker)
+        {
+            bool installed = File.Exists(Path.Combine(root, "version.dll"));
+            return new ModeState(mode, installed ? ModeStatus.UpToDate : ModeStatus.NotInstalled, active, null);
+        }
+        if (mode == UnlockerMode.Ost)
+        {
+            bool installed = File.Exists(Path.Combine(root, "OpenSteamTool.dll")) || File.Exists(Path.Combine(root, "dwmapi.dll"));
+            return new ModeState(mode, installed ? ModeStatus.UpToDate : ModeStatus.NotInstalled, active, null);
+        }
+        return new ModeState(mode, ModeStatus.Unknown, active, null);
+    }
+
+    /// <summary>Synchronous on-disk CloudRedirect state check (<1ms, no network I/O).</summary>
+    public CloudRedirectAddonState GetCloudRedirectLocalState()
+    {
+        string? root = steam.EffectivePath;
+        if (root is null || !steam.IsValid)
+            return new CloudRedirectAddonState(false, false, false, null);
+
+        string dll = Path.Combine(root, CloudRedirectDll);
+        bool installed = File.Exists(dll);
+        bool enabled = installed && ReadOpenSteamToolCloudEnabled(root);
+        return new CloudRedirectAddonState(installed, enabled, false, null);
+    }
+
     /// <summary>Query GitHub + local files → this mode's status. Returns Unknown on any failure/offline.
     /// Cached briefly unless <paramref name="forceRefresh"/>.</summary>
     public async Task<ModeState> GetStateAsync(UnlockerMode mode, bool forceRefresh = false, CancellationToken ct = default)
@@ -246,6 +280,12 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
     private async Task<ModeInstallResult> InstallIceBreakerFromReleaseAsync(
         string root, ModeDefinition def, IProgress<double?>? progress, CancellationToken ct)
     {
+        // Clean up legacy OST DLLs from Steam root to avoid 0xc000007b startup crash
+        string dwmapi = Path.Combine(root, "dwmapi.dll");
+        if (File.Exists(dwmapi)) try { File.Delete(dwmapi); } catch { }
+        string xinput = Path.Combine(root, "xinput1_4.dll");
+        if (File.Exists(xinput)) try { File.Delete(xinput); } catch { }
+
         var release = await FetchReleaseAsync(def, forceRefresh: true, ct);
         string staging = Path.Combine(Path.GetTempPath(), "DataJackUIGui", "icebreaker", Guid.NewGuid().ToString("N"));
         try
@@ -378,22 +418,28 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         string? root = steam.EffectivePath;
         if (root is null || !steam.IsValid) return null;
 
-        UnlockerMode? detected = await DetectIceBreaker(root)
-                              ?? DetectOst(root)
-                              ?? await DetectStableOst(root, ct);
+        if (File.Exists(Path.Combine(root, "version.dll")))
+        {
+            settings.SelectedMode = UnlockerMode.IceBreaker.ToString();
+            return UnlockerMode.IceBreaker;
+        }
+
+        if (File.Exists(Path.Combine(root, "OpenSteamTool.dll")))
+        {
+            settings.SelectedMode = UnlockerMode.Ost.ToString();
+            return UnlockerMode.Ost;
+        }
+
+        if (File.Exists(Path.Combine(root, "dwmapi.dll")) || File.Exists(Path.Combine(root, "xinput1_4.dll")))
+        {
+            settings.SelectedMode = UnlockerMode.Ost.ToString();
+            return UnlockerMode.Ost;
+        }
+
+        UnlockerMode? detected = await DetectStableOst(root, ct);
 
         if (detected is { } m) settings.SelectedMode = m.ToString();
         return detected;
-    }
-
-    private Task<UnlockerMode?> DetectIceBreaker(string root)
-    {
-        return Task.FromResult(File.Exists(Path.Combine(root, "version.dll")) ? (UnlockerMode?)UnlockerMode.IceBreaker : null);
-    }
-
-    private UnlockerMode? DetectOst(string root)
-    {
-        return File.Exists(Path.Combine(root, "OpenSteamTool.dll")) ? UnlockerMode.Ost : null;
     }
 
     private async Task<UnlockerMode?> DetectStableOst(string root, CancellationToken ct)

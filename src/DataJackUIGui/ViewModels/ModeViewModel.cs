@@ -134,19 +134,38 @@ public partial class ModeViewModel : ObservableObject
 
     /// <summary>Refresh the add-on panel state. Reads dll/toml from disk (cheap); checks GitHub for an
     /// update only when unlocked (Nightly active), respecting forceRefresh.</summary>
-    private async Task RefreshCloudRedirectAsync(bool forceRefresh)
+    /// <summary>Refresh the add-on panel state locally first, then check GitHub for updates.</summary>
+    private void RefreshCloudRedirectLocal()
     {
         CloudRedirectUnlocked = _unlocker.SelectedMode is UnlockerMode.Ost or UnlockerMode.IceBreaker;
-        var s = await _unlocker.GetCloudRedirectStateAsync(checkUpdate: CloudRedirectUnlocked, forceRefresh);
+        var s = _unlocker.GetCloudRedirectLocalState();
         CloudRedirectInstalled = s.Installed;
         CloudRedirectEnabled = s.Enabled;
-        CloudRedirectUpdateAvailable = s.UpdateAvailable;
+        CloudRedirectUpdateAvailable = false;
 
         CloudRedirectStatusText = !CloudRedirectUnlocked ? Resources.Strings.Mode_CloudRedirect_Locked
             : !s.Installed ? Resources.Strings.Mode_CloudRedirect_Status_NotInstalled
-            : s.UpdateAvailable ? Resources.Strings.Mode_CloudRedirect_Status_UpdateAvailable
             : s.Enabled ? Resources.Strings.Mode_CloudRedirect_Status_Enabled
             : Resources.Strings.Mode_CloudRedirect_Status_Disabled;
+    }
+
+    private async Task RefreshCloudRedirectAsync(bool forceRefresh)
+    {
+        bool unlocked = _unlocker.SelectedMode is UnlockerMode.Ost or UnlockerMode.IceBreaker;
+        var s = await _unlocker.GetCloudRedirectStateAsync(checkUpdate: unlocked, forceRefresh);
+        System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+        {
+            CloudRedirectUnlocked = unlocked;
+            CloudRedirectInstalled = s.Installed;
+            CloudRedirectEnabled = s.Enabled;
+            CloudRedirectUpdateAvailable = s.UpdateAvailable;
+
+            CloudRedirectStatusText = !CloudRedirectUnlocked ? Resources.Strings.Mode_CloudRedirect_Locked
+                : !s.Installed ? Resources.Strings.Mode_CloudRedirect_Status_NotInstalled
+                : s.UpdateAvailable ? Resources.Strings.Mode_CloudRedirect_Status_UpdateAvailable
+                : s.Enabled ? Resources.Strings.Mode_CloudRedirect_Status_Enabled
+                : Resources.Strings.Mode_CloudRedirect_Status_Disabled;
+        });
     }
 
     /// <summary>Enable/disable the add-on (edits opensteamtool.toml; first enable also downloads the dll).
@@ -251,9 +270,7 @@ public partial class ModeViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Page open / refresh. Only the ACTIVE mode is checked against GitHub (inactive cards just show
-    /// "Switch to this": switching re-fetches anyway, so pinging for them is wasted, and their hash
-    /// check would be misleading since modes share filenames). Active check is cached briefly.
+    /// Page open / refresh. Immediately loads on-disk status (<1ms), then queries GitHub in the background.
     /// </summary>
     private bool _detectionAttempted;
 
@@ -267,26 +284,29 @@ public partial class ModeViewModel : ObservableObject
             await _unlocker.DetectActiveModeAsync();
         }
 
-        // Re-evaluate which cards are visible (hidden modes appear only when revealed).
+        // 1. Instant local file state (<1ms)
         SyncCards();
-
         var active = _unlocker.SelectedMode;
         foreach (var card in Cards)
         {
-            if (card.Mode == active)
-            {
-                card.StatusText = Resources.Strings.Mode_Checking;
-                Apply(card, await _unlocker.GetStateAsync(card.Mode, forceRefresh));
-            }
-            else
-            {
-                // No network for inactive modes.
-                Apply(card, new ModeState(card.Mode, ModeStatus.NotInstalled, IsActive: false, null));
-            }
+            var localState = _unlocker.GetLocalState(card.Mode);
+            Apply(card, localState);
         }
+        RefreshCloudRedirectLocal();
 
-        // Bottom CloudRedirect add-on panel (locked unless Nightly BST is the active mode).
-        await RefreshCloudRedirectAsync(forceRefresh);
+        // 2. Background update check
+        _ = Task.Run(async () =>
+        {
+            foreach (var card in Cards)
+            {
+                if (card.Mode == active)
+                {
+                    var state = await _unlocker.GetStateAsync(card.Mode, forceRefresh);
+                    System.Windows.Application.Current?.Dispatcher?.Invoke(() => Apply(card, state));
+                }
+            }
+            await RefreshCloudRedirectAsync(forceRefresh);
+        });
     }
 
     private DateTime _lastCheck;
@@ -294,10 +314,18 @@ public partial class ModeViewModel : ObservableObject
     [RelayCommand]
     private async Task CheckForUpdates()
     {
-        // 30s cooldown: a forced refresh hits GitHub, and the unauthenticated API allows only 60/hr.
-        if (IsBusy || DateTime.UtcNow - _lastCheck < TimeSpan.FromSeconds(30)) return;
-        _lastCheck = DateTime.UtcNow;
-        await LoadAsync(forceRefresh: true);
+        if (IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            _lastCheck = DateTime.UtcNow;
+            await LoadAsync(forceRefresh: true);
+            _toast.Show(Resources.Strings.Mode_Title, Resources.Strings.Plugin_Toast_UpToDate);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private void Apply(ModeCardViewModel card, ModeState s)

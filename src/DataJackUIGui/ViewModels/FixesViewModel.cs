@@ -10,18 +10,33 @@ using DataJackUIGui.Services.Downloads;
 namespace DataJackUIGui.ViewModels;
 
 /// <summary>A game card in the Fixes grid.</summary>
-public partial class FixGameCardVm(DenuvoGameListing g) : ObservableObject
+public partial class FixGameCardVm : ObservableObject
 {
-    public string AppId { get; } = g.AppId;
-    public string Name { get; } = g.Name;
-    public string? HeaderImage { get; } = g.HeaderImage;
-    public int FixCount { get; } = g.FixCount;
-    public IReadOnlyList<string> TagIds { get; } = g.Tags.Select(t => t.Id).ToList();
+    public string AppId { get; }
+    public string Name { get; }
+    public string? HeaderImage { get; }
+    public int FixCount { get; }
+    public IReadOnlyList<string> TagIds { get; }
     public string FixCountLabel => string.Format(Resources.Strings.Fixes_Count, FixCount);
 
     /// <summary>Local cached cover path (set after CoverCache resolves it); bound via ImagePathToSource.</summary>
     [ObservableProperty] private string? _cover;
+    private readonly DenuvoGameListing g;
     private int _resolving;
+
+    public FixGameCardVm(DenuvoGameListing g, CoverCache? covers = null)
+    {
+        this.g = g;
+        AppId = g.AppId;
+        Name = g.Name;
+        HeaderImage = g.HeaderImage;
+        FixCount = g.FixCount;
+        TagIds = g.Tags.Select(t => t.Id).ToList();
+        if (covers is not null && long.TryParse(AppId, out long appid))
+        {
+            _cover = covers.GetLocalPath(appid);
+        }
+    }
 
     public bool Matches(string q) =>
         Name.Contains(q, StringComparison.OrdinalIgnoreCase) || AppId.Contains(q);
@@ -312,7 +327,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
                 return;
             }
 
-            _allGames = data.Games.Select(g => new FixGameCardVm(g)).ToList();
+            _allGames = data.Games.Select(g => new FixGameCardVm(g, covers)).ToList();
 
             Tags.Clear();
             Tags.Add(new TagPillVm(new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }));

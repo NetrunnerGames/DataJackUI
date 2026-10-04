@@ -29,8 +29,8 @@ public class ToastService
 
         void Post() => _snackbar.Show(
             title, message,
-            error ? ControlAppearance.Caution : ControlAppearance.Secondary,
-            null,
+            error ? ControlAppearance.Danger : ControlAppearance.Info,
+            error ? new SymbolIcon(SymbolRegular.ErrorCircle24) : new SymbolIcon(SymbolRegular.Info24),
             TimeSpan.FromSeconds(3));
 
         if (dispatcher.CheckAccess()) Post();
@@ -52,8 +52,8 @@ public class ToastService
             var bar = new Snackbar(_presenter)
             {
                 Title = title,
-                Appearance = error ? ControlAppearance.Caution : ControlAppearance.Secondary,
-                Icon = new SymbolIcon(SymbolRegular.ArrowSync24),
+                Appearance = error ? ControlAppearance.Danger : ControlAppearance.Info,
+                Icon = error ? new SymbolIcon(SymbolRegular.ErrorCircle24) : new SymbolIcon(SymbolRegular.ArrowSync24),
                 // No "infinite" sentinel exists: Timeout is how long it's VISIBLE (Zero = dismiss
                 // instantly), so use a very large value to effectively persist until acted on / closed.
                 Timeout = TimeSpan.FromDays(1),

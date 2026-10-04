@@ -77,15 +77,15 @@ public class SteamService(SettingsService settings)
     /// <summary>Full path to default Lua folder (config\datalua), or null if Steam isn't located.</summary>
     public string? StPlugInDir => DataLuaDir;
 
-    /// <summary>All active Lua search directories: config\datalua, config\stplug-in, config\lua.</summary>
+    /// <summary>All active Lua search directories: config\stplug-in, config\lua, config\datalua.</summary>
     public IEnumerable<string> LuaSearchDirs
     {
         get
         {
             if (EffectivePath is not { } p) yield break;
-            yield return Path.Combine(p, "config", "datalua");
             yield return Path.Combine(p, "config", "stplug-in");
             yield return Path.Combine(p, "config", "lua");
+            yield return Path.Combine(p, "config", "datalua");
         }
     }
 

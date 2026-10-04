@@ -299,6 +299,8 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
         int manifestCount = 0;
         var failed = new List<string>();
 
+        bool hasManifests = archive.Entries.Any(e => e.Name.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase));
+
         using (archive)
         {
             try { Directory.CreateDirectory(plugDir); } catch { }
@@ -312,7 +314,7 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
                 bool isManifest = entry.Name.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase);
                 if (!isLua && !isManifest) continue;
 
-                ProcessZipEntry(entry, plugDir, depotDir, appId, forceLocked, source, isLua, isManifest, ref luaInstalled, ref manifestCount, failed);
+                ProcessZipEntry(entry, plugDir, depotDir, appId, forceLocked || hasManifests, source, isLua, isManifest, ref luaInstalled, ref manifestCount, failed);
             }
         }
 

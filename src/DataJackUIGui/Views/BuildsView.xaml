@@ -67,6 +67,11 @@
             <Grid.ContextMenu>
                 <ContextMenu>
                     <MenuItem
+                        Command="{Binding PlacementTarget.Tag.GenerateSingleManifestCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding}"
+                        Header="Generate Manifest via Hubcap"
+                        Icon="{ui:SymbolIcon ArrowDownload24}" />
+                    <MenuItem
                         Command="{Binding PlacementTarget.Tag.CopyAppIdCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                         Header="{x:Static res:Strings.Common_CopyAppId}"
                         Icon="{ui:SymbolIcon Copy24}" />

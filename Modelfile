@@ -1,0 +1,4 @@
+FROM hf.co/bartowski/Qwen2.5-Coder-7B-Instruct-abliterated-GGUF:Q4_K_M
+PARAMETER num_ctx 2048
+PARAMETER num_thread 4
+PARAMETER num_gpu 0

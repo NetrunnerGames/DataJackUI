@@ -181,6 +181,7 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
     private readonly SteamDepotInfo _depotInfo;
     private readonly ToastService _toast;
     private readonly SettingsService _settings;
+    private readonly HubcapService _hubcap;
 
     private List<LuaTileViewModel> _allGames = [];
 
@@ -197,7 +198,8 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
     public BuildsViewModel(SteamService steam, LuaVault vault, SteamAppListCache appList,
         SteamAppInfoCache appInfo, CoverCache covers, SteamDepotInfo depotInfo, ToastService toast,
         SettingsService settings, DepotDownloaderService depotTool, DownloadQueue queue,
-        ManifestJobFactory jobs, SteamLibraryService library, HardwareAppIdService hardware)
+        ManifestJobFactory jobs, SteamLibraryService library, HardwareAppIdService hardware,
+        HubcapService hubcap)
     {
         _depotTool = depotTool;
         _queue = queue;
@@ -212,6 +214,7 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         _depotInfo = depotInfo;
         _toast = toast;
         _settings = settings;
+        _hubcap = hubcap;
 
         // The base offers 12/24/48/All, sized for the full-width Manage and Fixes grids. This list is a
         // narrow sidebar of single-line rows, so it gets its own steps. PageSizeOptions is a per-instance
@@ -1233,6 +1236,39 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
             _toast.Show(Resources.Strings.Common_CopyAppId, Resources.Strings.Err_ClipboardBusy, error: true);
     }
 
+    /// <summary>Generate a single depot manifest via Hubcap directly and save it to Steam's depotcache folder.</summary>
+    [RelayCommand]
+    private async Task GenerateSingleManifest(DepotRow row)
+    {
+        if (ActiveGame is not { } game) return;
+        string? key = _settings.HubcapApiKey;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            _toast.Show(Resources.Strings.Builds_Title, "Hubcap API Key is not configured. Please add your Hubcap API Key in Settings to generate manifest files.", error: true);
+            return;
+        }
+
+        string? manifestId = row.ManifestId ?? row.PublicManifestId ?? row.CommentedManifestId;
+        if (manifestId is null || !long.TryParse(manifestId, out long mid))
+        {
+            _toast.Show(Resources.Strings.Builds_Title, "No valid manifest ID available for this depot.", error: true);
+            return;
+        }
+
+        try
+        {
+            _toast.Show("Hubcap", $"Requesting manifest for Depot {row.Id} (Manifest {manifestId})...");
+            byte[] bytes = await _hubcap.GenerateSingleManifestAsync(row.Id, mid, key);
+            string savedPath = _hubcap.SaveSingleManifestToDepotCache(row.Id, mid, bytes, _steam);
+            _toast.Show("Hubcap", $"Manifest saved: {Path.GetFileName(savedPath)}");
+            await LoadDepotsAsync(quiet: true);
+        }
+        catch (Exception ex)
+        {
+            _toast.Show("Hubcap Error", ex.Message, error: true);
+        }
+    }
+
     /// <summary>Pin/unpin one depot. Comments its setManifestid line in or out.</summary>
     [RelayCommand]
     private void ToggleLock(DepotRow row)
@@ -1378,11 +1414,22 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         var info = await _depotInfo.GetAsync(appId);
         if (token != _depotLoadToken) return;
 
-        if (info is null) { DepotError = Resources.Strings.Manage_DepotError; IsLoadingDepots = false; return; }
+        bool isFallbackInfo = false;
+        if (info is null)
+        {
+            isFallbackInfo = true;
+            info = new AppDepotInfo(appId, [], [], []);
+        }
+
         if (info.PublicBuildId is not null) LatestBuildLabel = string.Format(Resources.Strings.Builds_LatestBuild, info.PublicBuildId);
 
         BuildRows(info, lua);
         IsLoadingDepots = false;
+
+        if (isFallbackInfo && InLuaCount == 0 && MissingCount == 0 && UnknownCount == 0)
+        {
+            DepotError = Resources.Strings.Manage_DepotError;
+        }
 
         await ResolveMissingDlcNamesAsync(info, lua, token);
     }

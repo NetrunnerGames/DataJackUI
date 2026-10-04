@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -9,14 +10,13 @@ using DataJackUIGui.Services.Downloads;
 namespace DataJackUIGui.Services;
 
 /// <summary>
-/// Talks to Hubcap (hubcapmanifest.com) DIRECTLY with the user's own API key, no lua.tools proxy.
-/// Stats and manifest downloads authenticate via <c>?api_key={key}</c>; the free status check uses a
-/// <c>Bearer</c> header (per the Hubcap API). Stats/status calls never throw. They return null on any
-/// failure so the UI degrades gracefully; only the explicit download surfaces errors to the caller.
+/// Talks to Hubcap (hubcapmanifest.com) DIRECTLY with the user's own API key.
+/// Supports stats, status checks, zip manifest downloads, and single manifest generation.
+/// Enforces a strict 5-second minimum interval between single manifest generation requests
+/// to comply with Hubcap anti-scrape / rate limiting rules.
 /// </summary>
 public partial class HubcapService
 {
-    // Hubcap-keyed downloads can be large manifest zips; allow a generous timeout like the lua.tools client.
     private readonly HttpClient _http = new()
     {
         BaseAddress = new Uri(AppConfig.HubcapBaseUrl),
@@ -24,6 +24,9 @@ public partial class HubcapService
     };
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
+
+    private static readonly SemaphoreSlim SingleManifestRateLimiter = new(1, 1);
+    private static DateTimeOffset _lastSingleManifestRequestTime = DateTimeOffset.MinValue;
 
     [GeneratedRegex("^smm_[0-9a-f]{96}$")]
     private static partial Regex KeyFormatRegex();
@@ -36,14 +39,9 @@ public partial class HubcapService
     {
         try
         {
-            // External communication disabled: Hubcap user stats GET commented out
-            await Task.CompletedTask;
-            return null;
-            /*
             var res = await _http.GetAsync($"/api/v1/user/stats?api_key={Uri.EscapeDataString(key)}", ct);
             if (!res.IsSuccessStatusCode) return null;
             return await ReadJsonAsync<HubcapStats>(res, ct);
-            */
         }
         catch { return null; }
     }
@@ -55,14 +53,9 @@ public partial class HubcapService
         {
             var req = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/status/{Uri.EscapeDataString(appid)}");
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
-            // External communication disabled: Hubcap manifest status check GET commented out
-            await Task.CompletedTask;
-            return null;
-            /*
             var res = await _http.SendAsync(req, ct);
             if (!res.IsSuccessStatusCode) return null;
             return await ReadJsonAsync<HubcapManifestStatus>(res, ct);
-            */
         }
         catch { return null; }
     }
@@ -73,14 +66,68 @@ public partial class HubcapService
         string appid, string key, IProgress<DownloadProgress>? progress, CancellationToken ct = default)
     {
         var url = $"/api/v1/manifest/{Uri.EscapeDataString(appid)}?api_key={Uri.EscapeDataString(key)}";
-        // External communication disabled: Hubcap manifest download GET commented out
-        await Task.CompletedTask;
-        throw new ApiException("External communication disabled.");
-        /*
         using var res = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-        if (!res.IsSuccessStatusCode) return null;
+        if (!res.IsSuccessStatusCode)
+        {
+            throw new ApiException($"Hubcap download failed with HTTP {(int)res.StatusCode}");
+        }
         return await HttpFileDownloader.SaveResponseAsync(res, $"{appid}.zip", progress, ct);
-        */
+    }
+
+    /// <summary>
+    /// Generate a single depot manifest file directly from Hubcap.
+    /// GET /api/v1/generate/manifest?depot_id={depot_id}&manifest_id={manifest_id}
+    /// Headers: Authorization: Bearer {key}
+    /// Returns the binary .manifest file bytes.
+    /// Enforces a strict minimum 5-second delay between requests to avoid anti-scrape detection and key bans.
+    /// </summary>
+    public async Task<byte[]> GenerateSingleManifestAsync(long depotId, long manifestId, string key, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ApiException("Hubcap API key is not configured in Settings.");
+
+        await SingleManifestRateLimiter.WaitAsync(ct);
+        try
+        {
+            var elapsed = DateTimeOffset.UtcNow - _lastSingleManifestRequestTime;
+            var requiredDelay = TimeSpan.FromSeconds(5) - elapsed;
+            if (requiredDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(requiredDelay, ct);
+            }
+            _lastSingleManifestRequestTime = DateTimeOffset.UtcNow;
+        }
+        finally
+        {
+            SingleManifestRateLimiter.Release();
+        }
+
+        var req = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/generate/manifest?depot_id={depotId}&manifest_id={manifestId}");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+
+        using var res = await _http.SendAsync(req, ct);
+        if (!res.IsSuccessStatusCode)
+        {
+            string err = await res.Content.ReadAsStringAsync(ct);
+            throw new ApiException($"Hubcap single manifest generation failed ({(int)res.StatusCode}): {(string.IsNullOrWhiteSpace(err) ? res.ReasonPhrase : err)}");
+        }
+
+        return await res.Content.ReadAsByteArrayAsync(ct);
+    }
+
+    /// <summary>
+    /// Save generated single manifest bytes into Steam's depotcache folder ({depot_id}_{manifest_id}.manifest).
+    /// </summary>
+    public string SaveSingleManifestToDepotCache(long depotId, long manifestId, byte[] content, SteamService steam)
+    {
+        string? dir = steam.DepotCacheDir;
+        if (string.IsNullOrWhiteSpace(dir))
+            throw new InvalidOperationException("Steam depotcache directory could not be resolved.");
+
+        Directory.CreateDirectory(dir);
+        string filePath = Path.Combine(dir, $"{depotId}_{manifestId}.manifest");
+        File.WriteAllBytes(filePath, content);
+        return filePath;
     }
 
     // ── Plumbing ────────────────────────────────────────────────────
