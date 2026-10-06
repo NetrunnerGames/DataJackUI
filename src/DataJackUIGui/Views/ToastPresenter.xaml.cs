@@ -62,10 +62,7 @@ public partial class ToastPresenter : UserControl
     public void Dismiss(ToastItem item)
     {
         item.Timer?.Stop();
-        if (Toasts.Contains(item))
-        {
-            Toasts.Remove(item);
-        }
+        Toasts.Remove(item);
     }
 
     private void OnToastMouseEnter(object sender, MouseEventArgs e)
