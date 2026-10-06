@@ -41,6 +41,81 @@ public static class LuaEditor
     public static string SetDepotLocked(string lua, long depotId, bool locked) =>
         Rewrite(lua, PinLine(depotId), active: locked);
 
+    /// <summary>Matches setManifestid(&lt;depot&gt;, …. Commented or not.</summary>
+    private static Regex ManifestLine(long depotId) =>
+        new(CommentPrefix + @"setManifestid\s*\(\s*" + depotId + @"\s*[,)][^)]*\)(?<tail>.*)$",
+            RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Set a depot to a specific manifest ID in the lua text.
+    /// If a setManifestid line already exists for this depot (active or commented out),
+    /// updates its manifest ID and ensures it is active (uncommented).
+    /// If no setManifestid line exists, inserts one directly after the depot's addappid line,
+    /// or appends it to the end if no addappid line exists.
+    /// </summary>
+    public static string SetDepotManifest(string lua, long depotId, string manifestId)
+    {
+        if (string.IsNullOrWhiteSpace(manifestId)) return lua;
+        manifestId = manifestId.Trim('"', ' ');
+
+        var lines = lua.Split('\n');
+        var pinRegex = ManifestLine(depotId);
+        bool foundPin = false;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var m = pinRegex.Match(lines[i]);
+            if (!m.Success) continue;
+
+            foundPin = true;
+            string indent = m.Groups["indent"].Value;
+            string tail = m.Groups["tail"].Value;
+            lines[i] = $"{indent}setManifestid({depotId}, \"{manifestId}\"){tail}";
+        }
+
+        if (foundPin)
+        {
+            return string.Join('\n', lines);
+        }
+
+        // If no setManifestid existed, look for the depot's addappid line to insert right after it
+        var list = new List<string>(lines);
+        var addAppIdRegex = AddAppIdLine(depotId);
+        int insertIndex = -1;
+        string matchedIndent = "";
+
+        for (int i = 0; i < list.Count; i++)
+        {
+            var m = addAppIdRegex.Match(list[i]);
+            if (m.Success)
+            {
+                insertIndex = i + 1;
+                matchedIndent = m.Groups["indent"].Value;
+            }
+        }
+
+        bool hasCr = lua.Contains("\r\n");
+        string cr = hasCr ? "\r" : "";
+
+        if (insertIndex >= 0)
+        {
+            list.Insert(insertIndex, $"{matchedIndent}setManifestid({depotId}, \"{manifestId}\"){cr}");
+        }
+        else
+        {
+            if (list.Count > 0 && string.IsNullOrWhiteSpace(list[^1]))
+            {
+                list.Insert(list.Count - 1, $"setManifestid({depotId}, \"{manifestId}\"){cr}");
+            }
+            else
+            {
+                list.Add($"setManifestid({depotId}, \"{manifestId}\"){cr}");
+            }
+        }
+
+        return string.Join('\n', list);
+    }
+
     /// <summary>Enable or disable a depot by commenting its addappid (decryption key) line in/out.</summary>
     public static string SetDepotEnabled(string lua, long depotId, bool enabled) =>
         Rewrite(lua, AddAppIdLine(depotId), active: enabled);

@@ -67,6 +67,11 @@
             <Grid.ContextMenu>
                 <ContextMenu>
                     <MenuItem
+                        Command="{Binding PlacementTarget.Tag.SelectDepotForLockCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding}"
+                        Header="Lock to Manifest..."
+                        Icon="{ui:SymbolIcon LockClosed24}" />
+                    <MenuItem
                         Command="{Binding PlacementTarget.Tag.GenerateSingleManifestCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                         CommandParameter="{Binding}"
                         Header="Generate Manifest via Hubcap"
@@ -645,10 +650,78 @@
                         Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
+                        <!-- Lock Depot Manifest (Older Build) card -->
+                        <Border
+                            Grid.Row="0"
+                            Margin="0,0,12,10"
+                            Padding="10"
+                            Background="#08FFFFFF"
+                            BorderBrush="#14FFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Visibility="{Binding IsBrowseMode, Converter={StaticResource BoolToVis}}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        FontSize="11.5"
+                                        FontWeight="SemiBold"
+                                        Foreground="#d1d5db"
+                                        Text="Lock Depot Manifest (Older Build)" />
+                                    <TextBlock
+                                        Grid.Column="1"
+                                        FontSize="11"
+                                        Foreground="#8b96f0"
+                                        Text="{Binding HubcapSingleUsageLabel}"
+                                        Visibility="{Binding HubcapSingleUsageLabel, Converter={StaticResource NullToCollapsed}}" />
+                                </Grid>
+                                <Grid Grid.Row="1" Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:TextBox
+                                        Margin="0,0,6,0"
+                                        PlaceholderText="Depot ID (e.g. 228983)"
+                                        Text="{Binding CustomDepotId, UpdateSourceTrigger=PropertyChanged}" />
+                                    <ui:TextBox
+                                        Grid.Column="1"
+                                        Margin="0,0,6,0"
+                                        PlaceholderText="Manifest ID"
+                                        Text="{Binding CustomManifestId, UpdateSourceTrigger=PropertyChanged}" />
+                                    <ui:Button
+                                        Grid.Column="2"
+                                        Appearance="Primary"
+                                        Command="{Binding LockCustomManifestCommand}"
+                                        Content="Lock Build"
+                                        Icon="{ui:SymbolIcon LockClosed24}"
+                                        IsEnabled="{Binding CanLockCustomManifest}" />
+                                    <ui:ProgressRing
+                                        Grid.Column="3"
+                                        Width="16"
+                                        Height="16"
+                                        Margin="8,0,0,0"
+                                        IsIndeterminate="True"
+                                        Visibility="{Binding IsLockingCustomManifest, Converter={StaticResource BoolToVis}}" />
+                                </Grid>
+                            </Grid>
+                        </Border>
+
                         <ui:TextBox
+                            Grid.Row="1"
                             Margin="0,0,12,0"
                             Icon="{ui:SymbolIcon Search24}"
                             PlaceholderText="{x:Static res:Strings.Builds_Depot_Search}"
@@ -656,7 +729,7 @@
                             Visibility="{Binding IsBrowseMode, Converter={StaticResource BoolToVis}}" />
 
                         <TextBlock
-                            Grid.Row="1"
+                            Grid.Row="2"
                             Margin="2,12,0,0"
                             VerticalAlignment="Top"
                             FontSize="11.5"
@@ -666,7 +739,7 @@
                             Visibility="{Binding HasNoDepotMatches, Converter={StaticResource BoolToVis}}" />
 
                     <ScrollViewer
-                        Grid.Row="1"
+                        Grid.Row="2"
                         Margin="0,8,0,0"
                         VerticalScrollBarVisibility="Auto"
                         Visibility="{Binding IsBrowseMode, Converter={StaticResource BoolToVis}}">
@@ -797,7 +870,7 @@
                          depots, so the Download button opens this rather than guessing which one. -->
                     <Grid
                         Grid.Row="0"
-                        Grid.RowSpan="2"
+                        Grid.RowSpan="3"
                         Margin="0,0,12,0"
                         Visibility="{Binding IsSelectMode, Converter={StaticResource BoolToVis}}">
                         <Grid.RowDefinitions>

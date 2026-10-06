@@ -38,7 +38,7 @@ public sealed record PluginStatus(
 /// "launch DataJackUI.exe when Steam opens", with no CDP hook, no load-timing race, and no dual-slot
 /// redundancy needed anymore.
 /// </summary>
-public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjectorService injector)
+public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjectorService injector, UnlockerService unlocker)
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
@@ -237,16 +237,40 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
         catch { return null; }
     }
 
-    /// <summary>Fast, network-free check: the plugin frontend + a loader slot are both present. Used by the
+    public string ActiveLoaderFileName =>
+        unlocker.SelectedMode == UnlockerMode.IceBreaker ? "version.dll" : "OpenSteamTool.dll";
+
+    /// <summary>Fast, network-free check: the plugin frontend + active mode's loader are both present. Used by the
     /// first-run onboarding gate (no GitHub round-trip, unlike <see cref="GetStatusAsync"/>).</summary>
-    public bool IsInstalledLocally() =>
-        File.Exists(DataJackUIJsPath)
-        && (Slots.Any(s => SlotPath(s) is { } p && File.Exists(p)) || LegacyDllPaths.Any(File.Exists));
+    public bool IsInstalledLocally()
+    {
+        if (!File.Exists(DataJackUIJsPath)) return false;
+        if (SteamDir is not { } s) return false;
+
+        var mode = unlocker.SelectedMode;
+        if (mode == UnlockerMode.IceBreaker)
+            return File.Exists(Path.Combine(s, "version.dll"));
+
+        return File.Exists(Path.Combine(s, "OpenSteamTool.dll"))
+            || File.Exists(Path.Combine(s, "dwmapi.dll"))
+            || File.Exists(Path.Combine(s, "xinput1_4.dll"));
+    }
 
     public async Task<PluginStatus> GetStatusAsync(bool force = false, CancellationToken ct = default)
     {
         bool frontend = File.Exists(DataJackUIJsPath);
-        bool dllInstalled = (SteamDir is { } s && File.Exists(Path.Combine(s, "version.dll")))
+        var mode = unlocker.SelectedMode;
+        bool dllInstalled = false;
+        if (SteamDir is { } s)
+        {
+            dllInstalled = mode == UnlockerMode.IceBreaker
+                ? File.Exists(Path.Combine(s, "version.dll"))
+                : (File.Exists(Path.Combine(s, "OpenSteamTool.dll"))
+                   || File.Exists(Path.Combine(s, "dwmapi.dll"))
+                   || File.Exists(Path.Combine(s, "xinput1_4.dll")));
+        }
+
+        dllInstalled = dllInstalled
             || File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "version.dll"))
             || File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "version.dll"));
 

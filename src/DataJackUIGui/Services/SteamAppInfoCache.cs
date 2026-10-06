@@ -164,7 +164,7 @@ public class SteamAppInfoCache
             catch (OperationCanceledException) { return null; }
             catch { return null; }
         }
-        return null;
+        return await FetchFallbackDetailsAsync(appid, ct);
     }
 
     private async Task<SteamAppInfo?> ParseAndCacheDetailsAsync(JsonDocument doc, long appid)
@@ -172,6 +172,9 @@ public class SteamAppInfoCache
         var entry = doc.RootElement.GetProperty(appid.ToString());
         if (!entry.GetProperty("success").GetBoolean())
         {
+            var fallback = await FetchFallbackDetailsAsync(appid, default);
+            if (fallback is not null) return fallback;
+
             _ = SaveFullDetailsAsync(appid, "{}");
             return null;
         }
@@ -186,6 +189,60 @@ public class SteamAppInfoCache
 
         _ = SaveFullDetailsAsync(appid, data.GetRawText());
         return info;
+    }
+
+    /// <summary>
+    /// Fallback game info lookup via AuthNetrunnerGames proxy (SteamGridDB + IGDB).
+    /// Used when an app is missing, delisted, or unlisted on Steam store.
+    /// </summary>
+    private async Task<SteamAppInfo?> FetchFallbackDetailsAsync(long appid, CancellationToken ct)
+    {
+        try
+        {
+            string url = $"{AppConfig.ApiBaseUrl}/api/game-fallback?appid={appid}";
+            using var res = await _http.GetAsync(url, ct);
+            if (!res.IsSuccessStatusCode) return null;
+
+            using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
+            var root = doc.RootElement;
+            if (root.TryGetProperty("success", out var s) && s.GetBoolean())
+            {
+                string? name = root.TryGetProperty("name", out var n) ? n.GetString() : null;
+                string? headerImage = root.TryGetProperty("header_image", out var h) ? h.GetString() : null;
+
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    var info = new SteamAppInfo(name, headerImage);
+                    _cache[appid] = info;
+
+                    var dict = new Dictionary<string, object?>
+                    {
+                        ["name"] = name,
+                        ["header_image"] = headerImage,
+                    };
+                    if (root.TryGetProperty("short_description", out var desc) && desc.GetString() is { } dStr)
+                    {
+                        dict["short_description"] = dStr;
+                    }
+                    if (root.TryGetProperty("genres", out var gArr) && gArr.ValueKind == JsonValueKind.Array)
+                    {
+                        var genres = new List<Dictionary<string, string>>();
+                        foreach (var g in gArr.EnumerateArray())
+                        {
+                            if (g.GetString() is { } gName)
+                                genres.Add(new Dictionary<string, string> { ["description"] = gName });
+                        }
+                        dict["genres"] = genres;
+                    }
+
+                    _ = SaveFullDetailsAsync(appid, JsonSerializer.Serialize(dict));
+                    return info;
+                }
+            }
+        }
+        catch { /* best effort */ }
+
+        return null;
     }
 
     // ── Full details (for filters) ───────────────────────────────────

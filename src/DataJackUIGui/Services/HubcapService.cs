@@ -60,6 +60,25 @@ public partial class HubcapService
         catch { return null; }
     }
 
+    /// <summary>
+    /// Get current generation usage limits and quota for single manifests.
+    /// GET /api/v1/generate/usage
+    /// Free - does not count toward usage count.
+    /// </summary>
+    public async Task<HubcapGenerationUsage?> GetGenerationUsageAsync(string key, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return null;
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, "/api/v1/generate/usage");
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key.Trim());
+            var res = await _http.SendAsync(req, ct);
+            if (!res.IsSuccessStatusCode) return null;
+            return await ReadJsonAsync<HubcapGenerationUsage>(res, ct);
+        }
+        catch { return null; }
+    }
+
     /// <summary>Download the manifest zip for an app directly from Hubcap (counts toward the key's daily
     /// limit). Throws <see cref="ApiException"/> on failure so the download flow can report it.</summary>
     public async Task<DownloadedFile> DownloadManifestAsync(

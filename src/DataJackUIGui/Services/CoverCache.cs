@@ -82,55 +82,108 @@ public class CoverCache
     /// <summary>True if we already determined this appid has no usable cover (don't keep retrying).</summary>
     public bool IsKnownMissing(long appid) => _noCover.ContainsKey(appid);
 
+    /// <summary>True if the bytes start with JPEG, PNG, or WEBP magic numbers.</summary>
+    private static bool IsValidImage(byte[] b) =>
+        b.Length >= 8 && (
+            IsJpeg(b) ||
+            (b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) ||
+            (b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46)
+        );
+
     /// <summary>Remember that an appid has no cover from any source, so we stop attempting it.</summary>
     public void MarkMissing(long appid) => _noCover[appid] = 0;
 
     /// <summary>
     /// Return the cached cover path, downloading from <paramref name="remoteUrl"/> first if needed.
+    /// Falls back to SteamGridDB (via Cloudflare worker proxy) if Steam CDN is unavailable.
     /// Rejects too-small responses (placeholder / error pages). Concurrent calls share one download.
     /// </summary>
-    public Task<string?> EnsureAsync(long appid, string remoteUrl, CancellationToken ct = default)
+    public Task<string?> EnsureAsync(long appid, string? remoteUrl, CancellationToken ct = default)
     {
         string path = PathFor(appid);
         if (File.Exists(path)) return Task.FromResult<string?>(path);
-        if (string.IsNullOrWhiteSpace(remoteUrl)) return Task.FromResult<string?>(null);
-
-        remoteUrl = SteamCdnUrl.Sanitize(remoteUrl) ?? remoteUrl;
+        if (IsKnownMissing(appid)) return Task.FromResult<string?>(null);
 
         // One download per appid even if asked concurrently (prefetch + page view).
         return _inFlight.GetOrAdd(appid, _ => DownloadAsync(appid, path, remoteUrl, ct));
     }
 
-    private async Task<string?> DownloadAsync(long appid, string path, string remoteUrl, CancellationToken ct)
+    private async Task<string?> DownloadAsync(long appid, string path, string? remoteUrl, CancellationToken ct)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(remoteUrl)) return null;
-            remoteUrl = SteamCdnUrl.Sanitize(remoteUrl) ?? remoteUrl;
-
-            byte[] bytes = await _http.GetByteArrayAsync(remoteUrl, ct);
-            if (bytes.Length < MinValidBytes || !IsJpeg(bytes)) return null;
-            if (IsHeaderCapsulePlaceholder(bytes)) return null;
-
-            await _ioGate.WaitAsync(ct);
-            try
+            if (!string.IsNullOrWhiteSpace(remoteUrl))
             {
-                Directory.CreateDirectory(CoversDir);
-                await File.WriteAllBytesAsync(path, bytes, ct);
+                string sanitizedUrl = SteamCdnUrl.Sanitize(remoteUrl) ?? remoteUrl;
+                try
+                {
+                    byte[] bytes = await _http.GetByteArrayAsync(sanitizedUrl, ct);
+                    if (bytes.Length >= MinValidBytes && IsValidImage(bytes) && !IsHeaderCapsulePlaceholder(bytes))
+                    {
+                        await _ioGate.WaitAsync(ct);
+                        try
+                        {
+                            Directory.CreateDirectory(CoversDir);
+                            await File.WriteAllBytesAsync(path, bytes, ct);
+                            return path;
+                        }
+                        finally { _ioGate.Release(); }
+                    }
+                }
+                catch { /* Steam CDN failed, try SteamGridDB fallback */ }
             }
-            finally
+
+            // Fallback to SteamGridDB via Cloudflare worker proxy
+            string? fallbackUrl = await ResolveFallbackCoverUrlAsync(appid, ct);
+            if (!string.IsNullOrWhiteSpace(fallbackUrl))
             {
-                _ioGate.Release();
+                try
+                {
+                    byte[] bytes = await _http.GetByteArrayAsync(fallbackUrl, ct);
+                    if (bytes.Length >= MinValidBytes && IsValidImage(bytes))
+                    {
+                        await _ioGate.WaitAsync(ct);
+                        try
+                        {
+                            Directory.CreateDirectory(CoversDir);
+                            await File.WriteAllBytesAsync(path, bytes, ct);
+                            return path;
+                        }
+                        finally { _ioGate.Release(); }
+                    }
+                }
+                catch { /* Fallback download failed */ }
             }
-            return path;
+
+            return null;
         }
         catch
         {
-            return null; // 404 / offline / write error: caller decides on fallback
+            return null;
         }
         finally
         {
             _inFlight.TryRemove(appid, out _);
         }
+    }
+
+    private async Task<string?> ResolveFallbackCoverUrlAsync(long appid, CancellationToken ct)
+    {
+        try
+        {
+            string url = $"{AppConfig.ApiBaseUrl}/api/game-fallback?appid={appid}";
+            using var res = await _http.GetAsync(url, ct);
+            if (!res.IsSuccessStatusCode) return null;
+
+            using var doc = System.Text.Json.JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
+            if (doc.RootElement.TryGetProperty("header_image", out var imgProp) &&
+                imgProp.GetString() is { Length: > 0 } imgUrl)
+            {
+                return imgUrl;
+            }
+        }
+        catch { /* best effort */ }
+
+        return null;
     }
 }

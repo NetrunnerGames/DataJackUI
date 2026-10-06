@@ -87,10 +87,10 @@ public class SettingsService
         }
     }
 
-    /// <summary>Selected unlocker backend ("SteamTools" | "OpenSteamTools"), or null if never chosen.</summary>
+    /// <summary>Selected unlocker backend ("Ost" | "Custom"), or "Ost" by default.</summary>
     public string? SelectedMode
     {
-        get => _settings.SelectedMode;
+        get => _settings.SelectedMode ?? "Ost";
         set { _settings.SelectedMode = string.IsNullOrWhiteSpace(value) ? null : value; Save(); }
     }
 

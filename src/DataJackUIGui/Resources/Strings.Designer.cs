@@ -45,15 +45,6 @@ public static class Strings
     public static string Settings_BrowsingAsGuest => Get(nameof(Settings_BrowsingAsGuest));
     public static string Settings_GuestHint => Get(nameof(Settings_GuestHint));
     public static string Settings_SignInDiscord => Get(nameof(Settings_SignInDiscord));
-    public static string Settings_BotCode_Hint => Get(nameof(Settings_BotCode_Hint));
-    public static string Settings_BotCode_Placeholder => Get(nameof(Settings_BotCode_Placeholder));
-    public static string Settings_BotCode_Redeem => Get(nameof(Settings_BotCode_Redeem));
-    public static string Settings_BotCode_Expired => Get(nameof(Settings_BotCode_Expired));
-    public static string Settings_BotCode_Invalid => Get(nameof(Settings_BotCode_Invalid));
-    public static string Settings_BotCode_ServerError => Get(nameof(Settings_BotCode_ServerError));
-    public static string Settings_BotLink_Title => Get(nameof(Settings_BotLink_Title));
-    public static string Settings_BotLink_Body => Get(nameof(Settings_BotLink_Body));
-    public static string Settings_BotLink_Dismiss => Get(nameof(Settings_BotLink_Dismiss));
     public static string Settings_LoginRequired => Get(nameof(Settings_LoginRequired));
     public static string Settings_ManageKeyHintPrefix => Get(nameof(Settings_ManageKeyHintPrefix));
     public static string Settings_Section_Hubcap => Get(nameof(Settings_Section_Hubcap));

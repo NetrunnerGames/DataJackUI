@@ -70,12 +70,24 @@ public class SteamService(SettingsService settings)
 
     public static string SteamExePathFor(string steamPath) => Path.Combine(steamPath, "steam.exe");
 
-    /// <summary>Full path to config\datalua (default write target for Lua files), or null if Steam isn't located.</summary>
+    /// <summary>Full path to config\datalua, or null if Steam isn't located.</summary>
     public string? DataLuaDir =>
         EffectivePath is { } p ? Path.Combine(p, "config", "datalua") : null;
 
-    /// <summary>Full path to default Lua folder (config\datalua), or null if Steam isn't located.</summary>
-    public string? StPlugInDir => DataLuaDir;
+    /// <summary>Full path to config\lua, or null if Steam isn't located.</summary>
+    public string? LuaDir =>
+        EffectivePath is { } p ? Path.Combine(p, "config", "lua") : null;
+
+    /// <summary>Full path to config\stplug-in, or null if Steam isn't located.</summary>
+    public string? StPlugInDir =>
+        EffectivePath is { } p ? Path.Combine(p, "config", "stplug-in") : null;
+
+    /// <summary>Preferred active directory to write new Lua files to based on existing folders.</summary>
+    public string? PreferredLuaDir =>
+        LuaDir is { } ld && Directory.Exists(ld) ? ld
+        : StPlugInDir is { } spd && Directory.Exists(spd) ? spd
+        : DataLuaDir is { } dld && Directory.Exists(dld) ? dld
+        : (StPlugInDir ?? DataLuaDir);
 
     /// <summary>All active Lua search directories: config\stplug-in, config\lua, config\datalua.</summary>
     public IEnumerable<string> LuaSearchDirs

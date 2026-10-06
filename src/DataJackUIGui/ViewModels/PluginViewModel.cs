@@ -27,6 +27,8 @@ public partial class PluginViewModel : ObservableObject
     [ObservableProperty] private string _frontendStatus = Resources.Strings.Plugin_Checking;
     [ObservableProperty] private string _dllStatus = Resources.Strings.Plugin_Checking;
 
+    public string LoaderRowTitle => $"Loader ({_installer.ActiveLoaderFileName})";
+
     // Per-component status flags: drive the colored status icons in the view (green check / amber
     // warning / grey dismiss). The *Status strings above stay the row label text.
     [ObservableProperty] private bool _frontendInstalled;
@@ -95,6 +97,7 @@ public partial class PluginViewModel : ObservableObject
         StatusLine = st.Offline ? Resources.Strings.Plugin_Status_OfflineCheck
             : st.Port8080Busy ? Resources.Strings.Plugin_Status_Port8080Busy
             : null;
+        OnPropertyChanged(nameof(LoaderRowTitle));
     }
 
     private Task<bool> ConfirmSteamRestartAsync() =>

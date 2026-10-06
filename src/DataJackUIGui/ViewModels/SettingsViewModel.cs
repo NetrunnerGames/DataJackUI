@@ -40,18 +40,6 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void DismissLoginRequired() => LoginRequiredMessage = null;
 
-    // ── Bot-provisioned account re-link banner ──────────────────────
-    /// <summary>True when the signed-in session is a Discord bot placeholder (@bot.lua.tools).</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowBotLinkBanner))]
-    private bool _isBotProvisioned;
-
-    /// <summary>Session-only. Resets next launch so the banner re-checks on every startup.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowBotLinkBanner))]
-    private bool _botBannerDismissed;
-
-    public bool ShowBotLinkBanner => false;
 
     // ── Steam location ──────────────────────────────────────────────
     [ObservableProperty] private string _steamPath = "";
@@ -207,6 +195,15 @@ public partial class SettingsViewModel : ObservableObject
     public bool HubcapStatsPending => HubcapIsKeyConfigured && HubcapStats is null;
 
     /// <summary>Placeholder text shown until real stats load.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HubcapSingleUsageText))]
+    private HubcapGenerationUsage? _hubcapGenUsage;
+
+    /// <summary>Single manifest generation quota display (e.g. "Single Manifests: 15 / 20 remaining").</summary>
+    public string? HubcapSingleUsageText =>
+        HubcapGenUsage?.Single is { } s ? $"Single Manifests: {s.Remaining} / {s.Limit} remaining" : null;
+
+    /// <summary>Placeholder text shown until real stats load.</summary>
     public string HubcapStatsText => HubcapStatsDisplay ?? Resources.Strings.Common_Loading;
 
     /// <summary>Set by App so the guest "Sign in" button can run the Discord flow.</summary>
@@ -259,63 +256,31 @@ public partial class SettingsViewModel : ObservableObject
 
     public void RefreshAccount()
     {
-        IsGuest = _auth.IsGuest;
-        DisplayName = _auth.DisplayName;
-        Username = _auth.Username ?? _auth.DisplayName;
-        UserId = _auth.UserId ?? _auth.DiscordId;
-        Email = _auth.Email;
-        AvatarUrl = _auth.AvatarUrl;
-        IsBotProvisioned = _auth.IsBotProvisioned;
-        if (!IsGuest) LoginRequiredMessage = null;
-    }
+        void Update()
+        {
+            IsGuest = _auth.IsGuest;
+            DisplayName = _auth.DisplayName;
+            Username = _auth.Username ?? _auth.DisplayName;
+            UserId = _auth.UserId ?? _auth.DiscordId;
+            Email = _auth.Email;
+            AvatarUrl = _auth.AvatarUrl;
+            if (!IsGuest) LoginRequiredMessage = null;
+        }
 
-    /// <summary>Hide the re-link banner for this session (returns next launch if still a bot account).</summary>
-    [RelayCommand]
-    private void DismissBotBanner() => BotBannerDismissed = true;
+        if (System.Windows.Application.Current?.Dispatcher is { } dispatcher && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(Update);
+        }
+        else
+        {
+            Update();
+        }
+    }
 
     [RelayCommand]
     private async Task SignInAsync()
     {
         if (RequestSignIn is not null) await RequestSignIn();
-    }
-
-    // ── Discord bot code sign-in ────────────────────────────────────
-
-    /// <summary>The 6-char code the user typed from the Discord <c>/login</c> DM.</summary>
-    [ObservableProperty] private string _codeInput = "";
-
-    /// <summary>True while redeeming. Disables the Redeem button via <see cref="CanRedeemCode"/>.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanRedeemCode))]
-    private bool _isRedeemingCode;
-
-    /// <summary>Error shown under the code box (expired/invalid/server). Null = hidden.</summary>
-    [ObservableProperty] private string? _codeError;
-
-    public bool CanRedeemCode => !IsRedeemingCode;
-
-    /// <summary>Redeem the Discord bot code for a session (no browser needed).</summary>
-    [RelayCommand]
-    private async Task SignInWithCodeAsync()
-    {
-        string code = CodeInput.Trim();
-        if (code.Length != 6) return;
-
-        IsRedeemingCode = true;
-        CodeError = null;
-        try
-        {
-            await _auth.SignInWithCodeAsync(code);
-            CodeInput = "";
-        }
-        catch (Exception ex)
-        {
-            CodeError = ex.Message;
-        }
-        finally
-        {
-            IsRedeemingCode = false;
-        }
     }
 
     [RelayCommand]
@@ -364,6 +329,7 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>Called by the View when loaded. Auto-refreshes stats if a key is saved.</summary>
     public void OnViewLoaded()
     {
+        RefreshAccount();
         if (HubcapIsKeyConfigured)
             RefreshHubcapStatsCommand.Execute(null);
         // Re-sync FastFetch in case the Add screen's toggle changed it this session (both are singletons
@@ -383,16 +349,23 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             HubcapStats = await _hubcap.GetStatsAsync(key);
+            HubcapGenUsage = await _hubcap.GetGenerationUsageAsync(key);
         }
         catch
         {
             HubcapStats = null;
+            HubcapGenUsage = null;
         }
         finally
         {
             IsRefreshingHubcapStats = false;
         }
     }
+
+    /// <summary>Open Hubcap's API key stats/generation page.</summary>
+    [RelayCommand]
+    private static void OpenHubcapKeyPage() =>
+        SteamService.OpenUrl("https://hubcapmanifest.com/api-keys/stats");
 
     /// <summary>Validate the typed key (format first, then a live stats call) and, if good, save it.</summary>
     [RelayCommand]
@@ -410,7 +383,8 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             var stats = await _hubcap.GetStatsAsync(key);
-            if (stats is null)
+            var genUsage = await _hubcap.GetGenerationUsageAsync(key);
+            if (stats is null && genUsage is null)
             {
                 // Could be a bad/expired key (401), or a network problem. Both surface as null.
                 ShowHubcapStatus(Resources.Strings.Settings_HubcapKeyError, isError: true);
@@ -422,6 +396,7 @@ public partial class SettingsViewModel : ObservableObject
             HubcapKeyInput = "";
             HubcapKeyStatus = null;
             HubcapStats = stats;
+            HubcapGenUsage = genUsage;
         }
         finally
         {
@@ -438,6 +413,7 @@ public partial class SettingsViewModel : ObservableObject
         HubcapKeyInput = "";
         HubcapKeyStatus = null;
         HubcapStats = null;
+        HubcapGenUsage = null;
     }
 
     private void ShowHubcapStatus(string text, bool isError)

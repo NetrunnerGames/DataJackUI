@@ -100,6 +100,20 @@ public class HubcapStats
     [JsonPropertyName("api_key_expires_at")] public string? ApiKeyExpiresAt { get; set; }
 }
 
+/// <summary>Hubcap <c>/api/v1/generate/usage</c> response for single manifest quota.</summary>
+public class HubcapSingleUsage
+{
+    [JsonPropertyName("usage")] public int Usage { get; set; }
+    [JsonPropertyName("limit")] public int Limit { get; set; }
+    [JsonPropertyName("remaining")] public int Remaining { get; set; }
+}
+
+public class HubcapGenerationUsage
+{
+    [JsonPropertyName("single")] public HubcapSingleUsage? Single { get; set; }
+    [JsonPropertyName("steam_service_ready")] public bool SteamServiceReady { get; set; } = true;
+}
+
 /// <summary>Hubcap <c>/api/v1/status/{appid}</c> response. Whether a manifest exists (free, no usage count).</summary>
 public class HubcapManifestStatus
 {
@@ -118,13 +132,6 @@ public record StandardUsage(int Used, int Limit);
 public class SupporterStatus
 {
     [JsonPropertyName("isSupporter")] public bool IsSupporter { get; set; }
-}
-
-/// <summary>Response from /api/auth/code/redeem. A Discord bot login code exchanged for a magic-link token.</summary>
-public class CodeRedeemResponse
-{
-    [JsonPropertyName("user_id")] public string UserId { get; set; } = "";
-    [JsonPropertyName("token")] public string Token { get; set; } = "";
 }
 
 // ── Supabase auth DTOs ──────────────────────────────────────────────
@@ -159,18 +166,15 @@ public class CustomClaims
     [JsonPropertyName("preferred_username")] public string? PreferredUsername { get; set; }
 }
 
-/// <summary>Persisted (DPAPI-encrypted) auth state.</summary>
+/// <summary>Persisted machine-bound encrypted auth session state.</summary>
 public class StoredAuth
 {
     public string RefreshToken { get; set; } = "";
     public string AccessToken { get; set; } = "";
     public DateTimeOffset ExpiresAt { get; set; }
-    public string? DisplayName { get; set; }
     public string? Username { get; set; }
     public string? UserId { get; set; }
-    public string? Email { get; set; }
     public string? AvatarUrl { get; set; }
-    public string? DiscordId { get; set; }
 }
 
 /// <summary>Per-source UI metadata, mirroring src/lib/source-meta.ts on the website.</summary>

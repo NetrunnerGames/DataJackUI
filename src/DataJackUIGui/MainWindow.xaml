@@ -161,11 +161,10 @@
                 </ui:NavigationView.PaneFooter>
             </ui:NavigationView>
 
-            <!-- Bottom-right toasts (attached to ToastService in App.OnStartup). Also hosts the
-                 persistent "update ready" prompt with a Restart action. -->
-            <ui:SnackbarPresenter
-                x:Name="RootSnackbar"
-                Margin="0,0,24,18"
+            <!-- Bottom-right native WPF acrylic toasts (attached to ToastService in App.OnStartup) -->
+            <views:ToastPresenter
+                x:Name="RootToastPresenter"
+                Margin="0,0,24,20"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Bottom" />
             </Grid>

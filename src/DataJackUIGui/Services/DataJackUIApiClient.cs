@@ -14,7 +14,7 @@ public class ApiException(string message, HttpStatusCode? status = null) : Excep
 
 public record DownloadedFile(string FilePath, string FileName);
 
-/// <summary>Typed client for the lua.tools web API, authenticated with a Supabase bearer token.</summary>
+/// <summary>Typed client for the DataJackUI backend API, authenticated with a Supabase bearer token.</summary>
 public class DataJackUIApiClient
 {
     private readonly HttpClient _http;

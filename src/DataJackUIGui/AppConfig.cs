@@ -1,8 +1,7 @@
 namespace DataJackUIGui;
 
 /// <summary>
-/// Compiled-in client configuration. The Supabase URL and anon key are public
-/// client values (they also ship in the lua.tools web bundle).
+/// Compiled-in client configuration.
 /// </summary>
 public static class AppConfig
 {
@@ -14,8 +13,8 @@ public static class AppConfig
     // Bot-provisioned placeholder accounts use this email domain.
     public const string BotAccountEmailDomain = "@auth.netrunnergames.workers.dev";
 
-    // Hubcap (hubcapmanifest.com): the app talks to this directly with the user's own API key
-    // (no lua.tools proxy). Key + stats are managed in Settings; key-gated source downloads hit it.
+    // Hubcap (hubcapmanifest.com): the app talks to this directly with the user's own API key.
+    // Key + stats are managed in Settings; key-gated source downloads hit it.
     public const string HubcapBaseUrl = "https://hubcapmanifest.com";
 
     /// <summary>Must be registered in Supabase Auth → Redirect URLs.</summary>
@@ -27,11 +26,10 @@ public static class AppConfig
     public const string DiscordOAuthScopes = "identify guilds";
     public const string RequiredDiscordServerId = ""; // Enforced server-side at Cloudflare Auth Worker Edge (/api/verify)
 
-    // The standard lua.tools daily download cap (Hubcap-keyed downloads are exempt). Hardcoded here
-    // because the web app enforces it inline with no API field exposing it; change in one place if it moves.
+    // The standard daily download cap (Hubcap-keyed downloads are exempt).
     public const int DailyDownloadLimit = 25;
 
-    // Public upstream APIs the app calls directly (no lua.tools proxy needed for guest browsing).
+    // Public upstream APIs the app calls directly (no proxy needed for guest browsing).
     public const string SteamStoreSearchUrl = "https://store.steampowered.com/api/storesearch/";
     // Steam's storefront "featured categories" (top sellers, new releases, etc.). Drives the Add page's
     // featured strips. Public, no auth.
@@ -126,7 +124,7 @@ public static class AppConfig
     //     API-only (its route 400s downloads) so it is deliberately NOT in this list.
     public static readonly string[] GithubApiMirrors =
     [
-        "https://lua.tools/api/gh/",   // self-hosted route (src/app/api/gh/[...rest]): proxies api.github.com with our PAT
+        "https://auth.netrunnergames.workers.dev/api/gh/",
     ];
     public static readonly string[] GithubDownloadMirrors =
     [

@@ -610,4 +610,44 @@ public class LuaVaultTests : IDisposable
         Assert.Contains(variants, v => v.DisplayLabel == "keeper" && v.BuildId == "18234567");
         Assert.Contains(reopened.AppsWithVariants(), id => id == AppId);
     }
+
+    [Fact]
+    public void LivePath_ResolvesAcrossMultipleSearchDirs()
+    {
+        string dirA = Path.Combine(_tmp, "dirA");
+        string dirB = Path.Combine(_tmp, "dirB");
+        Directory.CreateDirectory(dirA);
+        Directory.CreateDirectory(dirB);
+
+        string luaFile = Path.Combine(dirB, $"{AppId}.lua");
+        File.WriteAllText(luaFile, AutoUpdatingLua);
+
+        var multiVault = new LuaVault(() => dirA, Path.Combine(_tmp, "multi_vault"), () => [dirA, dirB]);
+        Assert.Equal(luaFile, multiVault.LivePath(AppId));
+        Assert.NotNull(multiVault.GetActiveHash(AppId));
+
+        multiVault.SyncDefaultFromLive(AppId);
+        Assert.Single(multiVault.GetVariants(AppId));
+    }
+
+    [Fact]
+    public void BackupLiveLua_CreatesDataLuaBackup()
+    {
+        WriteLive(AutoUpdatingLua);
+        string? backup = _vault.BackupLiveLua(AppId);
+
+        Assert.NotNull(backup);
+        Assert.True(File.Exists(backup));
+        Assert.EndsWith(".datalua", backup);
+        Assert.Equal(AutoUpdatingLua, File.ReadAllText(backup));
+
+        // When live is modified, backup without overwrite preserves original
+        WriteLive(PinnedBuildLua);
+        _vault.BackupLiveLua(AppId, overwrite: false);
+        Assert.Equal(AutoUpdatingLua, File.ReadAllText(backup));
+
+        // Overwrite updates backup
+        _vault.BackupLiveLua(AppId, overwrite: true);
+        Assert.Equal(PinnedBuildLua, File.ReadAllText(backup));
+    }
 }

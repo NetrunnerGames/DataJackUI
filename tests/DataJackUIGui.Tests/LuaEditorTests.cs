@@ -203,4 +203,49 @@ public class LuaEditorTests
         }
         finally { try { File.Delete(path); } catch { /* best effort */ } }
     }
+
+    // ── SetDepotManifest ──────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void SetDepotManifest_UpdatesExistingActivePin()
+    {
+        string result = LuaEditor.SetDepotManifest(Lua, 228983, "999999999");
+        Assert.Contains("setManifestid(228983, \"999999999\")", result);
+        Assert.DoesNotContain("111111111", result);
+    }
+
+    [Fact]
+    public void SetDepotManifest_UncommentsAndUpdatesExistingCommentedPin()
+    {
+        string result = LuaEditor.SetDepotManifest(Lua, 228985, "888888888");
+        Assert.Contains("setManifestid(228985, \"888888888\")", result);
+        Assert.DoesNotContain("--setManifestid(228985", result);
+    }
+
+    [Fact]
+    public void SetDepotManifest_InsertsAfterAddAppIdWhenNoPinExists()
+    {
+        const string baseLua = "addappid(386940, 1, \"basekey\")\naddappid(555555, 0, \"key\")\n";
+        string result = LuaEditor.SetDepotManifest(baseLua, 555555, "777777777");
+        var lines = Lines(result);
+        Assert.Equal("addappid(555555, 0, \"key\")", lines[1]);
+        Assert.Equal("setManifestid(555555, \"777777777\")", lines[2]);
+    }
+
+    [Fact]
+    public void SetDepotManifest_AppendsWhenNoMatchingDepotExists()
+    {
+        const string baseLua = "addappid(386940, 1, \"basekey\")\n";
+        string result = LuaEditor.SetDepotManifest(baseLua, 999111, "123456789");
+        Assert.Contains("setManifestid(999111, \"123456789\")", result);
+    }
+
+    [Fact]
+    public void SetDepotManifest_PreservesCrlf()
+    {
+        const string crlfLua = "addappid(386940, 1, \"basekey\")\r\naddappid(228983,0,\"aabb\")\r\nsetManifestid(228983,\"111111111\")\r\n";
+        string result = LuaEditor.SetDepotManifest(crlfLua, 228983, "444444444");
+        Assert.Contains("\r\n", result);
+        Assert.Contains("setManifestid(228983, \"444444444\")\r\n", result);
+    }
 }

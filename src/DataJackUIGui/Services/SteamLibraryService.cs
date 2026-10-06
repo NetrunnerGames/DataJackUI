@@ -58,6 +58,44 @@ public partial class SteamLibraryService(SteamService steam)
     }
 
     /// <summary>
+    /// Returns all depot IDs installed for this game according to its appmanifest_&lt;appid&gt;.acf file,
+    /// mapped to their installed manifest ID string.
+    /// </summary>
+    public IReadOnlyDictionary<long, string> GetInstalledDepots(long appId)
+    {
+        try
+        {
+            string? steamRoot = steam.EffectivePath;
+            if (steamRoot is null) return new Dictionary<long, string>();
+
+            foreach (string library in GetLibraryRoots(steamRoot))
+            {
+                string acf = Path.Combine(library, "steamapps", $"appmanifest_{appId}.acf");
+                if (!File.Exists(acf)) continue;
+
+                var result = new Dictionary<long, string>();
+                string text = File.ReadAllText(acf);
+
+                var match = Regex.Match(text, @"""InstalledDepots""\s*\{([^}]+(?:\{[^}]+\}[^}]+)*)\}", RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    var depotMatches = Regex.Matches(match.Groups[1].Value, @"""(\d+)""\s*\{[^}]*""manifest""\s*""(\d+)""", RegexOptions.IgnoreCase);
+                    foreach (Match m in depotMatches)
+                    {
+                        if (long.TryParse(m.Groups[1].Value, out long depotId))
+                        {
+                            result[depotId] = m.Groups[2].Value;
+                        }
+                    }
+                }
+                return result;
+            }
+        }
+        catch { /* unreadable ACF, treat as empty */ }
+        return new Dictionary<long, string>();
+    }
+
+    /// <summary>
     /// Every installed game across every library, from the appmanifests. Lazy, and skips anything whose
     /// folder isn't actually on disk.
     /// </summary>

@@ -26,7 +26,7 @@ DataJackUI provides an interface for Steam manifest acquisition, native DLL hook
 * **Dark Acrylic Interface**: Native Windows 10/11 Acrylic backdrop rendering paired with a dark-tinted background container grid.
 * **Store Query Engine**: Storefront search queries filtered strictly for real games to populate Top Sellers and Popular New Releases.
 * **Jack-in Plugin Backend**: Native RPC integration matching the `Jack-in` Steam CEF store plugin for 1-click manifest addition inside the Steam client.
-* **IceBreaker Hook Administration**: Management interface for `version.dll` native hooks and CloudRedirect configurations.
+* **Hook & Unlocker Administration**: Management interface for OpenSteamTools backend hooks and CloudRedirect configurations.
 * **Fixes & Diagnostics**: Integrated game fix repository and repair workflows with file backups.
 * **Cloudflare DoH Resolution**: Fallback DNS over HTTPS (`https://1.1.1.1/dns-query`) for networks where DNS lookup is restricted or throttled.
 

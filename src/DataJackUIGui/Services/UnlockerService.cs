@@ -53,9 +53,11 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
 
     private ModeDefinition Def(UnlockerMode mode) => Modes.First(m => m.Mode == mode);
 
-    /// <summary>The currently-active mode (the last one installed/selected), or null if none yet.</summary>
+    /// <summary>The currently-active mode (the last one installed/selected), or Ost by default.</summary>
     public UnlockerMode? SelectedMode =>
-        Enum.TryParse(settings.SelectedMode, out UnlockerMode m) ? m : null;
+        Enum.TryParse(settings.SelectedMode, out UnlockerMode m)
+            ? (m == UnlockerMode.IceBreaker ? UnlockerMode.Ost : m)
+            : UnlockerMode.Ost;
 
     /// <summary>Short display name of the active mode for status UI; null if none selected/detected yet.</summary>
     public string? SelectedModeDisplayName =>
@@ -79,7 +81,22 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
     {
         if (SelectedMode is not (UnlockerMode.Ost or UnlockerMode.IceBreaker)) return;
         if (steam.EffectivePath is not { } root) return;
-        try { EnsureOpenSteamToolLuaPath(root); } catch { /* config tweak is best-effort */ }
+        try
+        {
+            EnsureOpenSteamToolLuaPath(root);
+            if (SelectedMode == UnlockerMode.Ost)
+            {
+                SetOpenSteamToolCloudEnabled(root, true);
+                if (!File.Exists(Path.Combine(root, CloudRedirectDll)))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try { await DownloadCloudRedirectDllAsync(root, null, default); } catch { }
+                    });
+                }
+            }
+        }
+        catch { /* config tweak is best-effort */ }
     }
 
     // ── State query ─────────────────────────────────────────────────
@@ -180,23 +197,40 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
     private async Task<(ModeStatus status, string? latestTag)> OstStatusAsync(
         ModeDefinition def, string root, bool forceRefresh, CancellationToken ct)
     {
-        var nightly = await FetchReleaseAsync(def, forceRefresh, ct);
+        var release = await FetchReleaseAsync(def, forceRefresh, ct);
         string ostDll = Path.Combine(root, "OpenSteamTool.dll");
+        string dwmapi = Path.Combine(root, "dwmapi.dll");
+        bool installed = File.Exists(ostDll) || File.Exists(dwmapi);
 
-        if (nightly is not null && File.Exists(ostDll)
-            && AssetDigest(nightly, "OpenSteamTool.dll") == AssetHash.OfFile(ostDll))
-            return (ModeStatus.UpToDate, nightly.TagName);
+        if (!installed)
+            return (ModeStatus.NotInstalled, release?.TagName);
 
-        // Not the current nightly. Fall back to the stable mirror to tell "on stable OST" apart from
-        // "nothing installed": both end up as UpdateAvailable, but only the former is really OST.
-        var (mirrorStatus, mirrorTag) = await OstMirrorStatusAsync(root, ct);
-        string? tag = nightly?.TagName ?? mirrorTag;
+        if (release is null)
+            return (ModeStatus.Unknown, cache.OpenSteamToolsInstalledVersion);
 
-        if (mirrorStatus == ModeStatus.NotInstalled && !File.Exists(ostDll))
-            return (ModeStatus.NotInstalled, tag);
-        if (nightly is null && mirrorStatus == ModeStatus.Unknown)
-            return (ModeStatus.Unknown, tag);
-        return (ModeStatus.UpdateAvailable, tag);
+        // If the installed version recorded in cache matches the latest release tag -> UpToDate
+        if (!string.IsNullOrEmpty(cache.OpenSteamToolsInstalledVersion))
+        {
+            if (string.Equals(cache.OpenSteamToolsInstalledVersion, release.TagName, StringComparison.OrdinalIgnoreCase))
+                return (ModeStatus.UpToDate, release.TagName);
+
+            return (ModeStatus.UpdateAvailable, release.TagName);
+        }
+
+        // Cache was empty: check zip asset digest if available
+        var zipAsset = FindZipAsset(def, release);
+        if (zipAsset is not null && cache.OpenSteamToolsInstalledZipDigest is { } cachedDigest)
+        {
+            if (cachedDigest.Equals(AssetHash.ParseDigest(zipAsset.Digest), StringComparison.OrdinalIgnoreCase))
+            {
+                cache.OpenSteamToolsInstalledVersion = release.TagName;
+                return (ModeStatus.UpToDate, release.TagName);
+            }
+        }
+
+        // Fallback: if OST DLLs exist on disk and no older version was recorded, adopt current version as UpToDate
+        cache.OpenSteamToolsInstalledVersion = release.TagName;
+        return (ModeStatus.UpToDate, release.TagName);
     }
 
     private const string MirrorRepoOwner = "mendy-tools";
@@ -247,7 +281,11 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
             return ModeInstallResult.Fail(Resources.Strings.Err_SteamNotFound);
 
         if (mode == UnlockerMode.IceBreaker)
-            return await InstallIceBreakerFromReleaseAsync(root, def, progress, ct);
+        {
+            // IceBreaker: disabled for now while under development
+            return ModeInstallResult.Fail("IceBreaker mode is temporarily disabled.");
+            // return await InstallIceBreakerFromReleaseAsync(root, def, progress, ct);
+        }
 
         var (version, zipUrl, zipName, wantedZipDigest, manifest) = await ResolveReleaseAsync(def, ct);
         if (version is null)
@@ -266,7 +304,19 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
             settings.SelectedMode = mode.ToString();
             cache.OpenSteamToolsInstalledZipDigest = zipDigest;
             cache.OpenSteamToolsInstalledVersion = version;
-            try { EnsureOpenSteamToolLuaPath(root); } catch { }
+            try
+            {
+                EnsureOpenSteamToolLuaPath(root);
+                SetOpenSteamToolCloudEnabled(root, true);
+                if (!File.Exists(Path.Combine(root, CloudRedirectDll)))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try { await DownloadCloudRedirectDllAsync(root, null, ct); } catch { }
+                    });
+                }
+            }
+            catch { }
 
             return failed.Count > 0
                 ? new ModeInstallResult(false, string.Format(Resources.Strings.Err_WriteFailedCount, failed.Count), failed)
@@ -418,11 +468,12 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         string? root = steam.EffectivePath;
         if (root is null || !steam.IsValid) return null;
 
-        if (File.Exists(Path.Combine(root, "version.dll")))
-        {
-            settings.SelectedMode = UnlockerMode.IceBreaker.ToString();
-            return UnlockerMode.IceBreaker;
-        }
+        // IceBreaker: disabled for now while under development
+        // if (File.Exists(Path.Combine(root, "version.dll")))
+        // {
+        //     settings.SelectedMode = UnlockerMode.IceBreaker.ToString();
+        //     return UnlockerMode.IceBreaker;
+        // }
 
         if (File.Exists(Path.Combine(root, "OpenSteamTool.dll")))
         {
@@ -511,7 +562,8 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         string tomlPath = Path.Combine(steamRoot, "opensteamtool.toml");
         if (!File.Exists(tomlPath))
         {
-            File.WriteAllText(tomlPath, $"[lua]\npaths = [\"{OstLuaPath}\"]\n\n[cloud]\nenabled = false\n");
+            File.WriteAllText(tomlPath, $"[lua]\npaths = [\"{OstLuaPath}\"]\n\n[cloud]\nenabled = true\n");
+            SetDataJackJsonCloudEnabled(steamRoot, true);
             return;
         }
 

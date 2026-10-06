@@ -56,7 +56,8 @@
                                 Background="#0DFFFFFF"
                                 BorderBrush="#1FFFFFFF"
                                 BorderThickness="1"
-                                CornerRadius="10">
+                                CornerRadius="10"
+                                Opacity="{Binding CardOpacity}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -190,7 +191,7 @@
                                             Command="{Binding DataContext.InstallCommand, ElementName=Root}"
                                             CommandParameter="{Binding}"
                                             Content="{Binding ButtonText}"
-                                            IsEnabled="{Binding DataContext.NotBusy, ElementName=Root}"
+                                            IsEnabled="{Binding IsActionEnabled}"
                                             Visibility="{Binding ShowActionButton, Converter={StaticResource BoolToVis}}" />
                                     </StackPanel>
                                 </Grid>

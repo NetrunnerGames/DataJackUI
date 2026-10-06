@@ -43,12 +43,15 @@ public static class ModeMigration
     public static (string? Mode, bool ResetOnboarding) Migrate(string? stored)
     {
         if (string.IsNullOrWhiteSpace(stored)) return (null, false);   // fresh install; onboarding handles it
+        if (string.Equals(stored, nameof(UnlockerMode.IceBreaker), StringComparison.OrdinalIgnoreCase))
+            return (UnlockerMode.Ost.ToString(), false);
+
         if (Enum.TryParse<UnlockerMode>(stored, out var current))
-            return (current.ToString(), false);                        // already current. Leave it be
+            return (current == UnlockerMode.IceBreaker ? UnlockerMode.Ost.ToString() : current.ToString(), false);
 
         return stored switch
         {
-            "Bst" or "BetterSteamTools" or "OpenSteamToolsNightly" => (UnlockerMode.IceBreaker.ToString(), false),
+            "Bst" or "BetterSteamTools" or "OpenSteamToolsNightly" => (UnlockerMode.Ost.ToString(), false),
 
             // SteamTools and the CloudRedirect fix are retired with nothing to map onto. Clear the mode
             // and send them back through onboarding to choose deliberately. Anything else unrecognised

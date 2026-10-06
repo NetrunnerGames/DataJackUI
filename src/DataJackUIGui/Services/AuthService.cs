@@ -14,7 +14,7 @@ namespace DataJackUIGui.Services;
 
 public class AuthService
 {
-    private static readonly string AuthFile = Path.Combine(
+    internal static string AuthFile = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui", "auth.dat");
 
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(30) };
@@ -63,19 +63,22 @@ public class AuthService
         _accessToken = stored.AccessToken;
         _refreshToken = stored.RefreshToken;
         _expiresAt = stored.ExpiresAt;
-        DisplayName = stored.DisplayName;
-        Username = stored.Username ?? stored.DisplayName;
-        UserId = stored.UserId ?? stored.DiscordId;
-        Email = stored.Email;
+        Username = stored.Username;
+        DisplayName = stored.Username;
+        UserId = stored.UserId;
         AvatarUrl = stored.AvatarUrl;
-        DiscordId = stored.DiscordId;
+        Email = null;
+        DiscordId = null;
+
+        // Immediately sync UI with restored cached credentials
+        NotifyAuthStateChanged();
 
         // Token still comfortably valid, or refresh succeeds → keep the session
         if (_expiresAt > DateTimeOffset.UtcNow.AddMinutes(2))
         {
             bool inServer = await VerifyServerMembershipAsync();
             if (!inServer) return false;
-            AuthStateChanged?.Invoke();
+            NotifyAuthStateChanged();
             return true;
         }
         try
@@ -83,13 +86,13 @@ public class AuthService
             await RefreshAsync();
             bool inServer = await VerifyServerMembershipAsync();
             if (!inServer) return false;
-            AuthStateChanged?.Invoke();
+            NotifyAuthStateChanged();
             return true;
         }
         catch
         {
             ClearSession(); // revoked/expired. Fall back to guest
-            AuthStateChanged?.Invoke();
+            NotifyAuthStateChanged();
             return false;
         }
     }
@@ -204,7 +207,7 @@ public class AuthService
                ?? throw new AuthException("Invalid session returned from auth worker.");
 
         ApplySession(session);
-        AuthStateChanged?.Invoke();
+        NotifyAuthStateChanged();
     }
 
     private async Task<string> GetDiscordIpcCodeAsync(CancellationToken ct)
@@ -313,55 +316,6 @@ public class AuthService
         return (opcode, Encoding.UTF8.GetString(payloadBytes));
     }
 
-    // ── Discord bot code sign-in ────────────────────────────────────
-
-    /// <summary>
-    /// Sign in with a 6-character Discord bot code (from <c>/login</c>): redeem it for a magic-link
-    /// token, then verify that token into a real Supabase session. Single-use, 5-minute TTL.
-    /// </summary>
-    public async Task SignInWithCodeAsync(string code, CancellationToken ct = default)
-    {
-        // Step 1: redeem the code for a Supabase magic-link token hash. The code itself is the credential.
-        var redeemReq = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.ApiBaseUrl}/api/auth/code/redeem")
-        {
-            Content = new StringContent(
-                JsonSerializer.Serialize(new { code = code.Trim().ToUpperInvariant() }),
-                Encoding.UTF8, "application/json"),
-        };
-
-        var redeemRes = await _http.SendAsync(redeemReq, ct);
-        string redeemBody = await redeemRes.Content.ReadAsStringAsync(ct);
-        if (!redeemRes.IsSuccessStatusCode)
-            throw new AuthException(Resources.Strings.Settings_BotCode_ServerError);
-
-        var redeem = JsonSerializer.Deserialize<CodeRedeemResponse>(redeemBody);
-        if (redeem is null || string.IsNullOrEmpty(redeem.Token))
-            throw new AuthException(Resources.Strings.Settings_BotCode_ServerError);
-
-        // Step 2: verify the magic-link token hash into an access/refresh session.
-        var session = await VerifyMagicTokenAsync(redeem.Token, ct);
-        ApplySession(session);
-        AuthStateChanged?.Invoke();
-    }
-
-    private async Task<SupabaseSession> VerifyMagicTokenAsync(string tokenHash, CancellationToken ct)
-    {
-        var req = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.SupabaseUrl}/auth/v1/verify")
-        {
-            Content = new StringContent(
-                JsonSerializer.Serialize(new { type = "magiclink", token_hash = tokenHash }),
-                Encoding.UTF8, "application/json"),
-        };
-        req.Headers.Add("apikey", AppConfig.SupabaseAnonKey);
-
-        var res = await _http.SendAsync(req, ct);
-        string body = await res.Content.ReadAsStringAsync(ct);
-        if (!res.IsSuccessStatusCode)
-            throw new AuthException(Resources.Strings.Settings_BotCode_ServerError);
-
-        return JsonSerializer.Deserialize<SupabaseSession>(body)
-               ?? throw new AuthException(Resources.Strings.Settings_BotCode_ServerError);
-    }
 
     private static async Task<string> WaitForCallbackAsync(HttpListener listener, CancellationToken ct)
     {
@@ -470,7 +424,30 @@ public class AuthService
     public void SignOut()
     {
         ClearSession();
-        AuthStateChanged?.Invoke();
+        NotifyAuthStateChanged();
+    }
+
+    public void NotifyAuthStateChanged()
+    {
+        if (AuthStateChanged is null) return;
+        foreach (var handler in AuthStateChanged.GetInvocationList())
+        {
+            try
+            {
+                if (System.Windows.Application.Current?.Dispatcher is { } dispatcher && !dispatcher.CheckAccess())
+                {
+                    dispatcher.Invoke(() => handler.DynamicInvoke());
+                }
+                else
+                {
+                    handler.DynamicInvoke();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[AuthService] AuthStateChanged error: {ex}");
+            }
+        }
     }
 
     // ── Internals ───────────────────────────────────────────────────
@@ -496,12 +473,9 @@ public class AuthService
             RefreshToken = _refreshToken,
             AccessToken = _accessToken,
             ExpiresAt = _expiresAt,
-            DisplayName = DisplayName,
             Username = Username,
             UserId = UserId,
-            Email = Email,
             AvatarUrl = AvatarUrl,
-            DiscordId = DiscordId,
         });
     }
 
@@ -514,13 +488,116 @@ public class AuthService
         try { File.Delete(AuthFile); } catch { /* best effort */ }
     }
 
-    private static StoredAuth? LoadStored()
+    private const byte PayloadVersion = 0x01;
+    private static readonly byte[] AppSalt = "DataJackUI.SecureVault.v1"u8.ToArray();
+    private static readonly byte[] DpapiInfo = "DataJackUI.DpapiEntropy.v1"u8.ToArray();
+
+    private static byte[] GetMachineKey()
+    {
+        var sb = new StringBuilder();
+        sb.Append(Environment.MachineName).Append('|');
+        sb.Append(Environment.UserName).Append('|');
+        sb.Append(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)).Append('|');
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
+            sb.Append(key?.GetValue("MachineGuid")?.ToString()).Append('|');
+        }
+        catch { }
+        try
+        {
+            sb.Append(System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value).Append('|');
+        }
+        catch { }
+
+        byte[] ikm = Encoding.UTF8.GetBytes(sb.ToString());
+        return HKDF.DeriveKey(HashAlgorithmName.SHA256, ikm, 32, AppSalt, "DataJackUI.MachineKey"u8.ToArray());
+    }
+
+    private static byte[] GetDpapiEntropy()
+    {
+        byte[] key = GetMachineKey();
+        try
+        {
+            return HKDF.DeriveKey(HashAlgorithmName.SHA256, key, 32, AppSalt, DpapiInfo);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
+    }
+
+    internal static StoredAuth? LoadStored()
     {
         try
         {
             if (!File.Exists(AuthFile)) return null;
-            byte[] plain = ProtectedData.Unprotect(File.ReadAllBytes(AuthFile), null, DataProtectionScope.CurrentUser);
-            return JsonSerializer.Deserialize<StoredAuth>(plain);
+            byte[] fileBytes = File.ReadAllBytes(AuthFile);
+            if (fileBytes.Length == 0) return null;
+
+            byte[]? payload = null;
+            byte[] entropy = GetDpapiEntropy();
+            bool isLegacy = false;
+
+            try
+            {
+                payload = ProtectedData.Unprotect(fileBytes, entropy, DataProtectionScope.CurrentUser);
+            }
+            catch
+            {
+                // Fall back to legacy plain DPAPI (unprotect with null entropy)
+                try
+                {
+                    payload = ProtectedData.Unprotect(fileBytes, null, DataProtectionScope.CurrentUser);
+                    isLegacy = true;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(entropy);
+            }
+
+            if (payload is null || payload.Length == 0) return null;
+
+            if (isLegacy || payload[0] != PayloadVersion)
+            {
+                // Legacy plain JSON payload from prior versions
+                var legacyAuth = JsonSerializer.Deserialize<StoredAuth>(payload);
+                if (legacyAuth is not null)
+                {
+                    // Migrate immediately to machine-bound AES-GCM + DPAPI
+                    SaveStored(legacyAuth);
+                }
+                return legacyAuth;
+            }
+
+            // Modern format: [Version (1B)] + [Nonce (12B)] + [Tag (16B)] + [Ciphertext]
+            if (payload.Length < 1 + 12 + 16) return null;
+
+            byte[] nonce = payload[1..13];
+            byte[] tag = payload[13..29];
+            byte[] cipherBytes = payload[29..];
+            byte[] plainBytes = new byte[cipherBytes.Length];
+            byte[] key = GetMachineKey();
+
+            try
+            {
+                using (var aesGcm = new AesGcm(key, 16))
+                {
+                    aesGcm.Decrypt(nonce, cipherBytes, tag, plainBytes);
+                }
+
+                return JsonSerializer.Deserialize<StoredAuth>(plainBytes);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(plainBytes);
+                CryptographicOperations.ZeroMemory(key);
+            }
         }
         catch
         {
@@ -528,30 +605,61 @@ public class AuthService
         }
     }
 
-    private static void SaveStored(StoredAuth auth)
+    internal static void SaveStored(StoredAuth auth)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(AuthFile)!);
-        byte[] enc = ProtectedData.Protect(
-            JsonSerializer.SerializeToUtf8Bytes(auth), null, DataProtectionScope.CurrentUser);
 
-        // The token file can be momentarily locked (another instance, AV, indexer). A failed
-        // write must never break sign-in: the session is already live in memory. Persisting is
-        // a convenience for next launch. Retry briefly, then give up silently.
-        for (int attempt = 0; ; attempt++)
+        byte[] plainBytes = JsonSerializer.SerializeToUtf8Bytes(auth);
+        byte[] key = GetMachineKey();
+        byte[] entropy = GetDpapiEntropy();
+
+        try
         {
-            try
+            // 1. Encrypt with AES-256-GCM using machine-derived key
+            byte[] nonce = RandomNumberGenerator.GetBytes(12);
+            byte[] tag = new byte[16];
+            byte[] cipherBytes = new byte[plainBytes.Length];
+
+            using (var aesGcm = new AesGcm(key, 16))
             {
-                File.WriteAllBytes(AuthFile, enc);
-                return;
+                aesGcm.Encrypt(nonce, plainBytes, cipherBytes, tag);
             }
-            catch (IOException) when (attempt < 3)
+
+            // Payload structure: [Version (1 byte)] + [Nonce (12 bytes)] + [Tag (16 bytes)] + [Ciphertext]
+            byte[] payload = new byte[1 + 12 + 16 + cipherBytes.Length];
+            payload[0] = PayloadVersion;
+            Buffer.BlockCopy(nonce, 0, payload, 1, 12);
+            Buffer.BlockCopy(tag, 0, payload, 1 + 12, 16);
+            Buffer.BlockCopy(cipherBytes, 0, payload, 1 + 12 + 16, cipherBytes.Length);
+
+            // 2. Wrap payload with DPAPI using machine entropy
+            byte[] enc = ProtectedData.Protect(payload, entropy, DataProtectionScope.CurrentUser);
+
+            // The token file can be momentarily locked (another instance, AV, indexer). A failed
+            // write must never break sign-in: the session is already live in memory. Persisting is
+            // a convenience for next launch. Retry briefly, then give up silently.
+            for (int attempt = 0; ; attempt++)
             {
-                Thread.Sleep(150);
+                try
+                {
+                    File.WriteAllBytes(AuthFile, enc);
+                    return;
+                }
+                catch (IOException) when (attempt < 3)
+                {
+                    Thread.Sleep(150);
+                }
+                catch
+                {
+                    return; // locked/denied. Stay signed in for this session, just don't persist
+                }
             }
-            catch
-            {
-                return; // locked/denied. Stay signed in for this session, just don't persist
-            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plainBytes);
+            CryptographicOperations.ZeroMemory(key);
+            CryptographicOperations.ZeroMemory(entropy);
         }
     }
 

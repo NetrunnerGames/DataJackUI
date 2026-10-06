@@ -7,7 +7,7 @@ namespace DataJackUIGui.ViewModels;
 
 /// <summary>
 /// First-run welcome overlay. Shown once (gated by <see cref="CacheService.OnboardingComplete"/>) over the
-/// whole app: offers Discord sign-in, "apply recommended settings" (BetterSteamTools + FastFetch) and
+/// whole app: offers Discord sign-in, "apply recommended settings" (Default mode + FastFetch) and
 /// "install the plugin", then applies the chosen actions on "Let's go!" and dismisses.
 /// </summary>
 public partial class OnboardingViewModel : ObservableObject
@@ -126,7 +126,7 @@ public partial class OnboardingViewModel : ObservableObject
             if (applyRecommended)
             {
                 _settings.FastFetch = true;
-                var result = await _unlocker.InstallAsync(UnlockerMode.IceBreaker); // the Recommended mode
+                var result = await _unlocker.InstallAsync(UnlockerMode.Ost); // the Recommended mode
                 if (!result.Success)
                     _toast.Show(Resources.Strings.Onboarding_Title, result.Error ?? "", error: true);
             }

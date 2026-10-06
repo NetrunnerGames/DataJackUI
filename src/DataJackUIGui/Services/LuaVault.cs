@@ -88,18 +88,20 @@ public class LuaVault
 
     private readonly string _root;
     private readonly Func<string?> _stPlugInDir;
+    private readonly Func<IEnumerable<string>>? _searchDirs;
 
-    public LuaVault(SteamService steam) : this(() => steam.StPlugInDir, DefaultRoot) { }
+    public LuaVault(SteamService steam) : this(() => steam.PreferredLuaDir ?? steam.StPlugInDir, DefaultRoot, () => steam.LuaSearchDirs) { }
 
     /// <summary>
     /// Test seam: point the vault at throwaway directories instead of %AppData% and the real Steam
     /// install. Worth having. This class rewrites the files Steam loads, so "it destroys your luas" is
     /// the failure mode, and that's not something to only find out by hand.
     /// </summary>
-    internal LuaVault(Func<string?> stPlugInDir, string root)
+    internal LuaVault(Func<string?> stPlugInDir, string root, Func<IEnumerable<string>>? searchDirs = null)
     {
         _stPlugInDir = stPlugInDir;
         _root = root;
+        _searchDirs = searchDirs;
     }
 
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -120,10 +122,42 @@ public class LuaVault
     private string IndexPath(long appId) => Path.Combine(AppDir(appId), "index.json");
     private string VariantPath(long appId, string hash) => Path.Combine(AppDir(appId), hash + ".lua");
 
-    /// <summary>Steam's live copy for this game (config\stplug-in\&lt;appid&gt;.lua), or null if Steam
+    /// <summary>Steam's live copy for this game across active Lua search directories (or default write target), or null if Steam
     /// isn't located.</summary>
-    public string? LivePath(long appId) =>
-        _stPlugInDir() is { } dir ? Path.Combine(dir, $"{appId}.lua") : null;
+    public string? LivePath(long appId)
+    {
+        if (_searchDirs != null)
+        {
+            foreach (var searchDir in _searchDirs())
+            {
+                if (string.IsNullOrWhiteSpace(searchDir)) continue;
+                string candidate = Path.Combine(searchDir, $"{appId}.lua");
+                if (File.Exists(candidate)) return candidate;
+            }
+        }
+        return _stPlugInDir() is { } defaultDir ? Path.Combine(defaultDir, $"{appId}.lua") : null;
+    }
+
+    /// <summary>
+    /// Creates a backup of the live lua as &lt;appid&gt;.datalua if not already backed up.
+    /// Used when modifying lua files to lock builds (depot and manifest) to identify the game's original backup.
+    /// </summary>
+    public string? BackupLiveLua(long appId, bool overwrite = false)
+    {
+        string? live = LivePath(appId);
+        if (live is null || !File.Exists(live)) return null;
+
+        string backup = Path.ChangeExtension(live, ".datalua");
+        try
+        {
+            if (overwrite || !File.Exists(backup))
+            {
+                File.Copy(live, backup, overwrite: true);
+            }
+            return backup;
+        }
+        catch { return null; }
+    }
 
     // ── Reads ───────────────────────────────────────────────────────
 
@@ -178,14 +212,20 @@ public class LuaVault
     /// </summary>
     public IEnumerable<(long AppId, string BuildId, string Path)> EnumerateLooseBuildLuas()
     {
-        string? dir = _stPlugInDir();
-        if (dir is null || !Directory.Exists(dir)) yield break;
+        var dirs = _searchDirs != null ? _searchDirs() : (_stPlugInDir() is { } d ? [d] : Enumerable.Empty<string>());
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (string path in Directory.EnumerateFiles(dir, "*_*.lua"))
+        foreach (string dir in dirs)
         {
-            long? appId = LuaInstaller.AppIdFromFileName(path);
-            string? buildId = LuaInstaller.BuildIdFromFileName(path);
-            if (appId is { } id && buildId is not null) yield return (id, buildId, path);
+            if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir)) continue;
+
+            foreach (string path in Directory.EnumerateFiles(dir, "*_*.lua"))
+            {
+                if (!seen.Add(path)) continue;
+                long? appId = LuaInstaller.AppIdFromFileName(path);
+                string? buildId = LuaInstaller.BuildIdFromFileName(path);
+                if (appId is { } id && buildId is not null) yield return (id, buildId, path);
+            }
         }
     }
 

@@ -21,14 +21,27 @@ public partial class ModeCardViewModel(UnlockerMode mode, string title, string d
     [NotifyPropertyChangedFor(nameof(ShowActionButton))]
     private bool _isActive;
 
-    /// <summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsActionEnabled))]
+    private bool _isBusy;
+
+    /// <summary>Always show the action button so disabled modes remain visible but greyed out.</summary>
     public bool ShowActionButton => true;
 
-    /// <summary>IceBreaker is our recommended native mode.</summary>
-    public bool IsRecommended => Mode == UnlockerMode.IceBreaker;
+    /// <summary>IceBreaker is currently disabled while under development.</summary>
+    public bool CanSelect => Mode != UnlockerMode.IceBreaker;
 
-    /// <summary>OST is the upstream build.</summary>
-    public bool IsExperimental => Mode == UnlockerMode.Ost;
+    /// <summary>Action button is enabled only when selectable and view is idle.</summary>
+    public bool IsActionEnabled => CanSelect && !IsBusy;
+
+    /// <summary>Visual opacity to grey out disabled cards.</summary>
+    public double CardOpacity => CanSelect ? 1.0 : 0.65;
+
+    /// <summary>OST is the recommended mode.</summary>
+    public bool IsRecommended => Mode == UnlockerMode.Ost;
+
+    /// <summary>OST is upstream stable.</summary>
+    public bool IsExperimental => false;
 
     /// <summary>Both IceBreaker and OST carry native CloudRedirect support.</summary>
     public bool SupportsCloudRedirect => Mode is UnlockerMode.IceBreaker or UnlockerMode.Ost;
@@ -53,6 +66,12 @@ public partial class ModeViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanUseCloudRedirect))]
     private bool _isBusy;
     public bool NotBusy => !IsBusy;
+
+    partial void OnIsBusyChanged(bool value)
+    {
+        foreach (var card in Cards)
+            card.IsBusy = value;
+    }
 
     [ObservableProperty] private double _progress;
     [ObservableProperty] private bool _isProgressIndeterminate;
@@ -152,6 +171,13 @@ public partial class ModeViewModel : ObservableObject
     private async Task RefreshCloudRedirectAsync(bool forceRefresh)
     {
         bool unlocked = _unlocker.SelectedMode is UnlockerMode.Ost or UnlockerMode.IceBreaker;
+        if (unlocked && _unlocker.SelectedMode == UnlockerMode.Ost && _steam.EffectivePath is { } root)
+        {
+            if (!File.Exists(Path.Combine(root, "cloud_redirect.dll")))
+            {
+                try { await _unlocker.EnableCloudRedirectAsync(); } catch { }
+            }
+        }
         var s = await _unlocker.GetCloudRedirectStateAsync(checkUpdate: unlocked, forceRefresh);
         System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
         {
@@ -265,7 +291,7 @@ public partial class ModeViewModel : ObservableObject
             {
                 int idx = visible.IndexOf(def);
                 idx = Math.Min(idx, Cards.Count);
-                Cards.Insert(idx, new ModeCardViewModel(def.Mode, def.DisplayName, def.Description));
+                Cards.Insert(idx, new ModeCardViewModel(def.Mode, def.DisplayName, def.Description) { IsBusy = IsBusy });
             }
     }
 
@@ -330,6 +356,14 @@ public partial class ModeViewModel : ObservableObject
 
     private void Apply(ModeCardViewModel card, ModeState s)
     {
+        if (card.Mode == UnlockerMode.IceBreaker)
+        {
+            card.StatusText = "Disabled (Work in progress)";
+            card.ButtonText = "Disabled";
+            card.IsActive = false;
+            return;
+        }
+
         if (s.Status == ModeStatus.Unknown)
             card.StatusText = Resources.Strings.Mode_StatusUnavailable;
         else if (!s.IsActive)
@@ -359,7 +393,7 @@ public partial class ModeViewModel : ObservableObject
     [RelayCommand]
     private void Install(ModeCardViewModel card)
     {
-        if (IsBusy) return;
+        if (IsBusy || card.Mode == UnlockerMode.IceBreaker) return;
         _pendingCard = card;
         ConfirmTitle = card.IsActive
             ? string.Format(Resources.Strings.Mode_Confirm_Reinstall, card.Title)

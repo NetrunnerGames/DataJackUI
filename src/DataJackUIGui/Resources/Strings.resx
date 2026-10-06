@@ -84,15 +84,6 @@
   <data name="Settings_BrowsingAsGuest" xml:space="preserve"><value>Browsing as guest</value></data>
   <data name="Settings_GuestHint" xml:space="preserve"><value>Sign in to download manifests and DLC unlocks</value></data>
   <data name="Settings_SignInDiscord" xml:space="preserve"><value>Sign in with Discord</value></data>
-  <data name="Settings_BotCode_Hint" xml:space="preserve"><value>Have a code? Run /login in Discord and enter it here.</value></data>
-  <data name="Settings_BotCode_Placeholder" xml:space="preserve"><value>A3X9K2</value></data>
-  <data name="Settings_BotCode_Redeem" xml:space="preserve"><value>Redeem</value></data>
-  <data name="Settings_BotCode_Expired" xml:space="preserve"><value>Code expired. Run /login again.</value></data>
-  <data name="Settings_BotCode_Invalid" xml:space="preserve"><value>Invalid or unknown code.</value></data>
-  <data name="Settings_BotCode_ServerError" xml:space="preserve"><value>Server error. Try again.</value></data>
-  <data name="Settings_BotLink_Title" xml:space="preserve"><value>Finish linking your account</value></data>
-  <data name="Settings_BotLink_Body" xml:space="preserve"><value>You're signed in with a temporary Discord account. Sign in at lua.tools, then run /login again and enter the code to link your full account.</value></data>
-  <data name="Settings_BotLink_Dismiss" xml:space="preserve"><value>Dismiss</value></data>
   <data name="Settings_LoginRequired" xml:space="preserve"><value>Login is required for this action.</value></data>
   <data name="Settings_ManageKeyHintPrefix" xml:space="preserve"><value>Manage your Hubcap API key and profile on</value></data>
   <data name="Settings_Section_Hubcap" xml:space="preserve"><value>HUBCAP</value></data>
@@ -189,7 +180,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Sign in to unlock adding games and fixes.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Signed in ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Apply recommended settings</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mode: IceBreaker · FastFetch on</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mode: Default · FastFetch on</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Install our famous plugin</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Adds the "Add via DataJackUI" button to Steam store pages.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Yes please</value></data>

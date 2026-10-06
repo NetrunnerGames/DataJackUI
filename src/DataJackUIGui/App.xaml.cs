@@ -286,7 +286,7 @@ public partial class App : Application
         _host.Services.GetRequiredService<FixesViewModel>().RequestSignIn = navigateToSignIn;
 
         var toast = _host.Services.GetRequiredService<ToastService>();
-        toast.Attach(window.RootSnackbar);
+        toast.Attach(window.RootToastPresenter);
 
         settingsVm.RequestRestartPrompt = () => Dispatcher.Invoke(() =>
             toast.ShowAction(DataJackUIGui.Resources.Strings.Lang_Changed_Title, DataJackUIGui.Resources.Strings.Lang_Changed_Body,

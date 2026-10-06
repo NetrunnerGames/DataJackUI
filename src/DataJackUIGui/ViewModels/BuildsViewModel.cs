@@ -277,7 +277,10 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         // A filter carried over from the previous game would show the new one's table as empty or
         // half-missing, which reads as a data bug rather than a leftover search.
         DepotSearchText = "";
+        CustomDepotId = "";
+        CustomManifestId = "";
         RefreshVariants();
+        _ = RefreshHubcapUsageAsync();
         _ = LoadDepotsAsync();
     }
 
@@ -1262,6 +1265,7 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
             string savedPath = _hubcap.SaveSingleManifestToDepotCache(row.Id, mid, bytes, _steam);
             _toast.Show("Hubcap", $"Manifest saved: {Path.GetFileName(savedPath)}");
             await LoadDepotsAsync(quiet: true);
+            _ = RefreshHubcapUsageAsync();
         }
         catch (Exception ex)
         {
@@ -1269,18 +1273,158 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         }
     }
 
+    [ObservableProperty]
+    private string _customDepotId = "";
+
+    [ObservableProperty]
+    private string _customManifestId = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanLockCustomManifest))]
+    private bool _isLockingCustomManifest;
+
+    public bool CanLockCustomManifest => !IsLockingCustomManifest;
+
+    /// <summary>Display label for Hubcap single manifest quota (e.g. "Single Quota: 15/20 remaining").</summary>
+    [ObservableProperty]
+    private string? _hubcapSingleUsageLabel;
+
+    /// <summary>
+    /// Refresh generation usage quota for single manifests from Hubcap.
+    /// Free request, does not count against usage.
+    /// </summary>
+    public async Task RefreshHubcapUsageAsync()
+    {
+        string? key = _settings.HubcapApiKey;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            HubcapSingleUsageLabel = null;
+            return;
+        }
+
+        try
+        {
+            var usage = await _hubcap.GetGenerationUsageAsync(key);
+            if (usage?.Single is { } s)
+            {
+                string readyStatus = usage.SteamServiceReady ? "" : " · Steam Offline";
+                HubcapSingleUsageLabel = $"Single Quota: {s.Remaining}/{s.Limit} remaining{readyStatus}";
+            }
+            else
+            {
+                HubcapSingleUsageLabel = null;
+            }
+        }
+        catch
+        {
+            HubcapSingleUsageLabel = null;
+        }
+    }
+
+    /// <summary>Pre-fills custom depot and manifest inputs from a selected depot row.</summary>
+    [RelayCommand]
+    private void SelectDepotForLock(DepotRow row)
+    {
+        CustomDepotId = row.Id.ToString();
+        CustomManifestId = row.ManifestId ?? row.CommentedManifestId ?? row.PublicManifestId ?? "";
+    }
+
+    /// <summary>
+    /// Locks a depot to a specific manifest ID in the game's Lua.
+    /// If Hubcap API key is set, automatically fetches and saves the .manifest file to Steam's depotcache,
+    /// backs up the original Lua as &lt;appid&gt;.datalua, locks the build in Lua, and prompts to restart Steam.
+    /// If Hubcap API key is not set, prompts the user to get a key from hubcapmanifest.com/api-keys/stats.
+    /// </summary>
+    [RelayCommand]
+    private async Task LockCustomManifestAsync()
+    {
+        if (ActiveGame is not { } game)
+        {
+            _toast.Show(Resources.Strings.Builds_Title, "Please select an installed game first.", error: true);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(CustomDepotId) || !long.TryParse(CustomDepotId.Trim(), out long depotId) || depotId <= 0)
+        {
+            _toast.Show(Resources.Strings.Builds_Title, "Please enter a valid numeric Depot ID.", error: true);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(CustomManifestId) || !long.TryParse(CustomManifestId.Trim(), out long manifestId) || manifestId <= 0)
+        {
+            _toast.Show(Resources.Strings.Builds_Title, "Please enter a valid numeric Manifest ID.", error: true);
+            return;
+        }
+
+        string? key = _settings.HubcapApiKey;
+        if (!string.IsNullOrWhiteSpace(key))
+        {
+            IsLockingCustomManifest = true;
+            try
+            {
+                _toast.Show("Hubcap", $"Requesting manifest for Depot {depotId} (Manifest {manifestId})...");
+                byte[] bytes = await _hubcap.GenerateSingleManifestAsync(depotId, manifestId, key);
+                string savedPath = _hubcap.SaveSingleManifestToDepotCache(depotId, manifestId, bytes, _steam);
+
+                // Back up original Lua file as <appid>.datalua before modifying
+                _vault.BackupLiveLua(game.AppId);
+
+                EditLive(text => LuaEditor.SetDepotManifest(text, depotId, manifestId.ToString()));
+                await LoadDepotsAsync(quiet: true);
+                _ = RefreshHubcapUsageAsync();
+
+                _toast.Show("Hubcap", $"Manifest saved ({Path.GetFileName(savedPath)}) and build locked in Lua!");
+
+                bool restart = await UiMessageBox.ShowConfirmAsync(
+                    "Lock Build Complete",
+                    $"Manifest {depotId}_{manifestId}.manifest was saved to Steam depotcache and locked in {game.Name}'s Lua configuration.\n\nRestart Steam now so Steam downloads this build natively?",
+                    "Restart Steam",
+                    "Later");
+
+                if (restart)
+                {
+                    if (!_steam.RestartSteam())
+                    {
+                        _toast.Show(Resources.Strings.Manage_RestartSteam_Title, Resources.Strings.Manage_RestartSteam_Failed, error: true);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _toast.Show("Hubcap Error", ex.Message, error: true);
+            }
+            finally
+            {
+                IsLockingCustomManifest = false;
+            }
+        }
+        else
+        {
+            bool openSite = await UiMessageBox.ShowConfirmAsync(
+                "Hubcap API Key Required",
+                "A Hubcap API key is required to generate depot manifests from Steam.\n\nYou can generate an API key on Hubcap's website:\nhttps://hubcapmanifest.com/api-keys/stats\n(Login with Discord through their server's bot).\n\nSingle manifests are 1500 per API key (keys expire every 7 days).\n\nWould you like to open the Hubcap website to get your key now?",
+                "Get API Key",
+                "Cancel");
+
+            if (openSite)
+            {
+                SteamService.OpenUrl("https://hubcapmanifest.com/api-keys/stats");
+            }
+        }
+    }
+
     /// <summary>Pin/unpin one depot. Comments its setManifestid line in or out.</summary>
     [RelayCommand]
     private void ToggleLock(DepotRow row)
     {
-        if (row.CanLock) EditLive(row, text => LuaEditor.SetDepotLocked(text, row.ToggleId, !row.IsLocked));
+        if (row.CanLock) EditLive(text => LuaEditor.SetDepotLocked(text, row.ToggleId, !row.IsLocked));
     }
 
     /// <summary>Switch one depot on/off. Comments its addappid (decryption key) line in or out.</summary>
     [RelayCommand]
     private void ToggleEnabled(DepotRow row)
     {
-        if (row.CanEnable) EditLive(row, text => LuaEditor.SetDepotEnabled(text, row.ToggleId, !row.IsEnabled));
+        if (row.CanEnable) EditLive(text => LuaEditor.SetDepotEnabled(text, row.ToggleId, !row.IsEnabled));
     }
 
     /// <summary>
@@ -1319,7 +1463,7 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
     /// to prompt; none of them do now, and a modal on every switch flip would have been unusable anyway.</item>
     /// </list>
     /// </summary>
-    private void EditLive(DepotRow row, Func<string, string> edit)
+    private void EditLive(Func<string, string> edit)
     {
         if (ActiveGame is not { } game) return;
 
@@ -1584,6 +1728,8 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         long baseAppId = lua?.BaseAppId ?? info.AppId;
         var luaNames = declared.Where(kv => kv.Value.Comment is not null).ToDictionary(kv => kv.Key, kv => kv.Value.Comment!);
 
+        var installedDepots = _library.GetInstalledDepots(info.AppId);
+
         var items = new List<ContentDepot>(info.Depots);
         var depotDlcIds = info.Depots.Where(d => d.DlcAppId is not null).Select(d => d.DlcAppId!.Value).ToHashSet();
         foreach (long dlcId in info.DlcIds)
@@ -1592,16 +1738,16 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         AddDeclaredButUnlisted(items, declared, baseAppId, depotDlcIds);
 
         bool DlcNameKnown(long dlcId) => _appList.GetName(dlcId) is not null || _appInfo.GetCached(dlcId)?.Name is not null || luaNames.ContainsKey(dlcId);
-        bool IsInLua(ContentDepot d) => declared.ContainsKey(d.Id) || (d.DlcAppId is { } a && declared.ContainsKey(a));
+        bool IsInLua(ContentDepot d) => declared.ContainsKey(d.Id) || (d.DlcAppId is { } a && declared.ContainsKey(a)) || installedDepots.ContainsKey(d.Id);
         bool IsUnknown(ContentDepot d) => d.IsShared || (d.IsDlc && !DlcNameKnown(d.DlcAppId!.Value)) || (!d.IsDlc && d.Size == 0);
 
-        _allInLua = items.Where(IsInLua).Select(d => CreateDepotRow(d, declared, active, baseAppId, luaNames)).ToList();
-        _allMissing = items.Where(d => !IsInLua(d) && !IsUnknown(d)).Select(d => CreateDepotRow(d, declared, active, baseAppId, luaNames)).ToList();
-        _allUnknown = items.Where(d => !IsInLua(d) && IsUnknown(d)).Select(d => CreateDepotRow(d, declared, active, baseAppId, luaNames)).ToList();
+        _allInLua = items.Where(IsInLua).Select(d => CreateDepotRow(d, declared, active, baseAppId, luaNames, installedDepots)).ToList();
+        _allMissing = items.Where(d => !IsInLua(d) && !IsUnknown(d)).Select(d => CreateDepotRow(d, declared, active, baseAppId, luaNames, installedDepots)).ToList();
+        _allUnknown = items.Where(d => !IsInLua(d) && IsUnknown(d)).Select(d => CreateDepotRow(d, declared, active, baseAppId, luaNames, installedDepots)).ToList();
         ApplyDepotFilter();
     }
 
-    private DepotRow CreateDepotRow(ContentDepot d, Dictionary<long, LuaEntry> declared, HashSet<long> active, long baseAppId, Dictionary<long, string> luaNames)
+    private DepotRow CreateDepotRow(ContentDepot d, Dictionary<long, LuaEntry> declared, HashSet<long> active, long baseAppId, Dictionary<long, string> luaNames, IReadOnlyDictionary<long, string>? installedDepots = null)
     {
         string? steamName = d.DlcAppId is { } dlcId ? (_appList.GetName(dlcId) ?? _appInfo.GetCached(dlcId)?.Name) : null;
         string title = steamName ?? luaNames.GetValueOrDefault(d.Id) ?? (d.IsDlc ? string.Format(Resources.Strings.Manage_DlcName, d.DlcAppId) : d.IsShared ? Resources.Strings.Manage_SharedDepot : Resources.Strings.Manage_Depot);
@@ -1614,11 +1760,12 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         string url = d.DlcAppId is { } dlc ? $"https://steamdb.info/app/{dlc}/" : $"https://steamdb.info/depot/{d.Id}/";
         long declId = declared.ContainsKey(d.Id) ? d.Id : d.DlcAppId ?? d.Id;
         declared.TryGetValue(declId, out var entry);
-        bool inLua = entry is not null;
+        bool inLua = entry is not null || (installedDepots is not null && installedDepots.ContainsKey(d.Id));
+        string? manifestId = entry?.ManifestId ?? (installedDepots is not null && installedDepots.TryGetValue(d.Id, out var im) ? im : null);
 
         return new DepotRow(d.Id, title, string.Join("  ·  ", meta), d.IsDlc, d.IsShared, url,
-            entry?.ManifestId, entry?.CommentedManifestId, d.PublicManifestId,
-            IsInLua: inLua, IsEnabled: active.Contains(declId), CanToggle: inLua, IsBaseApp: declId == baseAppId)
+            manifestId, entry?.CommentedManifestId, d.PublicManifestId,
+            IsInLua: inLua, IsEnabled: active.Contains(declId) || inLua, CanToggle: entry is not null, IsBaseApp: declId == baseAppId)
         {
             ToggleId = declId, Size = d.Size, Os = d.Os, Language = d.Language, FromAppId = d.FromAppId, LuaSize = entry?.SizeOnDisk ?? 0,
         };

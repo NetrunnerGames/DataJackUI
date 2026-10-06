@@ -16,11 +16,12 @@ public class ModeMigrationTests
     [InlineData("OpenSteamToolsNightly")]
     [InlineData("BetterSteamTools")]
     [InlineData("Bst")]
-    public void BetterSteamToolsBrandedModes_BecomeIceBreaker_WithoutReonboarding(string stored)
+    [InlineData("IceBreaker")]
+    public void BetterSteamToolsAndIceBreakerModes_BecomeOst_WithoutReonboarding(string stored)
     {
         var (mode, reset) = ModeMigration.Migrate(stored);
 
-        Assert.Equal(nameof(UnlockerMode.IceBreaker), mode);
+        Assert.Equal(nameof(UnlockerMode.Ost), mode);
         Assert.False(reset); // they still have a mode, so don't nag them
     }
 
@@ -39,7 +40,6 @@ public class ModeMigrationTests
 
     [Theory]
     [InlineData(UnlockerMode.Ost)]
-    [InlineData(UnlockerMode.IceBreaker)]
     public void CurrentModes_AreUntouched(UnlockerMode mode)
     {
         var (result, reset) = ModeMigration.Migrate(mode.ToString());
