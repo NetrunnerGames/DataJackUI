@@ -316,7 +316,6 @@ public class AuthService
         return (opcode, Encoding.UTF8.GetString(payloadBytes));
     }
 
-
     private static async Task<string> WaitForCallbackAsync(HttpListener listener, CancellationToken ct)
     {
         // 5 minute window for the user to complete the browser flow

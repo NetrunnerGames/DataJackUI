@@ -40,7 +40,6 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void DismissLoginRequired() => LoginRequiredMessage = null;
 
-
     // ── Steam location ──────────────────────────────────────────────
     [ObservableProperty] private string _steamPath = "";
     [ObservableProperty] private bool _isSteamOverridden;
