@@ -10,10 +10,15 @@
     <AssemblyName>DataJackUI</AssemblyName>
     <AssemblyTitle>DataJackUI</AssemblyTitle>
     <Product>DataJackUI</Product>
-    <Version>2.00.5</Version>
+    <Version>2.10.0</Version>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <!-- Velopack needs a custom Main (Program.Main) that runs before WPF -->
     <StartupObject>DataJackUIGui.Program</StartupObject>
+
+    <!-- Fast Build Optimizations for local development -->
+    <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
 
   <!-- UseWindowsForms (for the tray NotifyIcon) injects WinForms into the implicit global usings, which
@@ -38,6 +43,8 @@
   <!-- Embed icon.ico as a resource so the Window Icon="icon.ico" can resolve it at runtime -->
   <ItemGroup>
     <Resource Include="icon.ico" />
+    <Resource Include="Resources\QR\qr_100.png" />
+    <Resource Include="Resources\QR\qr_200.png" />
   </ItemGroup>
 
   <ItemGroup>

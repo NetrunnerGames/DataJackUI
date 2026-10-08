@@ -64,6 +64,9 @@ public class AppSettings
 
     // DNS resolution preference: "Auto" | "Always" | "Never". Null = "Auto".
     public string? DnsMode { get; set; }
+
+    // App IDs unlocked via payment
+    public List<long>? UnlockedAppIds { get; set; }
 }
 
 public class SettingsService
@@ -248,7 +251,31 @@ public class SettingsService
         if (s.MinimizeToTray is not null) return false;
         if (s.FastFetch is not null) return false;
         if (s.DnsMode is not null) return false;
+        if (s.UnlockedAppIds is { Count: > 0 }) return false;
         return true;
+    }
+
+    /// <summary>Checks whether an App ID has been unlocked via payment.</summary>
+    public bool IsAppUnlocked(long appId) => _settings.UnlockedAppIds?.Contains(appId) == true;
+
+    /// <summary>Marks an App ID as unlocked and persists to settings.</summary>
+    public void UnlockApp(long appId)
+    {
+        _settings.UnlockedAppIds ??= [];
+        if (!_settings.UnlockedAppIds.Contains(appId))
+        {
+            _settings.UnlockedAppIds.Add(appId);
+            Save();
+        }
+    }
+
+    /// <summary>Removes an App ID from unlocked list (for testing/revocation).</summary>
+    public void RelockApp(long appId)
+    {
+        if (_settings.UnlockedAppIds?.Remove(appId) == true)
+        {
+            Save();
+        }
     }
 
     private void Save()

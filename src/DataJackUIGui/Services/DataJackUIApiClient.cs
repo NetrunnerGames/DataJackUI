@@ -448,7 +448,7 @@ public class DataJackUIApiClient
 
     // ── DepotBox game fixes ─────────────────────────────────────────
 
-    /// <summary>DepotBox game fixes endpoint. Returns game listings and the 3 DepotBox tags (Bypass, Online, Hypervisor).</summary>
+    /// <summary>DepotBox and Online-Fix game fixes endpoint. Returns game listings and tags (Bypass, Online Fix).</summary>
     public async Task<DenuvoListingsResponse?> GetDenuvoListingsAsync(CancellationToken ct = default)
     {
         try { await _appList.EnsureLoadedAsync(); } catch { }
@@ -457,14 +457,14 @@ public class DataJackUIApiClient
         var tags = new List<DenuvoTag>
         {
             new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" },
-            new DenuvoTag { Id = "online", Name = "Online", Slug = "online" },
-            new DenuvoTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }
+            new DenuvoTag { Id = "online", Name = "Online Fix", Slug = "online" }
         };
 
         var endpoints = new[]
         {
-            $"{AppConfig.ApiBaseUrl}/api/depotbox/api/game-fixes?tag=bypass,online,hypervisor",
-            "https://depotbox.org/api/game-fixes?tag=bypass,online,hypervisor"
+            $"{AppConfig.ApiBaseUrl}/api/fixes/list",
+            $"{AppConfig.ApiBaseUrl}/api/depotbox/api/game-fixes",
+            "https://depotbox.org/api/game-fixes"
         };
 
         foreach (var endpoint in endpoints)
@@ -480,17 +480,28 @@ public class DataJackUIApiClient
                     if (data?.Games is { Count: > 0 })
                     {
                         allGames.AddRange(data.Games);
+                        if (data.Tags.Count > 0)
+                        {
+                            foreach (var t in data.Tags)
+                            {
+                                if (!tags.Any(x => string.Equals(x.Id, t.Id, StringComparison.OrdinalIgnoreCase)))
+                                    tags.Add(t);
+                            }
+                        }
                     }
                 }
             }
             catch { }
         }
 
-        var mergedGames = allGames.DistinctBy(g => g.AppId).ToList();
+        var mergedGames = allGames
+            .Where(g => !long.TryParse(g.AppId, out long aid) || !DenuvoService.BlockedAppIds.Contains(aid))
+            .DistinctBy(g => g.AppId)
+            .ToList();
         return new DenuvoListingsResponse { Games = mergedGames, Tags = tags };
     }
 
-    private static DenuvoListingsResponse? ParseDenuvoListings(string json, SteamAppListCache appList)
+    private DenuvoListingsResponse? ParseDenuvoListings(string json, SteamAppListCache appList)
     {
         try
         {
@@ -537,9 +548,15 @@ public class DataJackUIApiClient
                 else if (item.TryGetProperty("game_name", out var gn2)) name = gn2.GetString();
                 else if (item.TryGetProperty("title", out var t)) name = t.GetString();
 
+                if (!string.IsNullOrWhiteSpace(name) &&
+                    (name.StartsWith("App ", StringComparison.OrdinalIgnoreCase) || long.TryParse(name.Trim(), out _)))
+                {
+                    name = null;
+                }
+
                 if (long.TryParse(appid, out long aid))
                 {
-                    string? cacheName = appList.GetName(aid);
+                    string? cacheName = appList.GetName(aid) ?? _appInfo.GetCached(aid)?.Name;
                     if (!string.IsNullOrWhiteSpace(cacheName)) name = cacheName;
                 }
 
@@ -565,13 +582,17 @@ public class DataJackUIApiClient
                             if (tagElem.ValueKind == JsonValueKind.String)
                             {
                                 string tStr = tagElem.GetString() ?? "";
-                                if (!string.IsNullOrWhiteSpace(tStr))
-                                    itemTags.Add(new DenuvoTag { Id = tStr.ToLower(), Name = tStr, Slug = tStr.ToLower() });
+                                if (!string.IsNullOrWhiteSpace(tStr) && !tStr.Contains("hypervisor", StringComparison.OrdinalIgnoreCase))
+                                    itemTags.Add(new DenuvoTag { Id = tStr.ToLower(), Name = tStr.Equals("online", StringComparison.OrdinalIgnoreCase) ? "Online Fix" : tStr, Slug = tStr.ToLower() });
                             }
                             else if (tagElem.ValueKind == JsonValueKind.Object)
                             {
                                 var tagObj = JsonSerializer.Deserialize<DenuvoTag>(tagElem.GetRawText(), JsonOpts);
-                                if (tagObj is not null) itemTags.Add(tagObj);
+                                if (tagObj is not null && !tagObj.Id.Contains("hypervisor", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    if (tagObj.Id.Equals("online", StringComparison.OrdinalIgnoreCase)) tagObj.Name = "Online Fix";
+                                    itemTags.Add(tagObj);
+                                }
                             }
                         }
                     }
@@ -580,7 +601,8 @@ public class DataJackUIApiClient
                         string tStr = tagsProp.GetString() ?? "";
                         foreach (var part in tStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                         {
-                            itemTags.Add(new DenuvoTag { Id = part.ToLower(), Name = part, Slug = part.ToLower() });
+                            if (!part.Contains("hypervisor", StringComparison.OrdinalIgnoreCase))
+                                itemTags.Add(new DenuvoTag { Id = part.ToLower(), Name = part.Equals("online", StringComparison.OrdinalIgnoreCase) ? "Online Fix" : part, Slug = part.ToLower() });
                         }
                     }
                 }
@@ -588,9 +610,9 @@ public class DataJackUIApiClient
                 if (item.TryGetProperty("tag", out var singleTag) && singleTag.ValueKind == JsonValueKind.String)
                 {
                     string tStr = singleTag.GetString() ?? "";
-                    if (!string.IsNullOrWhiteSpace(tStr) && !itemTags.Any(t => string.Equals(t.Id, tStr, StringComparison.OrdinalIgnoreCase)))
+                    if (!string.IsNullOrWhiteSpace(tStr) && !tStr.Contains("hypervisor", StringComparison.OrdinalIgnoreCase) && !itemTags.Any(t => string.Equals(t.Id, tStr, StringComparison.OrdinalIgnoreCase)))
                     {
-                        itemTags.Add(new DenuvoTag { Id = tStr.ToLower(), Name = tStr, Slug = tStr.ToLower() });
+                        itemTags.Add(new DenuvoTag { Id = tStr.ToLower(), Name = tStr.Equals("online", StringComparison.OrdinalIgnoreCase) ? "Online Fix" : tStr, Slug = tStr.ToLower() });
                     }
                 }
 
@@ -624,13 +646,12 @@ public class DataJackUIApiClient
 
             if (dict.Count > 0)
             {
-                var defaultTags = new List<DenuvoTag>
+                var responseTags = new List<DenuvoTag>
                 {
                     new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" },
-                    new DenuvoTag { Id = "online", Name = "Online", Slug = "online" },
-                    new DenuvoTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }
+                    new DenuvoTag { Id = "online", Name = "Online Fix", Slug = "online" }
                 };
-                return new DenuvoListingsResponse { Games = dict.Values.ToList(), Tags = defaultTags };
+                return new DenuvoListingsResponse { Games = dict.Values.ToList(), Tags = responseTags };
             }
         }
         catch { }
@@ -753,16 +774,25 @@ public class DataJackUIApiClient
         string fixId, string slot, string fallbackName,
         IProgress<DownloadProgress>? progress, CancellationToken ct = default)
     {
+        long.TryParse(fixId.Split('_')[0], out long parsedAppId);
+        string effectiveAppId = parsedAppId > 0 ? parsedAppId.ToString() : fixId;
         if (slot == "manifest")
         {
-            string manifestUrl = $"{AppConfig.ApiBaseUrl}/api/manifest/download?appid={Uri.EscapeDataString(fixId)}";
-            return await DownloadFileAsync(manifestUrl, $"{fixId}.zip", progress, ct);
+            string manifestUrl = $"{AppConfig.ApiBaseUrl}/api/manifest/download?appid={Uri.EscapeDataString(effectiveAppId)}";
+            return await DownloadFileAsync(manifestUrl, $"{effectiveAppId}.zip", progress, ct);
         }
 
-        string proxyUrl = $"{AppConfig.ApiBaseUrl}/api/depotbox/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
+        string proxyUrl = $"{AppConfig.ApiBaseUrl}/api/depotbox/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}&appid={parsedAppId}";
         try
         {
             var req = new HttpRequestMessage(HttpMethod.Get, proxyUrl);
+            string token = await _auth.GetValidAccessTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            string? uid = _auth.DiscordId ?? _auth.UserId;
+            if (!string.IsNullOrEmpty(uid))
+                req.Headers.TryAddWithoutValidation("X-Discord-Id", uid);
+
             var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
             if (res.IsSuccessStatusCode)
             {

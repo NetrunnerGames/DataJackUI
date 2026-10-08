@@ -1,6 +1,6 @@
 param(
     [Alias("d")]
-    [string]$DataJackVersion = "1.0.0",
+    [string]$DataJackVersion = "2.10.0",
 
     [Alias("p")]
     [string]$PluginVersion = "1.0.0",

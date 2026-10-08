@@ -39,6 +39,7 @@ public partial class App : Application
                 services.AddSingleton<AnalyticsService>();
                 services.AddSingleton<GithubProxy>();
                 services.AddSingleton<HardwareAppIdService>();
+                services.AddSingleton<DenuvoService>();
                 services.AddSingleton<SteamlessService>();
                 services.AddSingleton<SteamAutoCrackService>();
                 services.AddSingleton<CloudRedirectService>();
@@ -49,6 +50,7 @@ public partial class App : Application
                 services.AddSingleton<PluginInstallerService>();
                 services.AddTransient<DropInstallViewModel>(); // one per page (Home, Add)
                 services.AddSingleton<AuthService>();
+                services.AddSingleton<PaymentService>();
                 services.AddSingleton<DataJackUIApiClient>();
                 services.AddSingleton<HubcapService>();
                 services.AddSingleton<UpdateService>();
@@ -146,13 +148,12 @@ public partial class App : Application
     private static async Task ReapplyDriftedAsync(
         Services.AppInfo.LaunchOptionsService launch, IReadOnlyList<int> drifted, ToastService toast)
     {
-        // Same wording as the dialog's own prompt: closing Steam should never read as a different
-        // decision depending on where it was triggered from.
-        if (MessageBox.Show(
-                DataJackUIGui.Resources.Strings.Launch_ApplyNow_Body,
-                DataJackUIGui.Resources.Strings.Launch_ApplyNow_Title,
-                MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
-            return;
+        bool confirm = await UiMessageBox.ShowConfirmAsync(
+            DataJackUIGui.Resources.Strings.Launch_ApplyNow_Title,
+            DataJackUIGui.Resources.Strings.Launch_ApplyNow_Body,
+            "OK",
+            "Cancel");
+        if (!confirm) return;
 
         var result = await Task.Run(() => launch.Reapply(drifted));
 

@@ -654,7 +654,7 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <!-- Lock Depot Manifest (Older Build) card -->
+                        <!-- Lock Build ID / Depot Manifest card -->
                         <Border
                             Grid.Row="0"
                             Margin="0,0,12,10"
@@ -664,11 +664,7 @@
                             BorderThickness="1"
                             CornerRadius="6"
                             Visibility="{Binding IsBrowseMode, Converter={StaticResource BoolToVis}}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
+                            <StackPanel>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -678,7 +674,7 @@
                                         FontSize="11.5"
                                         FontWeight="SemiBold"
                                         Foreground="#d1d5db"
-                                        Text="Lock Depot Manifest (Older Build)" />
+                                        Text="Lock Build ID &amp; Fetch Manifests (Hubcap)" />
                                     <TextBlock
                                         Grid.Column="1"
                                         FontSize="11"
@@ -686,7 +682,34 @@
                                         Text="{Binding HubcapSingleUsageLabel}"
                                         Visibility="{Binding HubcapSingleUsageLabel, Converter={StaticResource NullToCollapsed}}" />
                                 </Grid>
-                                <Grid Grid.Row="1" Margin="0,6,0,0">
+                                <!-- Row 1: Lock by Build ID -->
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:TextBox
+                                        Margin="0,0,6,0"
+                                        PlaceholderText="Build ID (e.g. 24410208)"
+                                        Text="{Binding CustomBuildId, UpdateSourceTrigger=PropertyChanged}" />
+                                    <ui:Button
+                                        Grid.Column="1"
+                                        Appearance="Primary"
+                                        Command="{Binding LockBuildIdCommand}"
+                                        Content="Lock Build ID"
+                                        Icon="{ui:SymbolIcon ArrowDownload24}"
+                                        IsEnabled="{Binding CanLockBuildId}" />
+                                    <ui:ProgressRing
+                                        Grid.Column="2"
+                                        Width="16"
+                                        Height="16"
+                                        Margin="8,0,0,0"
+                                        IsIndeterminate="True"
+                                        Visibility="{Binding IsLockingBuildId, Converter={StaticResource BoolToVis}}" />
+                                </Grid>
+                                <!-- Row 2: Manual Single Depot Override -->
+                                <Grid Margin="0,8,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
@@ -704,9 +727,8 @@
                                         Text="{Binding CustomManifestId, UpdateSourceTrigger=PropertyChanged}" />
                                     <ui:Button
                                         Grid.Column="2"
-                                        Appearance="Primary"
                                         Command="{Binding LockCustomManifestCommand}"
-                                        Content="Lock Build"
+                                        Content="Lock Single Depot"
                                         Icon="{ui:SymbolIcon LockClosed24}"
                                         IsEnabled="{Binding CanLockCustomManifest}" />
                                     <ui:ProgressRing
@@ -717,7 +739,7 @@
                                         IsIndeterminate="True"
                                         Visibility="{Binding IsLockingCustomManifest, Converter={StaticResource BoolToVis}}" />
                                 </Grid>
-                            </Grid>
+                            </StackPanel>
                         </Border>
 
                         <ui:TextBox

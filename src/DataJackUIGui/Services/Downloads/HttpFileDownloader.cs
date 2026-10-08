@@ -67,7 +67,7 @@ internal static class HttpFileDownloader
             {
                 try
                 {
-                    if (File.GetLastWriteTimeUtc(path) < cutoff) File.Delete(path);
+                    if (File.GetLastWriteTimeUtc(path) < cutoff) MachineProtectionService.SecureDelete(path);
                 }
                 catch { /* in use or gone. Next startup gets it */ }
             }

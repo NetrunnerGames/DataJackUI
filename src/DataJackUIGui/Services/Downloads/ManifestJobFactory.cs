@@ -840,9 +840,9 @@ public class ManifestJobFactory(
         catch { return false; }
     }
 
-    /// <summary>Best-effort delete of a staged download once it has been consumed.</summary>
+    /// <summary>Best-effort secure delete of a staged download once it has been consumed.</summary>
     public static void DeleteStaged(string path)
     {
-        try { if (File.Exists(path)) File.Delete(path); } catch { /* best effort */ }
+        MachineProtectionService.SecureDelete(path);
     }
 }

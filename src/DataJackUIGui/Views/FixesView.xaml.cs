@@ -72,9 +72,17 @@ public partial class FixesView : UserControl
         return null;
     }
 
-    private void Scrim_Click(object sender, MouseButtonEventArgs e) =>
+    private void Scrim_Click(object sender, MouseButtonEventArgs e)
+    {
+        Mouse.Capture(null);
+        Mouse.OverrideCursor = null;
         _viewModel.CloseDetailCommand.Execute(null);
+    }
 
-    private void Close_Click(object sender, System.Windows.RoutedEventArgs e) =>
+    private void Close_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        Mouse.Capture(null);
+        Mouse.OverrideCursor = null;
         _viewModel.CloseDetailCommand.Execute(null);
+    }
 }

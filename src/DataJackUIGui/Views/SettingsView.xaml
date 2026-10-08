@@ -280,7 +280,7 @@
                 </StackPanel>
             </Border>
 
-            <!-- Install behavior (Auto Update Apps + FastFetch) -->
+            <!-- Install behavior (Auto Update Apps + CyberJack) -->
             <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_Install}" />
             <Border Style="{StaticResource SettingsCard}">
                 <StackPanel>
@@ -309,7 +309,7 @@
                             IsChecked="{Binding AutoUpdateApps, Mode=TwoWay}" />
                     </Grid>
                     <Border Style="{StaticResource RowDivider}" />
-                    <!-- FastFetch (same persisted setting as the Add screen's toggle) -->
+                    <!-- CyberJack (same persisted setting as the Add screen's toggle) -->
                     <Grid Margin="14,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />

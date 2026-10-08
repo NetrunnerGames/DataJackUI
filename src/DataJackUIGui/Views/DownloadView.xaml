@@ -367,7 +367,7 @@
                 </StackPanel>
             </Border>
 
-            <!-- FastFetch toggle -->
+            <!-- CyberJack toggle -->
             <Grid
                 Margin="0,12,0,0"
                 Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
@@ -391,11 +391,12 @@
                     IsChecked="{Binding FastFetch, Mode=TwoWay}" />
             </Grid>
 
-            <!-- Fetch button -->
+            <!-- Jack-in button -->
             <ui:Button
                 Margin="0,14,0,0"
                 HorizontalAlignment="Stretch"
                 Appearance="Primary"
+                Cursor="Hand"
                 Command="{Binding FetchCommand}"
                 Icon="{ui:SymbolIcon ArrowDownload24}"
                 Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
@@ -583,6 +584,7 @@
                                     <ui:Button
                                         Grid.Column="4"
                                         Appearance="Primary"
+                                        Cursor="Hand"
                                         Command="{Binding DownloadCommand}"
                                         Content="{x:Static res:Strings.Add_Download}"
                                         Icon="{ui:SymbolIcon ArrowDownload24}"
@@ -772,6 +774,7 @@
                     Margin="0,10,0,0"
                     HorizontalAlignment="Stretch"
                     Appearance="Primary"
+                    Cursor="Hand"
                     Command="{Binding GenerateDlcCommand}"
                     Icon="{ui:SymbolIcon ArrowDownload24}"
                     Visibility="{Binding CanGenerateDlc, Converter={StaticResource BoolToVis}}">
@@ -895,6 +898,161 @@
                         Content="{x:Static res:Strings.Confirm_Replace}"
                         Icon="{ui:SymbolIcon ArrowDownload24}" />
                 </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+
+    <!-- Payment portal overlay (Razorpay UPI QR) -->
+    <Grid
+        Background="#CC000000"
+        Visibility="{Binding IsPaymentRequired, Converter={StaticResource BoolToVis}}">
+        <Border
+            MaxWidth="420"
+            Margin="16"
+            Padding="22"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Background="#18181b"
+            BorderBrush="#40a78bfa"
+            BorderThickness="1"
+            CornerRadius="12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Header: Icon, Title, Price Badge -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon
+                                Margin="0,0,6,0"
+                                FontSize="18"
+                                Foreground="#a78bfa"
+                                Symbol="LockClosed24" />
+                            <TextBlock
+                                FontSize="15"
+                                FontWeight="SemiBold"
+                                Foreground="#f3f4f6"
+                                Text="Unlock Manifest" />
+                        </StackPanel>
+                        <TextBlock
+                            Margin="0,3,0,0"
+                            FontSize="12"
+                            Foreground="#9ca3af"
+                            Text="{Binding PaymentGameTitle}"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <!-- Price pill badge -->
+                    <Border
+                        Grid.Column="1"
+                        Padding="10,4"
+                        VerticalAlignment="Center"
+                        Background="#25164e63"
+                        BorderBrush="#4022d3ee"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <TextBlock
+                            FontSize="13"
+                            FontWeight="Bold"
+                            Foreground="#22d3ee"
+                            Text="{Binding PaymentAmountText}" />
+                    </Border>
+                </Grid>
+
+                <!-- Divider -->
+                <Border
+                    Grid.Row="1"
+                    Margin="0,12"
+                    Height="1"
+                    Background="#20FFFFFF" />
+
+                <!-- QR Code container -->
+                <StackPanel Grid.Row="2" HorizontalAlignment="Center">
+                    <Border
+                        Background="#080810"
+                        BorderBrush="#25FFFFFF"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        ClipToBounds="True"
+                        HorizontalAlignment="Center">
+                        <Image
+                            Width="200"
+                            Height="200"
+                            Source="{Binding PaymentQrImage}"
+                            RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+
+                    <TextBlock
+                        Margin="0,10,0,0"
+                        FontSize="11.5"
+                        Foreground="#9ca3af"
+                        HorizontalAlignment="Center"
+                        Text="Scan with Google Pay, PhonePe, Paytm, or any UPI app" />
+                </StackPanel>
+
+                <!-- UTR Input form -->
+                <StackPanel Grid.Row="3" Margin="0,14,0,0">
+                    <TextBlock
+                        FontSize="11.5"
+                        FontWeight="Medium"
+                        Foreground="#d1d5db"
+                        Text="12-digit UPI Reference / UTR Number" />
+                    <ui:TextBox
+                        Margin="0,6,0,0"
+                        MaxLength="12"
+                        PlaceholderText="e.g. 428109283719"
+                        Text="{Binding PaymentUtr, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <!-- Error message -->
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        FontSize="11"
+                        Foreground="#f87171"
+                        Text="{Binding PaymentError}"
+                        TextWrapping="Wrap"
+                        Visibility="{Binding PaymentError, Converter={StaticResource NullToCollapsed}}" />
+
+                    <!-- Success message -->
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        FontSize="11"
+                        Foreground="#34d399"
+                        Text="{Binding PaymentSuccessMessage}"
+                        Visibility="{Binding PaymentSuccessMessage, Converter={StaticResource NullToCollapsed}}" />
+                </StackPanel>
+
+                <!-- Actions -->
+                <Grid Grid.Row="4" Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ui:Button
+                        Grid.Column="0"
+                        HorizontalAlignment="Left"
+                        Cursor="Hand"
+                        Command="{Binding CancelPaymentCommand}"
+                        Content="{x:Static res:Strings.Mode_Cancel}" />
+
+                    <ui:Button
+                        Grid.Column="1"
+                        Appearance="Primary"
+                        Cursor="Hand"
+                        Command="{Binding VerifyPaymentCommand}"
+                        Content="Verify &amp; Unlock"
+                        Icon="{ui:SymbolIcon Checkmark24}" />
+                </Grid>
             </Grid>
         </Border>
     </Grid>

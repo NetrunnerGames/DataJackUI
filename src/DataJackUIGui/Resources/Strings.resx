@@ -65,6 +65,7 @@
   <data name="Nav_Manage" xml:space="preserve"><value>Manage</value></data>
   <data name="Nav_Mode" xml:space="preserve"><value>Mode</value></data>
   <data name="Nav_Fixes" xml:space="preserve"><value>Fixes</value></data>
+  <data name="Nav_OnlineFix" xml:space="preserve"><value>Online Fix</value></data>
   <data name="Nav_RestartSteam" xml:space="preserve"><value>Restart Steam</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="Nav_SignInDiscord" xml:space="preserve"><value>Sign in with Discord</value></data>
@@ -180,7 +181,7 @@
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Sign in to unlock adding games and fixes.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Signed in ✓</value></data>
   <data name="Onboarding_Recommended_Title" xml:space="preserve"><value>Apply recommended settings</value></data>
-  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mode: Default · FastFetch on</value></data>
+  <data name="Onboarding_Recommended_Detail" xml:space="preserve"><value>Mode: Default · CyberJack on</value></data>
   <data name="Onboarding_Plugin_Title" xml:space="preserve"><value>Install our famous plugin</value></data>
   <data name="Onboarding_Plugin_Detail" xml:space="preserve"><value>Adds the "Add via DataJackUI" button to Steam store pages.</value></data>
   <data name="Onboarding_Yes" xml:space="preserve"><value>Yes please</value></data>
@@ -315,10 +316,14 @@ This deletes the .lua files from Steam\config\stplug-in.</value></data>
 
   <!-- ── Fixes ── -->
   <data name="Fixes_Title" xml:space="preserve"><value>Fixes</value></data>
+  <data name="OnlineFix_Title" xml:space="preserve"><value>Online Fix</value></data>
+  <data name="OnlineFix_Subtitle" xml:space="preserve"><value>Multiplayer, co-op, and network fixes for supported games</value></data>
   <data name="Fixes_Loading" xml:space="preserve"><value>Loading fixes…</value></data>
   <data name="Fixes_Build" xml:space="preserve"><value>Build {0}</value></data>
   <data name="Fixes_Manifest" xml:space="preserve"><value>Manifest</value></data>
   <data name="Fixes_Fix" xml:space="preserve"><value>Fix</value></data>
+  <data name="Fixes_Sort_AZ" xml:space="preserve"><value>A to Z</value></data>
+  <data name="Fixes_Sort_ZA" xml:space="preserve"><value>Z to A</value></data>
   <!-- Fixes C# strings -->
   <data name="Fixes_Count" xml:space="preserve"><value>{0} fixes</value></data>
   <data name="Fixes_Err_Load" xml:space="preserve"><value>Couldn't load fixes. Check your connection.</value></data>
@@ -365,7 +370,7 @@ This deletes the .lua files from Steam\config\stplug-in.</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Top Sellers</value></data>
   <data name="Add_Featured_NewReleases" xml:space="preserve"><value>New Releases</value></data>
   <data name="Add_Released" xml:space="preserve"><value>Released {0}</value></data>
-  <data name="Add_Fetch" xml:space="preserve"><value>Fetch</value></data>
+  <data name="Add_Fetch" xml:space="preserve"><value>Jack-in</value></data>
   <data name="Add_Checking" xml:space="preserve"><value>Checking…</value></data>
   <data name="Add_Reveal" xml:space="preserve"><value>Reveal</value></data>
   <data name="Add_Supporter" xml:space="preserve"><value>Supporter</value></data>
@@ -395,8 +400,8 @@ This deletes the .lua files from Steam\config\stplug-in.</value></data>
   <data name="Add_Status_Cancelled" xml:space="preserve"><value>Install cancelled. Existing files left unchanged.</value></data>
   <data name="Add_Status_InstallFailed" xml:space="preserve"><value>Couldn't install {0} file(s). Close Steam (or use Restart Steam) and try again.</value></data>
   <data name="Add_Status_AddedManifests" xml:space="preserve"><value>Added {0}: lua + {1} manifest(s).</value></data>
-  <data name="Add_Status_AddedFetch" xml:space="preserve"><value>Added {0}. Steam will fetch manifests.</value></data>
-  <data name="Add_FastFetch" xml:space="preserve"><value>FastFetch™️</value></data>
+  <data name="Add_Status_AddedFetch" xml:space="preserve"><value>Added {0}. Steam will jack-in manifests.</value></data>
+  <data name="Add_FastFetch" xml:space="preserve"><value>CyberJack</value></data>
   <data name="Add_FastFetch_Hint" xml:space="preserve"><value>Auto-download from the first available source</value></data>
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>No available sources found for this game</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· via {0}</value></data>
@@ -614,7 +619,7 @@ This deletes the .lua files from Steam\config\stplug-in.</value></data>
   <data name="Builds_Select_Space" xml:space="preserve"><value>Needs {0} · {1} free on {2}</value></data>
   <data name="Builds_Select_SignIn" xml:space="preserve"><value>Sign in to download this depot.</value></data>
   <data name="Depot_Err_SignIn" xml:space="preserve"><value>Sign in to download depots.</value></data>
-  <data name="Downloads_Depot_FetchingManifest" xml:space="preserve"><value>fetching manifest</value></data>
+  <data name="Downloads_Depot_FetchingManifest" xml:space="preserve"><value>jacking in manifest</value></data>
   <data name="Depot_Err_NoManifest" xml:space="preserve"><value>Couldn't get this depot's manifest.</value></data>
   <data name="Downloads_Depots_Preparing" xml:space="preserve"><value>Preparing · {0} of {1}</value></data>
   <data name="Downloads_Depots_GettingTool" xml:space="preserve"><value>Getting the downloader</value></data>

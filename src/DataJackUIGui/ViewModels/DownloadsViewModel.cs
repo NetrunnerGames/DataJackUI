@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataJackUIGui.Services;
@@ -112,17 +112,14 @@ public partial class DownloadsViewModel : ObservableObject
         // Yes = stop and delete (the default), No = stop and keep, Cancel = keep downloading.
         // Escape lands on Cancel, so the accidental keypress is the harmless one even though the
         // destructive option is what Enter selects.
-        var choice = MessageBox.Show(
-            string.Format(Resources.Strings.Depot_Cancel_Body, ByteFormat.Size(item.BytesRead), outDir),
+        bool deleteFiles = await UiMessageBox.ShowConfirmAsync(
             Resources.Strings.Depot_Cancel_Title,
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Warning,
-            MessageBoxResult.Yes);
-
-        if (choice == MessageBoxResult.Cancel) return; // leave the download running
+            string.Format(Resources.Strings.Depot_Cancel_Body, ByteFormat.Size(item.BytesRead), outDir),
+            "Delete Files",
+            "Keep Files");
 
         _queue.Cancel(item);
-        if (choice != MessageBoxResult.Yes) return;
+        if (!deleteFiles) return;
 
         // The kill is asynchronous and the downloader holds handles on everything it pre-allocated, so
         // deleting before the item settles would just fail on a locked file.
@@ -185,18 +182,15 @@ public partial class DownloadsViewModel : ObservableObject
     private void MoveDown(DownloadItem item) => _queue.Move(item, +1);
 
     [RelayCommand]
-    private void ClearHistory()
+    private async Task ClearHistory()
     {
-        // Deliberately NOT async: MessageBox.Show already blocks and returns a result, and an async
-        // command would become an AsyncRelayCommand, which disables itself while running.
-        var choice = MessageBox.Show(
-            string.Format(Resources.Strings.Downloads_ClearHistory_Confirm, _queue.History.Count),
+        bool confirm = await UiMessageBox.ShowConfirmAsync(
             Resources.Strings.Downloads_Action_ClearHistory,
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No); // Enter must not wipe the list
+            string.Format(Resources.Strings.Downloads_ClearHistory_Confirm, _queue.History.Count),
+            "OK",
+            "Cancel");
 
-        if (choice == MessageBoxResult.Yes) _queue.ClearHistory();
+        if (confirm) _queue.ClearHistory();
     }
 
     /// <summary>

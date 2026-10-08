@@ -69,6 +69,9 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
     {
         try
         {
+            // Bypass vault caching for gated/unlocked titles to prevent extraction and distribution
+            if (settings.IsAppUnlocked(appId)) return;
+
             if (buildId is not null)
                 vault.Capture(appId, installedPath, LuaVariantKind.Build, buildId, source);
             else
@@ -112,16 +115,27 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
     /// Write a lua to <paramref name="dest"/>. Comments out manifest pins when AutoUpdate is on, UNLESS
     /// <paramref name="forceLocked"/> is set (Denuvo fixes must stay version-pinned → keep setManifestid).
     /// </summary>
-    private void WriteLua(string sourceLuaPath, string dest, bool forceLocked = false)
+    private void WriteLua(string sourceLuaPath, string dest, bool forceLocked = false, long? appId = null)
     {
+        string lua;
         if (AutoUpdate && !forceLocked)
         {
-            string lua = File.ReadAllText(sourceLuaPath);
-            File.WriteAllText(dest, CommentOutManifestPins(lua));
+            lua = CommentOutManifestPins(File.ReadAllText(sourceLuaPath));
         }
         else
         {
-            File.Copy(sourceLuaPath, dest, overwrite: true);
+            lua = File.ReadAllText(sourceLuaPath);
+        }
+
+        if (appId.HasValue && settings.IsAppUnlocked(appId.Value))
+        {
+            lua = MachineProtectionService.ProtectLua(appId.Value, lua);
+        }
+
+        File.WriteAllText(dest, lua);
+        if (appId.HasValue && settings.IsAppUnlocked(appId.Value))
+        {
+            MachineProtectionService.LockInstalledFile(dest, appId.Value);
         }
         StampNow(dest);
     }
@@ -151,7 +165,7 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
             string dest = Path.Combine(dir, $"{appId}.lua");
             string? buildId = BuildIdFromFileName(luaPath);
 
-            WriteLua(luaPath, dest, KeepPinsFor(buildId, forceLocked));
+            WriteLua(luaPath, dest, KeepPinsFor(buildId, forceLocked), appId);
             CaptureInstalled(appId, dest, buildId, source); // exactly what Steam now reads → the active build
             RecordLoaded(appId);
             return new InstallResult(LuaInstalled: true, ManifestCount: 0, Failed: [], Error: null);
@@ -295,6 +309,28 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
         try { archive = ZipFile.OpenRead(zipPath); }
         catch (Exception ex) { return InstallResult.Fail(string.Format(Resources.Strings.Err_OpenDownloadFailed, ex.Message)); }
 
+        return InstallZipArchive(archive, plugDir, depotDir, appId, forceLocked, source);
+    }
+
+    /// <summary>
+    /// Stream-based in-memory manifest extraction. Completely removes intermediate .zip staging from disk.
+    /// </summary>
+    public InstallResult InstallZipStream(Stream zipStream, long appId, bool forceLocked = false, string? source = null)
+    {
+        string? plugDir = steam.StPlugInDir;
+        string? depotDir = steam.DepotCacheDir;
+        if (plugDir is null || depotDir is null)
+            return InstallResult.Fail(Resources.Strings.Err_SteamNotFound);
+
+        ZipArchive archive;
+        try { archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: true); }
+        catch (Exception ex) { return InstallResult.Fail(string.Format(Resources.Strings.Err_OpenDownloadFailed, ex.Message)); }
+
+        return InstallZipArchive(archive, plugDir, depotDir, appId, forceLocked, source);
+    }
+
+    private InstallResult InstallZipArchive(ZipArchive archive, string plugDir, string depotDir, long appId, bool forceLocked, string? source)
+    {
         bool luaInstalled = false;
         int manifestCount = 0;
         var failed = new List<string>();
@@ -330,21 +366,37 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
         {
             if (isLua)
             {
-                string tmp = Path.Combine(Path.GetTempPath(), $"datajackui_{Guid.NewGuid():N}.lua");
-                try
+                // Stream directly in memory without writing any intermediate .lua to disk
+                using var stream = entry.Open();
+                using var reader = new StreamReader(stream);
+                string lua = reader.ReadToEnd();
+                string? buildId = BuildIdFromFileName(entry.Name);
+                if (AutoUpdate && !KeepPinsFor(buildId, forceLocked))
                 {
-                    entry.ExtractToFile(tmp, overwrite: true);
-                    string? buildId = BuildIdFromFileName(entry.Name);
-                    WriteLua(tmp, dest, KeepPinsFor(buildId, forceLocked));
-                    CaptureInstalled(appId, dest, buildId, source);
-                    luaInstalled = true;
-                    RecordLoaded(appId);
+                    lua = CommentOutManifestPins(lua);
                 }
-                finally { try { File.Delete(tmp); } catch { } }
+                if (settings.IsAppUnlocked(appId))
+                {
+                    lua = MachineProtectionService.ProtectLua(appId, lua);
+                }
+
+                File.WriteAllText(dest, lua);
+                if (settings.IsAppUnlocked(appId))
+                {
+                    MachineProtectionService.LockInstalledFile(dest, appId);
+                }
+                StampNow(dest);
+                CaptureInstalled(appId, dest, buildId, source);
+                luaInstalled = true;
+                RecordLoaded(appId);
             }
             else
             {
                 entry.ExtractToFile(dest, overwrite: true);
+                if (settings.IsAppUnlocked(appId))
+                {
+                    MachineProtectionService.LockInstalledFile(dest, appId);
+                }
                 StampNow(dest);
                 manifestCount++;
             }

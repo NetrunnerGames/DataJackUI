@@ -58,11 +58,68 @@ public class DenuvoFix
     [JsonPropertyName("title")] public string Title { get; set; } = "";
     [JsonPropertyName("description")] public string? Description { get; set; }
     [JsonPropertyName("tags")] public List<DenuvoTag> Tags { get; set; } = [];
-    [JsonPropertyName("hasManifest")] public bool HasManifest { get; set; }
-    [JsonPropertyName("hasFix")] public bool HasFix { get; set; }
-    [JsonPropertyName("manifestFilename")] public string? ManifestFilename { get; set; }
-    [JsonPropertyName("fixFilename")] public string? FixFilename { get; set; }
+    private bool _hasManifest;
+    private bool _hasFix = true;
+    private string? _manifestFilename;
+    private string? _fixFilename;
+
+    [JsonPropertyName("hasManifest")]
+    public bool HasManifest
+    {
+        get => _hasManifest;
+        set => _hasManifest = value;
+    }
+
+    [JsonPropertyName("has_manifest")]
+    public bool HasManifestSnake { set => _hasManifest = value; }
+
+    [JsonPropertyName("hasFix")]
+    public bool HasFix
+    {
+        get => _hasFix;
+        set => _hasFix = value;
+    }
+
+    [JsonPropertyName("has_fix")]
+    public bool HasFixSnake { set => _hasFix = value; }
+
+    [JsonPropertyName("manifestFilename")]
+    public string? ManifestFilename
+    {
+        get => _manifestFilename;
+        set => _manifestFilename = value;
+    }
+
+    [JsonPropertyName("manifest_filename")]
+    public string? ManifestFilenameSnake { set => _manifestFilename = value; }
+
+    [JsonPropertyName("fixFilename")]
+    public string? FixFilename
+    {
+        get => _fixFilename;
+        set => _fixFilename = value;
+    }
+
+    [JsonPropertyName("fix_filename")]
+    public string? FixFilenameSnake { set => _fixFilename = value; }
+
+    [JsonPropertyName("file_size")]
+    public long? FileSize { get; set; }
+
+    [JsonPropertyName("fileSize")]
+    public long? FileSizeCamel { set => FileSize = value; }
+
+    [JsonPropertyName("size_str")]
+    public string? SizeStr { get; set; }
+
+    [JsonPropertyName("download_url")]
+    public string? DownloadUrl { get; set; }
+
+    [JsonPropertyName("downloadUrl")]
+    public string? DownloadUrlCamel { set => DownloadUrl = value; }
+
     [JsonPropertyName("createdAt")] public string? CreatedAt { get; set; }
+    [JsonPropertyName("created_at")] public string? CreatedAtSnake { set => CreatedAt = value; }
 }
 
 // ── /api/denuvo/download?fix=&slot= (auth). Returns a signed URL ────

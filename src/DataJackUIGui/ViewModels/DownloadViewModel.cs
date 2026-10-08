@@ -130,6 +130,8 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     private readonly DownloadQueue _queue;
     private readonly ManifestJobFactory _jobs;
     private readonly CoverCache _covers;
+    private readonly PaymentService _payment;
+    private readonly DenuvoService _denuvo;
     private CancellationTokenSource? _searchCts;
     private CancellationTokenSource? _detailsCts;
 
@@ -350,11 +352,121 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     /// page exposes the same toggle, and both VMs are singletons that otherwise only read it at startup.</summary>
     public void SyncFastFetch() => FastFetch = _settings.FastFetch;
 
+    // ── Payment Portal (Razorpay UPI QR) ───────────────────────────
+    private Func<Task>? _pendingAfterPaymentAction;
+
+    [ObservableProperty] private bool _isPaymentRequired;
+    [ObservableProperty] private long _paymentAppId;
+    [ObservableProperty] private string _paymentGameTitle = "";
+    [ObservableProperty] private int _paymentAmount = 100;
+    [ObservableProperty] private string _paymentAmountText = "₹100";
+    [ObservableProperty] private System.Windows.Media.ImageSource? _paymentQrImage;
+    [ObservableProperty] private string _paymentUtr = "";
+    [ObservableProperty] private string? _paymentError;
+    [ObservableProperty] private string? _paymentSuccessMessage;
+    [ObservableProperty] private bool _isVerifyingPayment;
+
+    public void ShowPaymentModal(long appId, string gameTitle, bool isDenuvo, Func<Task> onVerified)
+    {
+        PaymentAppId = appId;
+        PaymentGameTitle = string.IsNullOrWhiteSpace(gameTitle) ? $"App {appId}" : gameTitle;
+        PaymentAmount = isDenuvo ? 200 : 100;
+        PaymentAmountText = $"₹{PaymentAmount}";
+        PaymentQrImage = isDenuvo ? PaymentService.GetQr200Image() : PaymentService.GetQr100Image();
+        PaymentUtr = "";
+        PaymentError = null;
+        PaymentSuccessMessage = null;
+        IsVerifyingPayment = false;
+        _pendingAfterPaymentAction = onVerified;
+        IsPaymentRequired = true;
+    }
+
+    [RelayCommand]
+    private void CancelPayment()
+    {
+        IsPaymentRequired = false;
+        _pendingAfterPaymentAction = null;
+        PaymentUtr = "";
+        PaymentError = null;
+        PaymentSuccessMessage = null;
+        IsVerifyingPayment = false;
+    }
+
+    [RelayCommand]
+    private async Task VerifyPaymentAsync()
+    {
+        if (IsVerifyingPayment) return;
+
+        string utr = PaymentUtr?.Trim() ?? "";
+        if (utr.Length != 12 || !long.TryParse(utr, out _))
+        {
+            PaymentError = "Please enter a valid 12-digit numeric UPI Reference / UTR number.";
+            return;
+        }
+
+        IsVerifyingPayment = true;
+        PaymentError = null;
+
+        try
+        {
+            var (success, error) = await _payment.VerifyPaymentAsync(PaymentAppId, utr, PaymentAmount, PaymentAmount == 200);
+            if (!success)
+            {
+                PaymentError = error ?? "Payment verification failed. Check your UTR and try again.";
+                return;
+            }
+
+            PaymentSuccessMessage = "✓ Payment verified! Unlocking download...";
+            await Task.Delay(650);
+
+            IsPaymentRequired = false;
+            var action = _pendingAfterPaymentAction;
+            _pendingAfterPaymentAction = null;
+
+            if (action is not null)
+            {
+                await action();
+            }
+        }
+        finally
+        {
+            IsVerifyingPayment = false;
+        }
+    }
+
+    private async Task<bool> CheckIsDenuvoAsync(long appId)
+    {
+        // 0. If Denuvo was verified removed (e.g. from PCGamingWiki removal list), override stale notices
+        if (_denuvo.IsDenuvoRemoved(appId)) return false;
+
+        // 1. Check in-memory Denuvo database (284 active IDs + synced curator IDs)
+        if (_denuvo.IsDenuvo(appId)) return true;
+
+        // 2. Check currently viewed game details (drm_notice directly from Steam store API)
+        if (Details?.AppId == appId && Details.HasDenuvo) return true;
+
+        // 3. Check cached Steam appdetails JSON on disk
+        if (_appInfo.CheckHasDenuvoFromDisk(appId)) return true;
+
+        // 4. Fallback: check DepotBox game listings if available
+        try
+        {
+            var listings = await _api.GetDenuvoListingsAsync();
+            if (listings?.Games is not null)
+            {
+                return listings.Games.Any(g => long.TryParse(g.AppId, out long id) && id == appId);
+            }
+        }
+        catch { }
+        return false;
+    }
+
     public DownloadViewModel(DataJackUIApiClient api, HubcapService hubcap, SettingsService settings,
         AuthService auth, ToastService toast, LuaInstaller installer,
         SteamAppListCache appList, SteamAppInfoCache appInfo, SteamDepotInfo depotInfo,
         HardwareAppIdService hardware, DropInstallViewModel drop,
-        DownloadQueue queue, ManifestJobFactory jobs, CoverCache covers)
+        DownloadQueue queue, ManifestJobFactory jobs, CoverCache covers,
+        PaymentService payment, DenuvoService denuvo)
     {
         _api = api;
         _hubcap = hubcap;
@@ -369,6 +481,9 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         _queue = queue;
         _jobs = jobs;
         _covers = covers;
+        _payment = payment;
+        _denuvo = denuvo;
+        _ = _denuvo.EnsureFreshAsync();
         Drop = drop;
         _fastFetch = settings.FastFetch;
         InitPageSize(settings.AddPageSize);
@@ -728,14 +843,29 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         bool hubcapWithKey = source.NeedsKey && !string.IsNullOrEmpty(_settings.HubcapApiKey);
         if (!hubcapWithKey && await PromptSignInIfGuestAsync(Resources.Strings.Add_SignIn_Download)) return null;
 
+        long appId = Details.AppId;
+        string gameName = Details.Name;
+        bool isDenuvo = await CheckIsDenuvoAsync(appId);
+
+        // Check if unlocked via payment
+        if (!await _payment.IsAppUnlockedAsync(appId))
+        {
+            ShowPaymentModal(appId, gameName, isDenuvo, async () =>
+            {
+                EnqueueSourceDownload(source, appId, gameName);
+                await Task.CompletedTask;
+            });
+            return null;
+        }
+
+        return EnqueueSourceDownload(source, appId, gameName);
+    }
+
+    private DownloadItem EnqueueSourceDownload(SourceRowViewModel source, long appId, string gameName)
+    {
         Error = null;
         LastDownload = null;
         InstallStatus = null;
-
-        // Captured now, not read from Details later: once the download is backgrounded the user can load
-        // a different game before the confirmation appears, and the dialog must still name THIS one.
-        long appId = Details.AppId;
-        string gameName = Details.Name;
         bool needsKey = source.NeedsKey;
 
         var job = _jobs.CreateManifestJob(
@@ -758,13 +888,31 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         if (Details?.BaseAppId is null) return;
         if (await PromptSignInIfGuestAsync(Resources.Strings.Add_SignIn_Download)) return;
 
+        long appId = Details.AppId;
+        string gameName = Details.Name;
+        bool isDenuvo = await CheckIsDenuvoAsync(appId);
+
+        if (!await _payment.IsAppUnlockedAsync(appId))
+        {
+            ShowPaymentModal(appId, gameName, isDenuvo, async () =>
+            {
+                EnqueueDlcDownload(appId, Details.BaseAppId, gameName);
+                await Task.CompletedTask;
+            });
+            return;
+        }
+
+        EnqueueDlcDownload(appId, Details.BaseAppId, gameName);
+    }
+
+    private void EnqueueDlcDownload(long appId, string baseAppId, string gameName)
+    {
         Error = null;
         LastDownload = null;
         InstallStatus = null;
 
-        long appId = Details.AppId;
         var job = _jobs.CreateDlcJob(
-            appId, Details.BaseAppId, Details.Name,
+            appId, baseAppId, gameName,
             onFinished: (item, result) => OnManifestFinished(item, result, needsKey: false),
             onReveal: () => NavigateToGame?.Invoke(appId));
 

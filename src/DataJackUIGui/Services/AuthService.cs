@@ -33,6 +33,9 @@ public class AuthService
 
     public UserEntitlement CurrentEntitlement { get; private set; } = new();
 
+    /// <summary>True when logged in as the software creator/owner (enforced and returned by server API).</summary>
+    public bool IsOwner => CurrentEntitlement.IsOwner;
+
     public bool IsBanned => CurrentEntitlement.IsBanned;
     public bool IsAppAllowed(long appid) => CurrentEntitlement.IsAppAllowed(appid);
 
@@ -113,7 +116,7 @@ public class AuthService
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("client_id", out var idProp))
                 {
-                    _cachedClientId = idProp.GetString();
+                    _cachedClientId = idProp.ValueKind == JsonValueKind.String ? idProp.GetString() : idProp.ToString();
                     if (!string.IsNullOrEmpty(_cachedClientId)) return _cachedClientId;
                 }
             }
@@ -160,7 +163,7 @@ public class AuthService
 
             if (root.TryGetProperty("user_id", out var userIdProp))
             {
-                DiscordId = userIdProp.GetString();
+                DiscordId = userIdProp.ValueKind == JsonValueKind.String ? userIdProp.GetString() : userIdProp.ToString();
             }
 
             return true;
@@ -234,48 +237,77 @@ public class AuthService
         if (pipe is null)
             throw new AuthException("Could not connect to Discord. Is the Discord desktop app running?");
 
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromMinutes(3));
+
         using (pipe)
         {
             try
             {
                 // 1. Send Handshake (Opcode 0)
-                await SendIpcMessageAsync(pipe, 0, JsonSerializer.Serialize(new { v = 1, client_id = clientId }), ct);
+                await SendIpcMessageAsync(pipe, 0, JsonSerializer.Serialize(new { v = 1, client_id = clientId }), cts.Token);
 
                 // Read Handshake response (READY)
-                await ReadIpcMessageAsync(pipe, ct);
+                await ReadIpcMessageAsync(pipe, cts.Token);
 
                 // 2. Send Authorize (Opcode 1)
                 var authorizePayload = JsonSerializer.Serialize(new
                 {
                     cmd = "AUTHORIZE",
-                    args = new { client_id = clientId, scopes = new[] { "identify", "email" }, redirect_uri = AppConfig.OAuthCallbackUrl },
-                    nonce = Guid.NewGuid().ToString()
+                    args = new
+                    {
+                        client_id = clientId,
+                        scopes = new[] { "identify", "email", "guilds" },
+                    },
+                    nonce = Guid.NewGuid().ToString("N")
                 });
 
-                await SendIpcMessageAsync(pipe, 1, authorizePayload, ct);
+                await SendIpcMessageAsync(pipe, 1, authorizePayload, cts.Token);
 
                 // 3. Read Authorize response
-                while (true)
+                while (!cts.Token.IsCancellationRequested)
                 {
-                    var response = await ReadIpcMessageAsync(pipe, ct);
+                    var response = await ReadIpcMessageAsync(pipe, cts.Token);
+                    PluginLog.Log($"[Discord IPC] Received Opcode {response.Opcode}: {response.Payload}");
+
                     using var doc = JsonDocument.Parse(response.Payload);
                     var root = doc.RootElement;
 
-                    if (root.TryGetProperty("cmd", out var cmd) && cmd.GetString() == "AUTHORIZE")
+                    if (root.TryGetProperty("evt", out var evt) && evt.ValueKind == JsonValueKind.String && evt.GetString() == "ERROR")
                     {
-                        if (root.TryGetProperty("data", out var data) && data.TryGetProperty("code", out var codeElement))
+                        string errMsg = "Unknown error";
+                        int errCode = 0;
+                        if (root.TryGetProperty("data", out var errData) && errData.ValueKind == JsonValueKind.Object)
                         {
-                            return codeElement.GetString()!;
+                            if (errData.TryGetProperty("message", out var errMsgProp) && errMsgProp.ValueKind == JsonValueKind.String)
+                                errMsg = errMsgProp.GetString() ?? errMsg;
+                            if (errData.TryGetProperty("code", out var errCodeProp) && errCodeProp.TryGetInt32(out var ec))
+                                errCode = ec;
                         }
+                        throw new AuthException(errCode != 0 ? $"Discord Auth Error ({errCode}): {errMsg}" : $"Discord Auth Error: {errMsg}");
+                    }
 
-                        if (root.TryGetProperty("evt", out var evt) && evt.GetString() == "ERROR")
-                        {
-                            var msg = root.TryGetProperty("data", out var errData) && errData.TryGetProperty("message", out var errMsg)
-                                ? errMsg.GetString() : "Unknown error";
-                            throw new AuthException($"Discord Auth Denied: {msg}");
-                        }
+                    if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object &&
+                        data.TryGetProperty("code", out var codeElement) && codeElement.ValueKind == JsonValueKind.String)
+                    {
+                        var authCode = codeElement.GetString();
+                        if (!string.IsNullOrEmpty(authCode))
+                            return authCode;
+                    }
+
+                    if (root.TryGetProperty("code", out var rootCode) && rootCode.ValueKind == JsonValueKind.String)
+                    {
+                        var authCode = rootCode.GetString();
+                        if (!string.IsNullOrEmpty(authCode))
+                            return authCode;
                     }
                 }
+
+                throw new AuthException("Timed out waiting for Discord authorization.");
+            }
+            catch (OperationCanceledException)
+            {
+                throw new AuthException("Timed out waiting for Discord authorization.");
             }
             catch (EndOfStreamException)
             {
@@ -298,6 +330,7 @@ public class AuthService
         payloadBytes.CopyTo(buffer, 8);
 
         await pipe.WriteAsync(buffer, ct);
+        await pipe.FlushAsync(ct);
     }
 
     private static async Task<(int Opcode, string Payload)> ReadIpcMessageAsync(NamedPipeClientStream pipe, CancellationToken ct)

@@ -76,20 +76,19 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>Confirm, then kill + relaunch Steam so newly added/removed luas take effect.</summary>
     [RelayCommand]
-    private void RestartSteam()
+    private async Task RestartSteam()
     {
-        var result = MessageBox.Show(
-            Resources.Strings.Main_RestartSteam_Ask,
+        bool result = await UiMessageBox.ShowConfirmAsync(
             Resources.Strings.Manage_RestartSteam_Title,
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Question);
-        if (result != MessageBoxResult.OK) return;
+            Resources.Strings.Main_RestartSteam_Ask,
+            "OK",
+            "Cancel");
+        if (!result) return;
 
         if (!_steam.RestartSteam())
-            MessageBox.Show(
-                Resources.Strings.Manage_RestartSteam_Failed,
+            await UiMessageBox.ShowConfirmAsync(
                 Resources.Strings.Manage_RestartSteam_Title,
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                Resources.Strings.Manage_RestartSteam_Failed,
+                "OK", "");
     }
 }

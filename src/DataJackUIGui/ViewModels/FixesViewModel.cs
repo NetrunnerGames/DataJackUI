@@ -13,11 +13,35 @@ namespace DataJackUIGui.ViewModels;
 public partial class FixGameCardVm : ObservableObject
 {
     public string AppId { get; }
-    public string Name { get; }
+    [ObservableProperty] private string _name;
+    [ObservableProperty] private string _displayAppId;
     public string? HeaderImage { get; }
     public int FixCount { get; }
     public IReadOnlyList<string> TagIds { get; }
-    public string FixCountLabel => string.Format(Resources.Strings.Fixes_Count, FixCount);
+    public string FixCountLabel => FixTypeLabel;
+
+    public bool HasPlaceholderName =>
+        string.IsNullOrWhiteSpace(Name) ||
+        Name.StartsWith("App ", StringComparison.OrdinalIgnoreCase) ||
+        long.TryParse(Name.Trim(), out _);
+
+    /// <summary>Displays what kind of fix is available (e.g. "Bypass", "Online Fix", "Hypervisor").</summary>
+    public string FixTypeLabel
+    {
+        get
+        {
+            var kinds = new List<string>();
+            foreach (var t in g.Tags)
+            {
+                string id = (t.Id ?? t.Slug ?? "").ToLowerInvariant();
+                if (id.Contains("online")) kinds.Add("Online Fix");
+                else if (id.Contains("bypass")) kinds.Add("Bypass");
+                else if (!string.IsNullOrWhiteSpace(t.Name) && !id.Contains("hypervisor")) kinds.Add(t.Name);
+            }
+            if (kinds.Count == 0) kinds.Add("Bypass");
+            return string.Join(" • ", kinds.Distinct(StringComparer.OrdinalIgnoreCase));
+        }
+    }
 
     /// <summary>Local cached cover path (set after CoverCache resolves it); bound via ImagePathToSource.</summary>
     [ObservableProperty] private string? _cover;
@@ -28,7 +52,8 @@ public partial class FixGameCardVm : ObservableObject
     {
         this.g = g;
         AppId = g.AppId;
-        Name = g.Name;
+        _displayAppId = g.AppId;
+        _name = g.Name;
         HeaderImage = g.HeaderImage;
         FixCount = g.FixCount;
         TagIds = g.Tags.Select(t => t.Id).ToList();
@@ -39,7 +64,9 @@ public partial class FixGameCardVm : ObservableObject
     }
 
     public bool Matches(string q) =>
-        Name.Contains(q, StringComparison.OrdinalIgnoreCase) || AppId.Contains(q);
+        Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+        AppId.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+        DisplayAppId.Contains(q, StringComparison.OrdinalIgnoreCase);
 
     public bool MatchesTag(string tagIdOrSlug)
     {
@@ -54,58 +81,101 @@ public partial class FixGameCardVm : ObservableObject
                                 || t.Id.Contains("voices38", StringComparison.OrdinalIgnoreCase)
                                 || t.Id.Contains("rockstar", StringComparison.OrdinalIgnoreCase)
                                 || t.Id.Contains("ubisoft", StringComparison.OrdinalIgnoreCase)
-                                || t.Id.Contains("generic", StringComparison.OrdinalIgnoreCase))
-                || Name.Contains("Bypass", StringComparison.OrdinalIgnoreCase)
-                || Name.Contains("voices38", StringComparison.OrdinalIgnoreCase);
+                                || t.Id.Contains("generic", StringComparison.OrdinalIgnoreCase));
         }
 
         if (tag == "online")
         {
             return g.Tags.Any(t => t.Id.Contains("online", StringComparison.OrdinalIgnoreCase)
                                 || t.Name.Contains("online", StringComparison.OrdinalIgnoreCase)
-                                || t.Slug.Contains("online", StringComparison.OrdinalIgnoreCase))
-                || Name.Contains("Online", StringComparison.OrdinalIgnoreCase);
-        }
-
-        if (tag == "hypervisor")
-        {
-            return g.Tags.Any(t => t.Id.Contains("hypervisor", StringComparison.OrdinalIgnoreCase)
-                                || t.Name.Contains("hypervisor", StringComparison.OrdinalIgnoreCase)
-                                || t.Slug.Contains("hypervisor", StringComparison.OrdinalIgnoreCase)
-                                || t.Id.Contains("denuvowo", StringComparison.OrdinalIgnoreCase)
-                                || t.Id.Contains("denuvo", StringComparison.OrdinalIgnoreCase))
-                || Name.Contains("Denuvo", StringComparison.OrdinalIgnoreCase)
-                || Name.Contains("DenuvOwO", StringComparison.OrdinalIgnoreCase);
+                                || t.Slug.Contains("online", StringComparison.OrdinalIgnoreCase));
         }
 
         return false;
     }
 
-    /// <summary>Cache the header image to disk once (CoverCache, keyed by appid), then expose its path.</summary>
-    /// <summary>Cache the header image to disk once (CoverCache, keyed by appid), then expose its path.</summary>
-    public async Task EnsureCoverAsync(CoverCache covers, SteamAppInfoCache appInfo)
+    /// <summary>Cache the header image to disk once (CoverCache, keyed by appid), and resolve title/appid if missing.</summary>
+    public async Task EnsureCoverAsync(CoverCache covers, SteamAppInfoCache appInfo, SteamAppListCache? appList = null)
     {
+        long appid = 0;
+        if (!long.TryParse(AppId, out appid))
+        {
+            // For online fix or non-numeric appids (e.g. of_18246), resolve the actual Steam App ID via appList search
+            if (appList is not null && !string.IsNullOrWhiteSpace(Name))
+            {
+                var matches = appList.Search(Name, 1);
+                if (matches.Count > 0)
+                {
+                    appid = matches[0].AppId;
+                    var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                    if (dispatcher is not null && !dispatcher.CheckAccess())
+                        dispatcher.Invoke(() => DisplayAppId = appid.ToString());
+                    else
+                        DisplayAppId = appid.ToString();
+                }
+            }
+        }
+        else
+        {
+            DisplayAppId = appid.ToString();
+        }
+
+        // If Name is a placeholder ("App 1963680"), immediately try cached names or fetch in background
+        if (appid > 0 && HasPlaceholderName)
+        {
+            string? cachedName = appList?.GetName(appid) ?? appInfo.GetCached(appid)?.Name;
+            if (!string.IsNullOrWhiteSpace(cachedName) && !cachedName.StartsWith("App ", StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateName(cachedName);
+            }
+            else
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var info = await appInfo.ResolveAsync(appid);
+                        if (!string.IsNullOrWhiteSpace(info?.Name))
+                        {
+                            UpdateName(info.Name);
+                            appList?.AddOrUpdate(appid, info.Name);
+                        }
+                    }
+                    catch { }
+                });
+            }
+        }
+
         if (Cover is not null) return;
-        if (!long.TryParse(AppId, out long appid)) return;
         if (Interlocked.Exchange(ref _resolving, 1) == 1) return;
         try
         {
-            string? local = covers.GetLocalPath(appid);
+            string? local = appid > 0 ? covers.GetLocalPath(appid) : null;
             if (local is null)
             {
                 string rawUrl = !string.IsNullOrWhiteSpace(HeaderImage)
                     ? HeaderImage!
-                    : SteamAppInfoCache.GuessHeaderImageUrl(appid);
-                string sanitized = SteamCdnUrl.Sanitize(rawUrl) ?? rawUrl;
-                local = await covers.EnsureAsync(appid, sanitized);
+                    : (appid > 0 ? SteamAppInfoCache.GuessHeaderImageUrl(appid) : "");
 
-                if (local is null)
+                if (!string.IsNullOrWhiteSpace(rawUrl))
+                {
+                    string sanitized = SteamCdnUrl.Sanitize(rawUrl) ?? rawUrl;
+                    long coverKey = appid > 0 ? appid : (long)(AppId.GetHashCode() & 0x7FFFFFFF);
+                    local = await covers.EnsureAsync(coverKey, sanitized);
+                }
+
+                if (local is null && appid > 0)
                 {
                     var info = await appInfo.ResolveAsync(appid);
                     if (!string.IsNullOrWhiteSpace(info?.HeaderImage))
                     {
                         string fallbackSanitized = SteamCdnUrl.Sanitize(info.HeaderImage) ?? info.HeaderImage;
                         local = await covers.EnsureAsync(appid, fallbackSanitized);
+                    }
+                    if (!string.IsNullOrWhiteSpace(info?.Name) && HasPlaceholderName)
+                    {
+                        UpdateName(info.Name);
+                        appList?.AddOrUpdate(appid, info.Name);
                     }
                 }
             }
@@ -121,6 +191,15 @@ public partial class FixGameCardVm : ObservableObject
         }
         catch { }
         finally { Interlocked.Exchange(ref _resolving, 0); }
+    }
+
+    private void UpdateName(string newName)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+            dispatcher.Invoke(() => Name = newName);
+        else
+            Name = newName;
     }
 }
 
@@ -140,10 +219,12 @@ public partial class FixItemVm(DenuvoFix f) : ObservableObject
     public string? Description { get; } = f.Description;
     public IReadOnlyList<DenuvoTag> Tags { get; } = f.Tags;
     public bool HasManifest { get; } = f.HasManifest;
-    public bool HasFix { get; } = f.HasFix;
+    public bool HasFix { get; } = f.HasFix || !f.HasManifest;
     public string? ManifestFilename { get; } = f.ManifestFilename;
     public string? FixFilename { get; } = f.FixFilename;
     public string DateLabel { get; } = FormatDate(f.CreatedAt);
+    public string? SizeLabel { get; } = FormatSize(f.FileSize, f.SizeStr);
+    public bool HasSize => !string.IsNullOrEmpty(SizeLabel);
 
     /// <summary>In-flight queue items for this fix's two slots. The buttons and their progress bars bind
     /// straight through, so the shared queue stays the only owner of download state.</summary>
@@ -181,6 +262,17 @@ public partial class FixItemVm(DenuvoFix f) : ObservableObject
 
     private static string FormatDate(string? iso) =>
         DateTimeOffset.TryParse(iso, out var d) ? d.UtcDateTime.ToString("d MMM yyyy") : "";
+
+    private static string? FormatSize(long? bytes, string? explicitSize)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitSize) && !string.Equals(explicitSize, "Fix archive", StringComparison.OrdinalIgnoreCase)) return explicitSize;
+        if (bytes is null or <= 0) return null;
+        double b = bytes.Value;
+        if (b >= 1024 * 1024 * 1024) return $"{b / (1024 * 1024 * 1024):0.##} GB";
+        if (b >= 1024 * 1024) return $"{b / (1024 * 1024):0.#} MB";
+        if (b >= 1024) return $"{b / 1024:0.#} KB";
+        return $"{b} B";
+    }
 }
 
 /// <summary>
@@ -194,6 +286,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     private readonly AuthService auth;
     private readonly CoverCache covers;
     private readonly SteamAppInfoCache appInfo;
+    private readonly SteamAppListCache appList;
     private readonly ToastService toast;
     private readonly SettingsService settings;
     private readonly DownloadQueue queue;
@@ -202,7 +295,8 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     private readonly SteamService steam;
 
     public FixesViewModel(
-        DataJackUIApiClient api, AuthService auth, CoverCache covers, SteamAppInfoCache appInfo, ToastService toast,
+        DataJackUIApiClient api, AuthService auth, CoverCache covers, SteamAppInfoCache appInfo,
+        SteamAppListCache appList, ToastService toast,
         SettingsService settings, DownloadQueue queue, ManifestJobFactory jobs,
         SteamLibraryService library, SteamService steam)
     {
@@ -210,6 +304,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         this.auth = auth;
         this.covers = covers;
         this.appInfo = appInfo;
+        this.appList = appList;
         this.toast = toast;
         this.settings = settings;
         this.queue = queue;
@@ -223,7 +318,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     public Func<Task>? RequestSignIn { get; set; }
 
     // The master list; the displayed page slice lives in the base's Items collection.
-    private List<FixGameCardVm> _allGames = [];
+    protected List<FixGameCardVm> _allGames = [];
 
     public ObservableCollection<TagPillVm> Tags { get; } = [];
 
@@ -231,20 +326,23 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     // Page size persists via SavePageSizeSetting below.
     protected override void SavePageSizeSetting(int size) => settings.FixesPageSize = size;
 
-    /// <summary>Warm the cover images for just the freshly-shown page (idempotent, off-UI).</summary>
+    /// <summary>Warm the cover images and resolve title for just the freshly-shown page (idempotent, off-UI).</summary>
     protected override void OnPageSliced(IReadOnlyList<FixGameCardVm> slice)
     {
-        foreach (var g in slice) _ = g.EnsureCoverAsync(covers, appInfo);
+        foreach (var g in slice) _ = g.EnsureCoverAsync(covers, appInfo, appList);
     }
 
     [ObservableProperty] private string _searchText = "";
     partial void OnSearchTextChanged(string value) => ApplyFilter();
 
     [ObservableProperty] private string? _selectedTagId; // null = "All"
+    public ObservableCollection<string> SortOptions { get; } = ["A to Z", "Z to A"];
+    [ObservableProperty] private string _selectedSort = "A to Z";
+    partial void OnSelectedSortChanged(string value) => ApplyFilter();
 
     // Appids with a lua in Steam's config/stplug-in ("my games"), so the page can filter the fix
     // listing down to games the user actually owns. Empty when Steam isn't set up / no luas installed.
-    private HashSet<long> _installedAppIds = [];
+    protected HashSet<long> _installedAppIds = [];
 
     /// <summary>True once the listing has been fetched (set at the end of LoadAsync).</summary>
     [ObservableProperty]
@@ -312,6 +410,15 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
 
     // ── Load ─────────────────────────────────────────────────────────
 
+    protected virtual List<FixGameCardVm> FilterLoadedGames(List<FixGameCardVm> all) => all;
+
+    protected virtual void PopulateTags()
+    {
+        Tags.Clear();
+        Tags.Add(new TagPillVm(new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }));
+        Tags.Add(new TagPillVm(new DenuvoTag { Id = "online", Name = "Online Fix", Slug = "online" }));
+    }
+
     /// <param name="force">True to re-fetch even if already loaded (the Refresh button); otherwise the
     /// listing loads once per session.</param>
     public async Task LoadAsync(bool force = false)
@@ -327,12 +434,10 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
                 return;
             }
 
-            _allGames = data.Games.Select(g => new FixGameCardVm(g, covers)).ToList();
+            var all = data.Games.Select(g => new FixGameCardVm(g, covers)).ToList();
+            _allGames = FilterLoadedGames(all);
 
-            Tags.Clear();
-            Tags.Add(new TagPillVm(new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" }));
-            Tags.Add(new TagPillVm(new DenuvoTag { Id = "online", Name = "Online", Slug = "online" }));
-            Tags.Add(new TagPillVm(new DenuvoTag { Id = "hypervisor", Name = "Hypervisor", Slug = "hypervisor" }));
+            PopulateTags();
 
             // "My games" filter source: the same stplug-in scan the Manage page uses, so the toggle
             // shows only games the user actually added. Scanned once per listing load.
@@ -382,6 +487,11 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         if (SelectedTagId is { } tag) shown = shown.Where(g => g.MatchesTag(tag));
         if (MyGamesOnly) shown = shown.Where(g => long.TryParse(g.AppId, out long id) && _installedAppIds.Contains(id));
         if (q.Length > 0) shown = shown.Where(g => g.Matches(q));
+
+        if (string.Equals(SelectedSort, "Z to A", StringComparison.OrdinalIgnoreCase))
+            shown = shown.OrderByDescending(g => g.Name, StringComparer.OrdinalIgnoreCase);
+        else
+            shown = shown.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase);
 
         // Hand the filtered list to the base: it slices the visible page and (via OnPageSliced) warms
         // that page's covers.
@@ -436,11 +546,35 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
             string.Format(Resources.Strings.Fixes_Toast_GameNotFound_Body, game.Name), error: true);
     }
 
+    private static void ClearCursor()
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        dispatcher?.Invoke(() =>
+        {
+            System.Windows.Input.Mouse.Capture(null);
+            System.Windows.Input.Mouse.OverrideCursor = null;
+        });
+    }
+
     [RelayCommand]
     private async Task OpenGame(FixGameCardVm game)
     {
+        ClearCursor();
         SelectedGame = game;
-        _ = game.EnsureCoverAsync(covers, appInfo);
+        _ = game.EnsureCoverAsync(covers, appInfo, appList);
+        if (game.HasPlaceholderName && long.TryParse(game.AppId, out long appid))
+        {
+            try
+            {
+                var info = await appInfo.ResolveAsync(appid);
+                if (!string.IsNullOrWhiteSpace(info?.Name))
+                {
+                    game.Name = info.Name;
+                    appList.AddOrUpdate(appid, info.Name);
+                }
+            }
+            catch { }
+        }
         Fixes.Clear();
         _allFixes = [];
         FixTags.Clear();
@@ -453,6 +587,10 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
             {
                 data = DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
             }
+            else if (data.Name.StartsWith("App ", StringComparison.OrdinalIgnoreCase) && !game.HasPlaceholderName)
+            {
+                data.Name = game.Name;
+            }
             await ProcessGameDataAsync(game, data);
         }
         catch
@@ -460,7 +598,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
             var fallback = DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
             await ProcessGameDataAsync(game, fallback);
         }
-        finally { IsLoadingFixes = false; }
+        finally { IsLoadingFixes = false; ClearCursor(); }
     }
 
     private async Task ProcessGameDataAsync(FixGameCardVm game, DenuvoFixesResponse data)
@@ -501,7 +639,11 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     }
 
     [RelayCommand]
-    private void CloseDetail() => SelectedGame = null;
+    private void CloseDetail()
+    {
+        ClearCursor();
+        SelectedGame = null;
+    }
 
     // ── Downloads ────────────────────────────────────────────────────
 
@@ -558,7 +700,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     {
         if (await PromptSignInIfGuestAsync(Resources.Strings.Fixes_SignIn)) return;
         if (SelectedGame is not { } game) return;
-        if (!long.TryParse(game.AppId, out long appId)) return;
+        long.TryParse(game.AppId, out long appId);
 
         EnqueueDownloadJob(fix, slot, game, appId);
     }

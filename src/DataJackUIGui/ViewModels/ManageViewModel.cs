@@ -84,6 +84,28 @@ public partial class LuaTileViewModel : ObservableObject
         // since the last ApplyFilter pass. Cheap (reads the memoized filter cache).
         if (string.IsNullOrEmpty(ReleaseLabel)) OnUi(() => UpdateReleaseLabel(appInfo));
 
+        // If name is still placeholder, resolve it even if cover was already cached
+        if (_nameIsPlaceholder)
+        {
+            var cached = appInfo.GetCached(AppId);
+            if (!string.IsNullOrWhiteSpace(cached?.Name))
+            {
+                SetName(cached.Name);
+            }
+            else
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var resolved = await appInfo.ResolveAsync(AppId);
+                        if (!string.IsNullOrWhiteSpace(resolved?.Name)) SetName(resolved.Name);
+                    }
+                    catch { }
+                });
+            }
+        }
+
         if (Cover is not null) return;
         if (Interlocked.Exchange(ref _resolving, 1) == 1) return;
         try
@@ -397,11 +419,12 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
     {
         if (tile is null || IsBusy) return;
 
-        var confirm = MessageBox.Show(
-            Resources.Strings.Manage_Steamless_Confirm_Body,
+        bool confirm = await UiMessageBox.ShowConfirmAsync(
             Resources.Strings.Manage_Steamless_Confirm_Title,
-            MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-        if (confirm != MessageBoxResult.OK) return;
+            Resources.Strings.Manage_Steamless_Confirm_Body,
+            "OK",
+            "Cancel");
+        if (!confirm) return;
 
         IsBusy = true;
         IsProgressIndeterminate = true;
@@ -445,14 +468,14 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
 
     /// <summary>Confirm, then delete the &lt;appid&gt;.lua file and remove the tile from the grid.</summary>
     [RelayCommand]
-    private void Delete(LuaTileViewModel tile)
+    private async Task Delete(LuaTileViewModel tile)
     {
-        var result = MessageBox.Show(
-            string.Format(Resources.Strings.Manage_Delete_Body, tile.Name, tile.AppId),
+        bool result = await UiMessageBox.ShowConfirmAsync(
             Resources.Strings.Manage_Delete_Title,
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Warning);
-        if (result != MessageBoxResult.OK) return;
+            string.Format(Resources.Strings.Manage_Delete_Body, tile.Name, tile.AppId),
+            "OK",
+            "Cancel");
+        if (!result) return;
 
         try
         {
@@ -460,12 +483,14 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         }
         catch (Exception ex)
         {
-            MessageBox.Show(string.Format(Resources.Strings.Manage_RemoveFailed_File, ex.Message), Resources.Strings.Manage_RemoveFailed_Title,
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            await UiMessageBox.ShowConfirmAsync(
+                Resources.Strings.Manage_RemoveFailed_Title,
+                string.Format(Resources.Strings.Manage_RemoveFailed_File, ex.Message),
+                "OK", "");
             return;
         }
 
-        if (!TryDeleteFile(tile.FilePath, tile.Name)) return;
+        if (!await TryDeleteFileAsync(tile.FilePath, tile.Name)) return;
         RemoveTile(tile);
     }
 
@@ -480,22 +505,22 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
 
     /// <summary>Delete all selected lua files after one confirm; offer a Steam restart afterwards.</summary>
     [RelayCommand]
-    private void DeleteSelected()
+    private async Task DeleteSelected()
     {
         var targets = _all.Where(t => t.IsSelected).ToList();
         if (targets.Count == 0) return;
 
-        var result = MessageBox.Show(
-            string.Format(Resources.Strings.Manage_DeleteMany_Body, targets.Count),
+        bool result = await UiMessageBox.ShowConfirmAsync(
             Resources.Strings.Manage_DeleteMany_Title,
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Warning);
-        if (result != MessageBoxResult.OK) return;
+            string.Format(Resources.Strings.Manage_DeleteMany_Body, targets.Count),
+            "OK",
+            "Cancel");
+        if (!result) return;
 
         int failed = 0;
         foreach (var t in targets)
         {
-            if (TryDeleteFile(t.FilePath, t.Name, silent: true))
+            if (await TryDeleteFileAsync(t.FilePath, t.Name, silent: true))
             {
                 t.SelectionChanged = null;
                 _all.Remove(t);
@@ -509,14 +534,16 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         SelectedCount = _all.Count(t => t.IsSelected);
 
         if (failed > 0)
-            MessageBox.Show(string.Format(Resources.Strings.Manage_RemoveFailed_Count, failed),
-                Resources.Strings.Manage_RemoveFailed_Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            await UiMessageBox.ShowConfirmAsync(
+                Resources.Strings.Manage_RemoveFailed_Title,
+                string.Format(Resources.Strings.Manage_RemoveFailed_Count, failed),
+                "OK", "");
 
         // No restart prompt: OST/BST watch config/stplug-in, so deleting a lua un-applies it live.
     }
 
     /// <summary>Delete one lua file; returns false (and warns, unless silent) on failure.</summary>
-    private static bool TryDeleteFile(string path, string name, bool silent = false)
+    private static async Task<bool> TryDeleteFileAsync(string path, string name, bool silent = false)
     {
         try
         {
@@ -526,8 +553,10 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         catch (Exception ex)
         {
             if (!silent)
-                MessageBox.Show(string.Format(Resources.Strings.Manage_RemoveFailed_Named, name, ex.Message), Resources.Strings.Manage_RemoveFailed_Title,
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                await UiMessageBox.ShowConfirmAsync(
+                    Resources.Strings.Manage_RemoveFailed_Title,
+                    string.Format(Resources.Strings.Manage_RemoveFailed_Named, name, ex.Message),
+                    "OK", "");
             return false;
         }
     }

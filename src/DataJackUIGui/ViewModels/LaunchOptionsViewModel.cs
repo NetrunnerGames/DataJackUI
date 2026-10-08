@@ -273,7 +273,7 @@ public partial class LaunchOptionsViewModel : ObservableObject
 
     /// <summary>Stage the edit, then offer to write it into appinfo (which closes Steam).</summary>
     [RelayCommand]
-    private void Save()
+    private async Task Save()
     {
         if (_state is null) return;
 
@@ -288,7 +288,7 @@ public partial class LaunchOptionsViewModel : ObservableObject
         _launch.Stage((int)AppId, _state.ChangeNumber, _state.Current, desired);
         IsModded = true;
 
-        if (Confirm(Resources.Strings.Launch_ApplyNow_Body, Resources.Strings.Launch_ApplyNow_Title))
+        if (await ConfirmAsync(Resources.Strings.Launch_ApplyNow_Body, Resources.Strings.Launch_ApplyNow_Title))
             ApplyToSteam(new Dictionary<int, IReadOnlyList<LaunchOption>> { [(int)AppId] = desired });
         else
             _toast.Show(Resources.Strings.Launch_Title, Resources.Strings.Launch_Staged);
@@ -298,7 +298,7 @@ public partial class LaunchOptionsViewModel : ObservableObject
 
     /// <summary>Put back the snapshot taken before this game was first edited.</summary>
     [RelayCommand]
-    private void Restore()
+    private async Task Restore()
     {
         if (_launch.StageRestore((int)AppId) is not { } original)
         {
@@ -306,7 +306,7 @@ public partial class LaunchOptionsViewModel : ObservableObject
             return;
         }
 
-        if (!Confirm(Resources.Strings.Launch_Restore_Body, Resources.Strings.Launch_Restore_Title)) return;
+        if (!await ConfirmAsync(Resources.Strings.Launch_Restore_Body, Resources.Strings.Launch_Restore_Title)) return;
 
         ApplyToSteam(new Dictionary<int, IReadOnlyList<LaunchOption>> { [(int)AppId] = original });
         _launch.Store.Remove((int)AppId);
@@ -334,6 +334,6 @@ public partial class LaunchOptionsViewModel : ObservableObject
                 string.Format(Resources.Strings.Launch_ApplyFailed, result.Error), error: true);
     }
 
-    private static bool Confirm(string body, string title) =>
-        MessageBox.Show(body, title, MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
+    private static Task<bool> ConfirmAsync(string body, string title) =>
+        UiMessageBox.ShowConfirmAsync(title, body, "OK", "Cancel");
 }

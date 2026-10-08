@@ -78,15 +78,17 @@ public class SteamAppInfoCache
     // trip the 429. The window timestamps persist to cache.json so a restart resumes it (no fresh burst
     // into a still-counting window).
     private readonly CacheService _cache2;
+    private readonly SteamAppListCache? _appList;
     private readonly SemaphoreSlim _rateGate = new(1, 1);
     private readonly Queue<DateTime> _requestTimes = new();
     private static readonly TimeSpan Window = TimeSpan.FromSeconds(200);
     private const int MaxPerWindow = 190; // small safety margin under the measured 200
     private DateTime _lastPersist = DateTime.MinValue;
 
-    public SteamAppInfoCache(CacheService cache)
+    public SteamAppInfoCache(CacheService cache, SteamAppListCache? appList = null)
     {
         _cache2 = cache;
+        _appList = appList;
         var handler = new HttpClientHandler
         {
             ServerCertificateCustomValidationCallback = (sender, cert, chain, sslErrors) => true
@@ -113,9 +115,12 @@ public class SteamAppInfoCache
     /// (including a negative result, so a missing/empty blob isn't re-read on every render).</summary>
     public SteamAppInfo? GetCached(long appid)
     {
-        if (_cache.TryGetValue(appid, out var info)) return info; // hit (may be a cached null)
+        if (_cache.TryGetValue(appid, out var info) && info is not null) return info;
         var fromDisk = ReadInfoFromDetails(appid);
-        _cache[appid] = fromDisk; // memoize hit OR miss
+        if (fromDisk is not null)
+        {
+            _cache[appid] = fromDisk;
+        }
         return fromDisk;
     }
 
@@ -142,7 +147,7 @@ public class SteamAppInfoCache
     /// are derived from it, so each app is only ever fetched once.</summary>
     public async Task<SteamAppInfo?> ResolveAsync(long appid, CancellationToken ct = default)
     {
-        if (_cache.TryGetValue(appid, out var hit)) return hit;
+        if (_cache.TryGetValue(appid, out var hit) && hit is not null) return hit;
 
         var url = $"https://store.steampowered.com/api/appdetails?appids={appid}&cc=us&l=english";
         for (int attempt = 0; attempt < 3; attempt++)
@@ -186,6 +191,7 @@ public class SteamAppInfoCache
         string? image = SteamCdnUrl.Sanitize(data.TryGetProperty("header_image", out var img) ? img.GetString() : null);
         var info = new SteamAppInfo(name, image);
         _cache[appid] = info;
+        _appList?.AddOrUpdate(appid, name);
 
         _ = SaveFullDetailsAsync(appid, data.GetRawText());
         return info;
@@ -214,6 +220,7 @@ public class SteamAppInfoCache
                 {
                     var info = new SteamAppInfo(name, headerImage);
                     _cache[appid] = info;
+                    _appList?.AddOrUpdate(appid, name);
 
                     var dict = new Dictionary<string, object?>
                     {
@@ -436,9 +443,27 @@ public class SteamAppInfoCache
                 Genres = ExtractGenres(d),
                 HeaderImage = d.TryGetProperty("header_image", out var hi) ? hi.GetString() : null,
                 ReleaseDate = d.TryGetProperty("release_date", out var rd) && rd.TryGetProperty("date", out var dt) ? dt.GetString() : null,
+                DrmNotice = d.TryGetProperty("drm_notice", out var drm) ? drm.GetString() : null,
             };
         }
         catch { return null; }
+    }
+
+    /// <summary>Check if the app has a Denuvo drm_notice in its cached details.json on disk.</summary>
+    public bool CheckHasDenuvoFromDisk(long appid)
+    {
+        try
+        {
+            if (!File.Exists(DetailsPath(appid))) return false;
+            using var doc = JsonDocument.Parse(File.ReadAllText(DetailsPath(appid)));
+            var d = doc.RootElement;
+            if (d.TryGetProperty("drm_notice", out var drm) && drm.GetString() is { } s)
+            {
+                return s.Contains("Denuvo", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        catch { }
+        return false;
     }
 
     private static List<string> ExtractGenres(System.Text.Json.JsonElement d)
@@ -486,7 +511,8 @@ public class SteamAppInfoCache
             catch (OperationCanceledException) { return false; }
             catch { return false; }
         }
-        return false;
+        var fallbackInfo = await FetchFallbackDetailsAsync(appid, ct);
+        return fallbackInfo is not null;
     }
 
     private async Task<bool> ParseAndCacheFullDetailsAsync(JsonDocument doc, long appid)
@@ -494,6 +520,9 @@ public class SteamAppInfoCache
         var entry = doc.RootElement.GetProperty(appid.ToString());
         if (!entry.GetProperty("success").GetBoolean())
         {
+            var fallback = await FetchFallbackDetailsAsync(appid, default);
+            if (fallback is not null) return true;
+
             await SaveFullDetailsAsync(appid, "{}");
             return true;
         }
@@ -501,10 +530,11 @@ public class SteamAppInfoCache
         var data = entry.GetProperty("data");
         await SaveFullDetailsAsync(appid, data.GetRawText());
 
-        if (!_cache.ContainsKey(appid) && data.TryGetProperty("name", out var n) && n.GetString() is { } nm && nm.Length > 0)
+        if (data.TryGetProperty("name", out var n) && n.GetString() is { } nm && nm.Length > 0)
         {
             string? image = data.TryGetProperty("header_image", out var img) ? img.GetString() : null;
             _cache[appid] = new SteamAppInfo(nm, image);
+            _appList?.AddOrUpdate(appid, nm);
         }
         return true;
     }

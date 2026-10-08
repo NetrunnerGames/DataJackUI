@@ -114,7 +114,8 @@ public class FilterOptionDisplayConverter : IValueConverter
             "Name (A–Z)" => Resources.Strings.Manage_Sort_NameAZ,
             "Release date (newest)" => Resources.Strings.Manage_Sort_ReleaseNewest,
             "Metacritic" => Resources.Strings.Manage_Sort_Metacritic,
-            "Most reviewed" => Resources.Strings.Manage_Sort_MostReviewed,
+            "A to Z" => Resources.Strings.Fixes_Sort_AZ,
+            "Z to A" => Resources.Strings.Fixes_Sort_ZA,
             "All" => Resources.Strings.Manage_PageSize_All, // page-size dropdown
             _ => s, // genre/type/year/page-number data. Show as-is
         } : value;

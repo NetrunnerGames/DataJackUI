@@ -198,7 +198,7 @@
                                                 Foreground="#e5e7eb"
                                                 Text="{Binding Name}"
                                                 TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Margin="0,3,0,0" FontSize="11.5" Foreground="#6b7280" Text="{Binding FixCountLabel}" />
+                                            <TextBlock Margin="0,3,0,0" FontSize="11.5" FontWeight="Medium" Foreground="#a78bfa" Text="{Binding FixTypeLabel}" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -209,12 +209,30 @@
             </vwp:VirtualizingItemsControl.ItemTemplate>
         </vwp:VirtualizingItemsControl>
 
-        <!-- Pager bar: page numbers centered across the full width, with results-per-page overlaid at the
-             right. Shown once game cards are present. (Mirrors ManageView's pager.) -->
+        <!-- Pager bar: page numbers centered across the full width, with sort dropdown on the left
+             and results-per-page on the right. Shown once game cards are present. -->
         <Grid
             Grid.Row="4"
             Margin="0,12,0,2"
             Visibility="{Binding ShowItems, Converter={StaticResource BoolToVis}}">
+
+            <!-- Left: sort dropdown (A to Z / Z to A) -->
+            <StackPanel
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Orientation="Horizontal">
+                <TextBlock
+                    Margin="0,0,8,0"
+                    VerticalAlignment="Center"
+                    FontSize="11.5"
+                    Foreground="#9ca3af"
+                    Text="{x:Static res:Strings.Manage_Filter_SortBy}" />
+                <ComboBox
+                    MinWidth="90"
+                    ItemTemplate="{StaticResource FilterOptionTemplate}"
+                    ItemsSource="{Binding SortOptions}"
+                    SelectedItem="{Binding SelectedSort}" />
+            </StackPanel>
 
             <!-- Centered group: ‹ prev | page numbers (fixed-width zone) | › next. -->
             <Grid
@@ -327,14 +345,16 @@
             Grid.RowSpan="5"
             Margin="-8,-16,-16,-8"
             Background="#80000000"
+            Cursor="Arrow"
             Visibility="{Binding IsDetailOpen, Converter={StaticResource BoolToVis}}">
-            <Border Background="Transparent" MouseLeftButtonUp="Scrim_Click" />
+            <Border Background="Transparent" Cursor="Arrow" MouseLeftButtonUp="Scrim_Click" />
             <Border
                 Width="420"
                 HorizontalAlignment="Right"
                 Background="#1c1c22"
                 BorderBrush="#22FFFFFF"
-                BorderThickness="1,0,0,0">
+                BorderThickness="1,0,0,0"
+                Cursor="Arrow">
                 <Grid>
                     <Grid Margin="20" DataContext="{Binding SelectedGame}">
                         <Grid.RowDefinitions>
@@ -356,7 +376,7 @@
                             <Image Source="{Binding Cover, Converter={StaticResource ImagePathToSource}}" Stretch="UniformToFill" />
                         </Border>
                         <TextBlock Margin="0,10,0,0" FontSize="16" FontWeight="Bold" Text="{Binding Name}" TextWrapping="Wrap" />
-                        <TextBlock FontSize="11.5" Foreground="#6b7280" Text="{Binding AppId, StringFormat='App ID: {0}'}" />
+                        <TextBlock FontSize="11.5" Foreground="#6b7280" Text="{Binding DisplayAppId, StringFormat='App ID: {0}'}" />
                     </StackPanel>
 
                     <!-- Fixes list -->
@@ -430,24 +450,33 @@
                                             <StackPanel>
                                                 <TextBlock FontSize="13.5" FontWeight="SemiBold" Foreground="#e5e7eb"
                                                            Text="{Binding Title, StringFormat={x:Static res:Strings.Fixes_Build}}" TextWrapping="Wrap" />
-                                                <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="#6b7280" Text="{Binding DateLabel}" />
 
-                                                <!-- Tag chips -->
-                                                <ItemsControl Margin="0,6,0,0" ItemsSource="{Binding Tags}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Border Margin="0,0,5,5" Padding="6,1" Background="#2a2440" CornerRadius="4">
-                                                                <TextBlock FontSize="10" FontWeight="SemiBold" Foreground="#c4b5fd" Text="{Binding Name}" />
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
+                                                <!-- Tag chips & Size inline -->
+                                                <StackPanel Margin="0,6,0,0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <ItemsControl ItemsSource="{Binding Tags}" VerticalAlignment="Center">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Margin="0,0,6,0" Padding="8,2" Background="#2a2440" BorderBrush="#40a78bfa" BorderThickness="1" CornerRadius="4">
+                                                                    <TextBlock FontSize="10.5" FontWeight="SemiBold" Foreground="#c4b5fd" Text="{Binding Name}" />
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+
+                                                    <TextBlock
+                                                        VerticalAlignment="Center"
+                                                        FontSize="11"
+                                                        FontWeight="Medium"
+                                                        Foreground="#a78bfa"
+                                                        Text="{Binding SizeLabel, StringFormat='•  {0}'}"
+                                                        Visibility="{Binding HasSize, Converter={StaticResource BoolToVis}}" />
+                                                </StackPanel>
 
                                                 <markdig:MarkdownViewer
-                                                    Margin="0,4,0,0"
+                                                    Margin="0,6,0,0"
                                                     Markdown="{Binding Description}"
                                                     PreviewMouseWheel="Markdown_PreviewMouseWheel"
                                                     Visibility="{Binding Description, Converter={StaticResource NullToCollapsed}}">
@@ -495,6 +524,7 @@
 
                                                 <!-- Download buttons -->
                                                 <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                                                    <!-- Manifest button disabled: depot+manifest IDs must be manually assigned before re-enabling -->
                                                     <ui:Button
                                                         Margin="0,0,10,0"
                                                         Padding="14,7"
@@ -503,7 +533,7 @@
                                                         Content="{x:Static res:Strings.Fixes_Manifest}"
                                                         Icon="{ui:SymbolIcon Document24}"
                                                         IsEnabled="{Binding CanDownloadManifest}"
-                                                        Visibility="{Binding HasManifest, Converter={StaticResource BoolToVis}}" />
+                                                        Visibility="Collapsed" />
                                                     <ui:Button
                                                         Margin="0,0,10,0"
                                                         Padding="14,7"
@@ -533,7 +563,7 @@
                                                     IsIndeterminate="{Binding ManifestItem.IsIndeterminate, FallbackValue=False}"
                                                     Maximum="100"
                                                     Value="{Binding ManifestItem.Percent, Mode=OneWay, FallbackValue=0}"
-                                                    Visibility="{Binding ManifestItem.ShowProgress, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}" />
+                                                    Visibility="Collapsed" />
                                                 <ProgressBar
                                                     Height="4"
                                                     Margin="0,8,0,0"

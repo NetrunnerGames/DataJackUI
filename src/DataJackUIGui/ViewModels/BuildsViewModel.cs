@@ -277,6 +277,7 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         // A filter carried over from the previous game would show the new one's table as empty or
         // half-missing, which reads as a data bug rather than a leftover search.
         DepotSearchText = "";
+        CustomBuildId = "";
         CustomDepotId = "";
         CustomManifestId = "";
         RefreshVariants();
@@ -621,15 +622,16 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
     }
 
     [RelayCommand]
-    private void DeleteVariant()
+    private async Task DeleteVariant()
     {
         if (ActiveGame is not { } game || SelectedVariant?.Variant is not { } variant) return;
 
-        var result = MessageBox.Show(
-            string.Format(Resources.Strings.Builds_Delete_Body, variant.DisplayLabel),
+        bool result = await UiMessageBox.ShowConfirmAsync(
             Resources.Strings.Builds_Delete_Title,
-            MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-        if (result != MessageBoxResult.OK) return;
+            string.Format(Resources.Strings.Builds_Delete_Body, variant.DisplayLabel),
+            "OK",
+            "Cancel");
+        if (!result) return;
 
         if (_vault.Delete(game.AppId, variant.Hash)) RefreshVariants();
     }
@@ -1274,6 +1276,15 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
     }
 
     [ObservableProperty]
+    private string _customBuildId = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanLockBuildId))]
+    private bool _isLockingBuildId;
+
+    public bool CanLockBuildId => !IsLockingBuildId;
+
+    [ObservableProperty]
     private string _customDepotId = "";
 
     [ObservableProperty]
@@ -1318,6 +1329,147 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         catch
         {
             HubcapSingleUsageLabel = null;
+        }
+    }
+
+    /// <summary>
+    /// Locks the game to a specific Steam Build ID.
+    /// Gathers all depot ID + manifest ID pairs for the Build ID (from vault variants, SteamDepotInfo, or Lua parser),
+    /// generates/fetches each manifest file via Hubcap API with the Settings API key into Steam's depotcache,
+    /// locks the depot manifests in Lua (setManifestid), and prompts to restart Steam.
+    /// </summary>
+    [RelayCommand]
+    private async Task LockBuildIdAsync()
+    {
+        if (ActiveGame is not { } game)
+        {
+            _toast.Show(Resources.Strings.Builds_Title, "Please select an installed game first.", error: true);
+            return;
+        }
+
+        string buildIdStr = CustomBuildId.Trim();
+        if (string.IsNullOrWhiteSpace(buildIdStr))
+        {
+            _toast.Show(Resources.Strings.Builds_Title, "Please enter a valid Build ID.", error: true);
+            return;
+        }
+
+        string? key = _settings.HubcapApiKey;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            bool openSite = await UiMessageBox.ShowConfirmAsync(
+                "Hubcap API Key Required",
+                "A Hubcap API key is required to generate depot manifests from Steam.\n\nYou can generate an API key on Hubcap's website:\nhttps://hubcapmanifest.com/api-keys/stats\n(Login with Discord through their server's bot).\n\nWould you like to open the Hubcap website to get your key now?",
+                "Get API Key",
+                "Cancel");
+
+            if (openSite)
+            {
+                SteamService.OpenUrl("https://hubcapmanifest.com/api-keys/stats");
+            }
+            return;
+        }
+
+        IsLockingBuildId = true;
+        try
+        {
+            var targetPairs = new List<(long DepotId, string ManifestId)>();
+
+            // 1. Check vaulted variants for this game matching this BuildId
+            var matchingVariant = _vault.GetVariants(game.AppId)
+                .FirstOrDefault(v => string.Equals(v.BuildId, buildIdStr, StringComparison.OrdinalIgnoreCase));
+
+            if (matchingVariant is not null && matchingVariant.ManifestIds.Count > 0)
+            {
+                foreach (var (depotIdStr, manifestIdStr) in matchingVariant.ManifestIds)
+                {
+                    if (long.TryParse(depotIdStr, out long depotId) && !string.IsNullOrWhiteSpace(manifestIdStr))
+                    {
+                        targetPairs.Add((depotId, manifestIdStr));
+                    }
+                }
+            }
+
+            // 2. Check SteamDepotInfo for public manifest IDs
+            var appDepotInfo = await _depotInfo.GetAsync(game.AppId);
+            if (appDepotInfo is not null)
+            {
+                foreach (var depot in appDepotInfo.Depots)
+                {
+                    if (!targetPairs.Any(p => p.DepotId == depot.Id) && !string.IsNullOrWhiteSpace(depot.PublicManifestId))
+                    {
+                        targetPairs.Add((depot.Id, depot.PublicManifestId));
+                    }
+                }
+            }
+
+            // 3. Fallback: check in-lua depots from current Lua
+            if (targetPairs.Count == 0 && _allInLua.Count > 0)
+            {
+                foreach (var row in _allInLua)
+                {
+                    string? mid = row.ManifestId ?? row.CommentedManifestId ?? row.PublicManifestId;
+                    if (!string.IsNullOrWhiteSpace(mid))
+                    {
+                        targetPairs.Add((row.Id, mid));
+                    }
+                }
+            }
+
+            if (targetPairs.Count == 0)
+            {
+                _toast.Show("Build Lock Error", $"No depot and manifest IDs could be found for Build ID {buildIdStr}.", error: true);
+                return;
+            }
+
+            int successCount = 0;
+            _vault.BackupLiveLua(game.AppId);
+
+            foreach (var (depotId, manifestIdStr) in targetPairs.Distinct())
+            {
+                if (long.TryParse(manifestIdStr, out long mid))
+                {
+                    try
+                    {
+                        _toast.Show("Hubcap", $"Requesting manifest for Depot {depotId} (Manifest {mid})...");
+                        byte[] bytes = await _hubcap.GenerateSingleManifestAsync(depotId, mid, key);
+                        string savedPath = _hubcap.SaveSingleManifestToDepotCache(depotId, mid, bytes, _steam);
+
+                        EditLive(text => LuaEditor.SetDepotManifest(text, depotId, mid.ToString()));
+                        successCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _toast.Show("Hubcap Error", $"Depot {depotId}: {ex.Message}", error: true);
+                    }
+                }
+            }
+
+            await LoadDepotsAsync(quiet: true);
+            _ = RefreshHubcapUsageAsync();
+
+            if (successCount > 0)
+            {
+                _toast.Show("Hubcap", $"Locked {successCount} depot manifest(s) for Build {buildIdStr}!");
+
+                bool restart = await UiMessageBox.ShowConfirmAsync(
+                    "Lock Build Complete",
+                    $"Successfully generated {successCount} manifest(s) via Hubcap for Build {buildIdStr} and locked {game.Name}'s Lua configuration.\n\nRestart Steam now so Steam downloads this build natively?",
+                    "Restart Steam",
+                    "Later");
+
+                if (restart)
+                {
+                    if (!_steam.RestartSteam())
+                    {
+                        _toast.Show(Resources.Strings.Manage_RestartSteam_Title, Resources.Strings.Manage_RestartSteam_Failed, error: true);
+                    }
+                }
+            }
+        }
+        finally
+        {
+            IsLockingBuildId = false;
         }
     }
 

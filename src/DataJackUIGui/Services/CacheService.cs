@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text.Json;
 
 namespace DataJackUIGui.Services;
@@ -24,6 +24,11 @@ public class CacheData
     // Steam "hardware" appids (Deck, Index, controllers, VR) to hide from featured/search.
     public List<long> HardwareAppIds { get; set; } = [];
     public long HardwareAppIdsFetchedAtMs { get; set; } // Unix-ms of last successful fetch; 0 = never
+
+    // ── Denuvo appid lists (refreshed from PCGW & Steam Curator, ~7-day TTL) ──
+    public List<long> DenuvoActiveAppIds { get; set; } = [];
+    public List<long> DenuvoRemovedAppIds { get; set; } = [];
+    public long DenuvoAppIdsFetchedAtMs { get; set; }
 
     // ── Loaded-apps notification list (dismissable) ──────────────────
     // Appids the plugin surfaces as "recently loaded" on the store page; cleared on dismiss.
@@ -128,6 +133,23 @@ public class CacheService
     {
         _cache.HardwareAppIds = ids.Distinct().ToList();
         _cache.HardwareAppIdsFetchedAtMs = fetchedAtMs;
+        Save();
+    }
+
+    /// <summary>Cached active Denuvo appids for payment tier detection.</summary>
+    public IReadOnlyList<long> GetDenuvoActiveAppIds() => _cache.DenuvoActiveAppIds;
+
+    /// <summary>Cached games formerly using Denuvo (removed) to prevent false positives.</summary>
+    public IReadOnlyList<long> GetDenuvoRemovedAppIds() => _cache.DenuvoRemovedAppIds;
+
+    /// <summary>Unix-ms of the last successful Denuvo database fetch (0 = never), for TTL check.</summary>
+    public long GetDenuvoAppIdsFetchedAt() => _cache.DenuvoAppIdsFetchedAtMs;
+
+    public void SaveDenuvoAppIds(IEnumerable<long> activeIds, IEnumerable<long> removedIds, long fetchedAtMs)
+    {
+        _cache.DenuvoActiveAppIds = activeIds.Distinct().ToList();
+        _cache.DenuvoRemovedAppIds = removedIds.Distinct().ToList();
+        _cache.DenuvoAppIdsFetchedAtMs = fetchedAtMs;
         Save();
     }
 

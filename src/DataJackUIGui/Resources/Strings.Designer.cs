@@ -26,6 +26,7 @@ public static class Strings
     public static string Nav_Builds => Get(nameof(Nav_Builds));
     public static string Nav_Mode => Get(nameof(Nav_Mode));
     public static string Nav_Fixes => Get(nameof(Nav_Fixes));
+    public static string Nav_OnlineFix => Get(nameof(Nav_OnlineFix));
     public static string Nav_RestartSteam => Get(nameof(Nav_RestartSteam));
     public static string Nav_Settings => Get(nameof(Nav_Settings));
     public static string Nav_SignInDiscord => Get(nameof(Nav_SignInDiscord));
@@ -265,10 +266,14 @@ public static class Strings
 
     // ── Fixes ──
     public static string Fixes_Title => Get(nameof(Fixes_Title));
+    public static string OnlineFix_Title => Get(nameof(OnlineFix_Title));
+    public static string OnlineFix_Subtitle => Get(nameof(OnlineFix_Subtitle));
     public static string Fixes_Loading => Get(nameof(Fixes_Loading));
     public static string Fixes_Build => Get(nameof(Fixes_Build));
     public static string Fixes_Manifest => Get(nameof(Fixes_Manifest));
     public static string Fixes_Fix => Get(nameof(Fixes_Fix));
+    public static string Fixes_Sort_AZ => Get(nameof(Fixes_Sort_AZ));
+    public static string Fixes_Sort_ZA => Get(nameof(Fixes_Sort_ZA));
     public static string Fixes_Count => Get(nameof(Fixes_Count));
     public static string Fixes_Err_Load => Get(nameof(Fixes_Err_Load));
     public static string Fixes_Empty_None => Get(nameof(Fixes_Empty_None));

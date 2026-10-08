@@ -56,8 +56,10 @@ public class GameDetails
     [JsonPropertyName("genres")] public List<string> Genres { get; set; } = [];
     [JsonPropertyName("headerImage")] public string? HeaderImage { get; set; }
     [JsonPropertyName("releaseDate")] public string? ReleaseDate { get; set; }
+    [JsonPropertyName("drmNotice")] public string? DrmNotice { get; set; }
 
     [JsonIgnore] public bool IsDlc => string.Equals(Type, "dlc", StringComparison.OrdinalIgnoreCase);
+    [JsonIgnore] public bool HasDenuvo => !string.IsNullOrEmpty(DrmNotice) && DrmNotice.Contains("Denuvo", StringComparison.OrdinalIgnoreCase);
 }
 
 public class DlcDepot
