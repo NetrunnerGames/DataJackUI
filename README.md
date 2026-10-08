@@ -33,6 +33,12 @@ DataJackUI provides an interface for Steam manifest acquisition, native DLL hook
 * **Fixes & Diagnostics**: Integrated game fix repository and repair workflows with file backups.
 * **Cloudflare DoH Resolution**: Fallback DNS over HTTPS (`https://1.1.1.1/dns-query`) for networks where DNS lookup is restricted or throttled.
 
+## Tasks
+
+- [ ] UWP Tab with UWP Games
+- [ ] Custom fixes list
+- [ ] D* Games Activation
+
 ## Installation & Downloads
 
 > [!TIP]
