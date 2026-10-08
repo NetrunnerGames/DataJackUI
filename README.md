@@ -11,8 +11,8 @@ A modern desktop interface for Steam manifest management, native hook injection,
 <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/Framework-.NET_8.0_WPF-090a0f?style=for-the-badge&labelColor=090a0f&logo=dotnet&logoColor=512bd4" height="42" alt="Framework" /></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-090a0f?style=for-the-badge&labelColor=090a0f&logo=open-source-initiative&logoColor=3da639" height="42" alt="License" /></a>
 
-<br /><br />
 <img src="docs/screenshot.png" width="95%" alt="DataJackUI Interface Screenshot" />
+<br ><br >
 
 </div>
 
