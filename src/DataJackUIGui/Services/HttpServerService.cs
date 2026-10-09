@@ -595,10 +595,10 @@ public class HttpServerService : IHostedService
     {
         try
         {
-            var iconPath = Path.Combine(AppContext.BaseDirectory, "datajackui-icon.png");
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "icon.ico");
             if (!File.Exists(iconPath))
             {
-                var alt = Path.Combine(AppContext.BaseDirectory, "icon.ico");
+                var alt = Path.Combine(AppContext.BaseDirectory, "datajackui-icon.png");
                 if (File.Exists(alt))
                     iconPath = alt;
                 else

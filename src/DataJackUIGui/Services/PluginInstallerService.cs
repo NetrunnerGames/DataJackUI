@@ -312,6 +312,8 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
             slotAssets[slot] = asset;
         }
 
+        bool wasRunning = SteamService.IsSteamRunning();
+
         string tmp = Path.Combine(Path.GetTempPath(), "datajackui-plugin-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tmp);
         Dictionary<string, List<string>>? disabledMillenniumEntries = null;
@@ -329,13 +331,10 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
 
             await injector.ReloadPluginFilesAsync();
 
-            bool legacyPresent = LegacyDllPaths.Any(File.Exists);
-            bool anySlotNeedsUpdate = Slots.Any(slot =>
-                SlotPath(slot) is not { } cur || !File.Exists(cur) || AssetHash.OfFile(cur) != slotShas![slot]);
-            
-            if (!DllUpdateDisabled && (anySlotNeedsUpdate || legacyPresent))
+            if (!IsInstalledLocally())
             {
-                disabledMillenniumEntries = await UpdateLoaderDllsAsync(steamDir, slotDlPaths!, ct);
+                var mode = unlocker.SelectedMode ?? UnlockerMode.Ost;
+                await unlocker.InstallAsync(mode, progress, ct);
             }
 
             if (CdpMarkerPath is { } markerPath)
@@ -348,6 +347,12 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
                 ZipSha = zipSha!,
                 DisabledMillenniumEntries = disabledMillenniumEntries,
             });
+
+            if (wasRunning)
+            {
+                steam.RestartSteam();
+            }
+
             return (true, null);
         }
         catch (Exception ex) { return (false, ex.Message); }
