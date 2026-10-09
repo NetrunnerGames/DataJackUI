@@ -9,7 +9,7 @@
     <AssemblyName>DataJackUI</AssemblyName>
     <AssemblyTitle>DataJackUI</AssemblyTitle>
     <Product>DataJackUI</Product>
-    <Version>2.11.0</Version>
+    <Version>2.12.0</Version>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <!-- Velopack needs a custom Main (Program.Main) that runs before WPF -->
     <StartupObject>DataJackUIGui.Program</StartupObject>
@@ -19,7 +19,7 @@
     <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
   <!-- UseWindowsForms (for the tray NotifyIcon) injects WinForms into the implicit global usings, which
-       collides with WPF types (Application, UserControl, DragEventArgsÃ¢â‚¬Â¦). We reference WinForms fully
+       collides with WPF types (Application, UserControl, DragEventArgsÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦). We reference WinForms fully
        qualified, so strip those implicit usings to keep WPF unambiguous. -->
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />
