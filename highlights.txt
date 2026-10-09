@@ -1,2 +1,0 @@
-• **Search Grid Fix**: Search results grid stays visible and interactive while typing.
-• **Navigation Polish**: Clicking a game card opens details view with top Back button.

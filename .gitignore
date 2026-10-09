@@ -3,11 +3,16 @@ bin/
 obj/
 publish/
 Releases/
-DataJackUI-v*.zip
+DataJackUI-*.zip
+DataJackUI-*.exe
 TestResults/
 [B|b]uild/
 [D|d]ebug/
 [R|r]elease/
+
+# Dynamic release notes text files
+changelog.txt
+highlights.txt
 
 # WPF temporary project files (generated during builds)
 *_wpftmp.csproj

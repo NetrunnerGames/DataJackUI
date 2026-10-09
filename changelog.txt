@@ -1,3 +1,0 @@
-[+] Resolved issue where typing in search box invoked FetchDetailsDebouncedAsync and hid the search results grid.
-[+] Ensured search results grid stays visible while typing and searching.
-[+] Maintained game detail view navigation upon clicking individual game cards.
