@@ -20,6 +20,11 @@ public partial class SettingsViewModel : ObservableObject
     private readonly AuthService _auth;
     private readonly SteamService _steam;
     private readonly HubcapService _hubcap;
+    private readonly UpdateService _updateService;
+
+    [ObservableProperty] private bool _isCheckingForUpdates;
+    [ObservableProperty] private string? _updateStatusText;
+    [ObservableProperty] private string _updateStatusColor = "#9ca3af";
 
     [ObservableProperty] private string? _displayName;
     [ObservableProperty] private string? _username;
@@ -216,12 +221,13 @@ public partial class SettingsViewModel : ObservableObject
     public Action? RequestRestartPrompt { get; set; }
 
     public SettingsViewModel(SettingsService settings, AuthService auth, SteamService steam,
-        HubcapService hubcap)
+        HubcapService hubcap, UpdateService updateService)
     {
         _settings = settings;
         _auth = auth;
         _steam = steam;
         _hubcap = hubcap;
+        _updateService = updateService;
         _auth.AuthStateChanged += RefreshAccount;
         RefreshAccount();
         RefreshSteam();
@@ -319,6 +325,39 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void OpenHubcap() =>
         Process.Start(new ProcessStartInfo(AppConfig.HubcapBaseUrl) { UseShellExecute = true });
+
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        IsCheckingForUpdates = true;
+        UpdateStatusText = "Checking GitHub for DataJackUI releases...";
+        UpdateStatusColor = "#9ca3af";
+
+        try
+        {
+            await _updateService.CheckAndStageAsync();
+
+            if (_updateService.HasStagedUpdate)
+            {
+                UpdateStatusText = "Update downloaded and staged! It will apply on next restart.";
+                UpdateStatusColor = "#22c55e";
+            }
+            else
+            {
+                UpdateStatusText = "DataJackUI is already up to date.";
+                UpdateStatusColor = "#38bdf8";
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText = $"Update check failed: {ex.Message}";
+            UpdateStatusColor = "#f87171";
+        }
+        finally
+        {
+            IsCheckingForUpdates = false;
+        }
+    }
 
     [RelayCommand]
     private void SignOut() => _auth.SignOut();

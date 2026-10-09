@@ -336,7 +336,7 @@
                 </StackPanel>
             </Border>
 
-            <!-- General (language) -->
+            <!-- General (language & updates) -->
             <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_General}" />
             <Border Style="{StaticResource SettingsCard}">
                 <StackPanel Margin="14,12">
@@ -357,6 +357,43 @@
                         Foreground="#6b7280"
                         Text="{x:Static res:Strings.Settings_Language_Hint}"
                         TextWrapping="Wrap" />
+
+                    <Border Style="{StaticResource RowDivider}" Margin="0,14" />
+                    <!-- Check for Application Updates -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock
+                                FontSize="13"
+                                FontWeight="Medium"
+                                Text="Check for Application Updates" />
+                            <TextBlock
+                                Margin="0,4,0,0"
+                                FontSize="12"
+                                Foreground="#6b7280"
+                                Text="Check for new releases of DataJackUI directly from GitHub and install background delta updates."
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,4,0,0"
+                                FontSize="12"
+                                Foreground="{Binding UpdateStatusColor}"
+                                Text="{Binding UpdateStatusText}"
+                                TextWrapping="Wrap"
+                                Visibility="{Binding UpdateStatusText, Converter={StaticResource NullToCollapsed}}" />
+                        </StackPanel>
+                        <ui:Button
+                            Grid.Column="1"
+                            Margin="12,0,0,0"
+                            VerticalAlignment="Center"
+                            Appearance="Primary"
+                            Command="{Binding CheckForUpdatesCommand}"
+                            Content="Check for Updates"
+                            Icon="{ui:SymbolIcon ArrowSync24}"
+                            IsEnabled="{Binding IsCheckingForUpdates, Converter={StaticResource InverseBool}}" />
+                    </Grid>
                 </StackPanel>
             </Border>
 

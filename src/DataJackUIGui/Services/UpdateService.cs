@@ -15,14 +15,25 @@ namespace DataJackUIGui.Services;
 /// </summary>
 public class UpdateService
 {
-    // One UpdateManager per configured repo, in priority order (primary first). All share the proxied
-    // downloader so every repo is also mirror-resilient.
-    private readonly UpdateManager[] _managers =
-        AppConfig.GithubReleasesRepos
-            .Select(repo => new UpdateManager(
-                new GithubSource(repo, accessToken: null, prerelease: false,
-                    downloader: new ProxiedFileDownloader())))
-            .ToArray();
+    private UpdateManager[]? _managers;
+
+    private UpdateManager[] GetManagers()
+    {
+        if (_managers is not null) return _managers;
+        try
+        {
+            _managers = AppConfig.GithubReleasesRepos
+                .Select(repo => new UpdateManager(
+                    new GithubSource(repo, accessToken: null, prerelease: false,
+                        downloader: new ProxiedFileDownloader())))
+                .ToArray();
+        }
+        catch
+        {
+            _managers = Array.Empty<UpdateManager>();
+        }
+        return _managers;
+    }
 
     // The manager whose repo actually produced the staged update. Apply against this same one.
     private UpdateManager? _stagedMgr;
@@ -38,10 +49,10 @@ public class UpdateService
     /// usable update; the first success wins. No-op for un-installed (dev) builds.</summary>
     public async Task CheckAndStageAsync()
     {
-        // IsInstalled is a property of the Velopack install, not the repo, so any manager answers it.
-        if (_managers.Length == 0 || !_managers[0].IsInstalled) return; // `dotnet run` / unpacked builds
+        var managers = GetManagers();
+        if (managers.Length == 0 || !managers[0].IsInstalled) return; // `dotnet run` / unpacked builds
 
-        foreach (var mgr in _managers)
+        foreach (var mgr in managers)
         {
             try
             {

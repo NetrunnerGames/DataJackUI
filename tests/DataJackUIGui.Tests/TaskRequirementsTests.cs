@@ -23,8 +23,9 @@ public class TaskRequirementsTests
         var auth = new AuthService();
         var steam = new SteamService(settings);
         var hubcap = new HubcapService();
+        var update = new UpdateService();
 
-        var vm = new SettingsViewModel(settings, auth, steam, hubcap);
+        var vm = new SettingsViewModel(settings, auth, steam, hubcap, update);
 
         Assert.Equal(auth.Username ?? auth.DisplayName, vm.Username);
         Assert.Equal(auth.UserId ?? auth.DiscordId, vm.UserId);
@@ -37,8 +38,9 @@ public class TaskRequirementsTests
         var auth = new AuthService();
         var steam = new SteamService(settings);
         var hubcap = new HubcapService();
+        var update = new UpdateService();
 
-        var vm = new SettingsViewModel(settings, auth, steam, hubcap);
+        var vm = new SettingsViewModel(settings, auth, steam, hubcap, update);
 
         Assert.Equal(2, vm.LanguageOptions.Count);
         Assert.Null(vm.LanguageOptions[0].Tag);
@@ -52,8 +54,9 @@ public class TaskRequirementsTests
         var auth = new AuthService();
         var steam = new SteamService(settings);
         var hubcap = new HubcapService();
+        var update = new UpdateService();
 
-        var vm = new SettingsViewModel(settings, auth, steam, hubcap);
+        var vm = new SettingsViewModel(settings, auth, steam, hubcap, update);
         vm.ToolsPath = @"C:\CustomToolsPath";
 
         Assert.Equal(@"C:\CustomToolsPath", settings.ToolsPath);

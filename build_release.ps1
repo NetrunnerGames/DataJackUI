@@ -67,11 +67,10 @@ if (Test-Path $PublishDir) {
     Remove-Item -Recurse -Force $PublishDir -ErrorAction SilentlyContinue
 }
 
-# Clean releases directory
-if (Test-Path $ReleasesDir) {
-    Remove-Item -Recurse -Force $ReleasesDir -ErrorAction SilentlyContinue
+# Ensure releases directory exists (preserve previous .nupkg packages so vpk pack generates delta .diff.nupkg updates)
+if (-not (Test-Path $ReleasesDir)) {
+    New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
 }
-New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
 
 # 1. Update plugin.json version property (if plugin source exists locally)
 if (Test-Path $PluginJsonFile) {
