@@ -60,8 +60,9 @@ try {
     $portableZip = "$PSScriptRoot/Releases/DataJackUI-win-Portable.zip"
     $nupkg = "$PSScriptRoot/Releases/DataJackUI-$Version-full.nupkg"
     $releasesFile = "$PSScriptRoot/Releases/RELEASES"
+    $pluginZip = "$PSScriptRoot/Releases/plugin.zip"
 
-    gh release create "v$Version" --title "$releaseTitle" --notes "$releaseNotes" $setupExe $portableZip $nupkg $releasesFile
+    gh release create "v$Version" --title "$releaseTitle" --notes "$releaseNotes" $setupExe $portableZip $nupkg $releasesFile $pluginZip
     Write-Host "GitHub release v$Version created successfully." -ForegroundColor Green
 } catch {
     Write-Host "Note: gh CLI release creation skipped or warning: $_" -ForegroundColor Yellow
