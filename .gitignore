@@ -3,6 +3,7 @@ bin/
 obj/
 publish/
 Releases/
+DataJackUI-v*.zip
 TestResults/
 [B|b]uild/
 [D|d]ebug/

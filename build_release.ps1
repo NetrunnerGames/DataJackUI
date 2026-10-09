@@ -99,7 +99,19 @@ if (Test-Path "src/DataJackUIPlugin") {
     [System.IO.Compression.ZipFile]::CreateFromDirectory($PluginSrc, $ZipTarget)
 }
 
+# 5. Package Standard Uncompressed ZIP in Project Root & Releases/ (100% native Windows Explorer extraction support)
+Write-Host "`n4. Packaging Standard EXE ZIP in Project Root..." -ForegroundColor Yellow
+$RootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-v$DataJackVersion.zip"
+$ReleasesZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/DataJackUI-v$DataJackVersion-Standard.zip"
+
+if (Test-Path $RootZip) { Remove-Item -Force $RootZip }
+if (Test-Path $ReleasesZip) { Remove-Item -Force $ReleasesZip }
+
+[System.IO.Compression.ZipFile]::CreateFromDirectory($PublishDir, $RootZip, [System.IO.Compression.CompressionLevel]::NoCompression, $false)
+Copy-Item $RootZip $ReleasesZip -Force
+
 Write-Host "`n====================================================" -ForegroundColor Green
-Write-Host " Successfully Created All Release Artifacts in '$ReleasesDir':" -ForegroundColor Green
+Write-Host " Successfully Created All Release Artifacts:" -ForegroundColor Green
+Write-Host " Root Zip: $RootZip" -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
 Get-ChildItem $ReleasesDir | Select-Object Name, @{Name="SizeMB";Expression={[math]::Round($_.Length/1MB, 2)}}

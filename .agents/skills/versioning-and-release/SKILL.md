@@ -50,8 +50,9 @@ Examples:
 ---
 
 ## 4. Release Execution Procedure
-When "publish new build" is requested:
-1. Update `<Version>` in `src/DataJackUIGui/DataJackUIGui.csproj` and `build_release.ps1`.
-2. Execute `./build_release.ps1` to produce published artifacts in `Releases/` and `bin/PublishFrameworkDependent/`.
+When "publish new build" or `/versioning-and-release` is requested:
+1. Run `./bump_version.ps1 -Type <patch|minor|major>` to bump Semantic Versioning in `src/DataJackUIGui/DataJackUIGui.csproj`.
+2. Execute `./build_release.ps1`. This dynamically reads the version from `DataJackUIGui.csproj`, produces Velopack setup/delta artifacts in `Releases/`, and packages a standard uncompressed executable ZIP (`DataJackUI-v<Version>.zip`) directly into the project root folder.
 3. Commit and tag the git repository (`git tag v<Version>`).
-4. Publish the tag and release artifacts to GitHub using `gh release create` or the GitHub API.
+4. Publish tag and release artifacts to GitHub using `gh release create`.
+5. Execute `./package_and_announce.ps1` to dispatch the release announcement (embeds, diff-formatted changelog, action row button, and root ZIP attachment) via `https://bots.netrunnergames.workers.dev/api/announce`.
