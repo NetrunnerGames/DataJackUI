@@ -356,34 +356,42 @@
                 BorderThickness="1,0,0,0"
                 Cursor="Arrow">
                 <Grid>
-                    <Grid Margin="20" DataContext="{Binding SelectedGame}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <!-- Close -->
-                    <ui:Button
-                        HorizontalAlignment="Right"
-                        Click="Close_Click"
-                        Icon="{ui:SymbolIcon Dismiss24}" />
-
-                    <!-- Game header -->
-                    <StackPanel Grid.Row="1" Margin="0,4,0,0">
-                        <Border Height="150" Background="#11FFFFFF" ClipToBounds="True" CornerRadius="8">
+                    <!-- Banner (Full Fit across drawer width) -->
+                    <Grid Grid.Row="0" DataContext="{Binding SelectedGame}">
+                        <Border Height="180" Background="#11FFFFFF" ClipToBounds="True">
                             <Image Source="{Binding Cover, Converter={StaticResource ImagePathToSource}}" Stretch="UniformToFill" />
                         </Border>
-                        <TextBlock Margin="0,10,0,0" FontSize="16" FontWeight="Bold" Text="{Binding Name}" TextWrapping="Wrap" />
-                        <TextBlock FontSize="11.5" Foreground="#6b7280" Text="{Binding DisplayAppId, StringFormat='App ID: {0}'}" />
+
+                        <!-- Close Button floating top-right over banner -->
+                        <ui:Button
+                            Margin="0,12,12,0"
+                            Padding="8"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Background="#991c1c22"
+                            BorderBrush="#33FFFFFF"
+                            BorderThickness="1"
+                            Click="Close_Click"
+                            CornerRadius="16"
+                            Icon="{ui:SymbolIcon Dismiss24}" />
+                    </Grid>
+
+                    <!-- Title & App ID -->
+                    <StackPanel Grid.Row="1" Margin="18,14,18,0" DataContext="{Binding SelectedGame}">
+                        <TextBlock FontSize="16.5" FontWeight="Bold" Foreground="#ffffff" Text="{Binding Name}" TextWrapping="Wrap" />
+                        <TextBlock Margin="0,2,0,0" FontSize="11.5" Foreground="#6b7280" Text="{Binding DisplayAppId, StringFormat='App ID: {0}'}" />
                     </StackPanel>
 
                     <!-- Fixes list -->
-                    <ScrollViewer Grid.Row="2" Margin="0,14,0,0" VerticalScrollBarVisibility="Auto"
-                                  DataContext="{Binding DataContext, ElementName=Root}">
+                    <ScrollViewer Grid.Row="2" Margin="18,12,18,16" VerticalScrollBarVisibility="Auto" DataContext="{Binding DataContext, ElementName=Root}">
                         <!-- Right margin keeps the scrollbar in its own lane instead of sitting on the rows. -->
-                        <StackPanel Margin="0,0,12,0">
+                        <StackPanel Margin="0,0,8,0">
                             <!-- Loading fixes -->
                             <StackPanel
                                 Margin="0,8,0,0"
@@ -437,6 +445,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
+                            <!-- Fix Cards -->
                             <ItemsControl ItemsSource="{Binding Fixes}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -448,19 +457,16 @@
                                             BorderThickness="1"
                                             CornerRadius="8">
                                             <StackPanel>
-                                                <TextBlock FontSize="13.5" FontWeight="SemiBold" Foreground="#e5e7eb"
-                                                           Text="{Binding Title, StringFormat={x:Static res:Strings.Fixes_Build}}" TextWrapping="Wrap" />
-
-                                                <!-- Tag chips & Size inline -->
-                                                <StackPanel Margin="0,6,0,0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <!-- Row 1: [Bypass] badge · size -->
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                     <ItemsControl ItemsSource="{Binding Tags}" VerticalAlignment="Center">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                                                         </ItemsControl.ItemsPanel>
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate>
-                                                                <Border Margin="0,0,6,0" Padding="8,2" Background="#2a2440" BorderBrush="#40a78bfa" BorderThickness="1" CornerRadius="4">
-                                                                    <TextBlock FontSize="10.5" FontWeight="SemiBold" Foreground="#c4b5fd" Text="{Binding Name}" />
+                                                                <Border Margin="0,0,6,0" Padding="8,3" Background="#2a2440" BorderBrush="#40a78bfa" BorderThickness="1" CornerRadius="4">
+                                                                    <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="#c4b5fd" Text="{Binding Name}" />
                                                                 </Border>
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
@@ -468,75 +474,18 @@
 
                                                     <TextBlock
                                                         VerticalAlignment="Center"
-                                                        FontSize="11"
-                                                        FontWeight="Medium"
+                                                        FontSize="12.5"
+                                                        FontWeight="SemiBold"
                                                         Foreground="#a78bfa"
                                                         Text="{Binding SizeLabel, StringFormat='•  {0}'}"
                                                         Visibility="{Binding HasSize, Converter={StaticResource BoolToVis}}" />
                                                 </StackPanel>
 
-                                                <markdig:MarkdownViewer
-                                                    Margin="0,6,0,0"
-                                                    Markdown="{Binding Description}"
-                                                    PreviewMouseWheel="Markdown_PreviewMouseWheel"
-                                                    Visibility="{Binding Description, Converter={StaticResource NullToCollapsed}}">
-                                                    <markdig:MarkdownViewer.Resources>
-                                                        <!-- Compact, dark-themed overrides. The library defaults are
-                                                             document-sized (huge headings) and too big for the flyout. -->
-                                                        <Style x:Key="{x:Static markdig:Styles.DocumentStyleKey}" TargetType="{x:Type FlowDocument}">
-                                                            <Setter Property="FontFamily" Value="Segoe UI" />
-                                                            <Setter Property="FontSize" Value="12.5" />
-                                                            <Setter Property="Foreground" Value="#c9ced6" />
-                                                            <Setter Property="PagePadding" Value="0" />
-                                                        </Style>
-                                                        <Style x:Key="{x:Static markdig:Styles.ParagraphStyleKey}" TargetType="{x:Type Paragraph}">
-                                                            <Setter Property="Margin" Value="0,0,0,6" />
-                                                            <Setter Property="LineHeight" Value="18" />
-                                                        </Style>
-                                                        <Style x:Key="{x:Static markdig:Styles.Heading1StyleKey}" TargetType="{x:Type Paragraph}">
-                                                            <Setter Property="FontSize" Value="15" />
-                                                            <Setter Property="FontWeight" Value="Bold" />
-                                                            <Setter Property="Foreground" Value="#e5e7eb" />
-                                                            <Setter Property="Margin" Value="0,8,0,4" />
-                                                        </Style>
-                                                        <Style x:Key="{x:Static markdig:Styles.Heading2StyleKey}" TargetType="{x:Type Paragraph}">
-                                                            <Setter Property="FontSize" Value="13.5" />
-                                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                                            <Setter Property="Foreground" Value="#e5e7eb" />
-                                                            <Setter Property="Margin" Value="0,8,0,3" />
-                                                        </Style>
-                                                        <Style x:Key="{x:Static markdig:Styles.Heading3StyleKey}" TargetType="{x:Type Paragraph}">
-                                                            <Setter Property="FontSize" Value="12.5" />
-                                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                                            <Setter Property="Foreground" Value="#d1d5db" />
-                                                            <Setter Property="Margin" Value="0,6,0,2" />
-                                                        </Style>
-                                                        <Style x:Key="{x:Static markdig:Styles.HyperlinkStyleKey}" TargetType="{x:Type Hyperlink}">
-                                                            <Setter Property="Foreground" Value="#a78bfa" />
-                                                            <Setter Property="TextDecorations" Value="{x:Null}" />
-                                                        </Style>
-                                                        <Style x:Key="{x:Static markdig:Styles.CodeStyleKey}" TargetType="{x:Type Run}">
-                                                            <Setter Property="FontFamily" Value="Consolas" />
-                                                            <Setter Property="Foreground" Value="#c4b5fd" />
-                                                        </Style>
-                                                    </markdig:MarkdownViewer.Resources>
-                                                </markdig:MarkdownViewer>
-
-                                                <!-- Download buttons -->
-                                                <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
-                                                    <!-- Manifest button disabled: depot+manifest IDs must be manually assigned before re-enabling -->
+                                                <!-- Row 2: Fix button | Revert button -->
+                                                <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
                                                     <ui:Button
                                                         Margin="0,0,10,0"
-                                                        Padding="14,7"
-                                                        Command="{Binding DataContext.DownloadManifestCommand, ElementName=Root}"
-                                                        CommandParameter="{Binding}"
-                                                        Content="{x:Static res:Strings.Fixes_Manifest}"
-                                                        Icon="{ui:SymbolIcon Document24}"
-                                                        IsEnabled="{Binding CanDownloadManifest}"
-                                                        Visibility="Collapsed" />
-                                                    <ui:Button
-                                                        Margin="0,0,10,0"
-                                                        Padding="14,7"
+                                                        Padding="16,7"
                                                         Appearance="Primary"
                                                         Command="{Binding DataContext.DownloadFixCommand, ElementName=Root}"
                                                         CommandParameter="{Binding}"
@@ -556,14 +505,7 @@
                                                         Visibility="{Binding IsApplied, Converter={StaticResource BoolToVis}}" />
                                                 </StackPanel>
 
-                                                <!--  Per-slot progress, bound straight to the queue item.  -->
-                                                <ProgressBar
-                                                    Height="4"
-                                                    Margin="0,8,0,0"
-                                                    IsIndeterminate="{Binding ManifestItem.IsIndeterminate, FallbackValue=False}"
-                                                    Maximum="100"
-                                                    Value="{Binding ManifestItem.Percent, Mode=OneWay, FallbackValue=0}"
-                                                    Visibility="Collapsed" />
+                                                <!-- Progress Bar -->
                                                 <ProgressBar
                                                     Height="4"
                                                     Margin="0,8,0,0"
@@ -578,7 +520,6 @@
                             </ItemsControl>
                         </StackPanel>
                     </ScrollViewer>
-                    </Grid>
 
                     <!-- Revert confirmation overlay (in-flyout card, same pattern as ModeView). -->
                     <Grid

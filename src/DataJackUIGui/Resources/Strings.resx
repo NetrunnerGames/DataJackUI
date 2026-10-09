@@ -416,15 +416,15 @@ This deletes the .lua files from Steam\config\stplug-in.</value></data>
   <data name="Confirm_Skip" xml:space="preserve"><value>Skip</value></data>
   <data name="Confirm_Replace" xml:space="preserve"><value>Replace</value></data>
   <data name="Plugin_Title" xml:space="preserve"><value>DataJackUI Plugin</value></data>
-  <data name="Plugin_Subtitle" xml:space="preserve"><value>The DataJackUI Steam Plugin! Now using Netrunning instead of Shittenium</value></data>
+  <data name="Plugin_Subtitle" xml:space="preserve"><value>The DataJackUI Steam Plugin! Now using NetLoader instead of Shittenium</value></data>
   <data name="Plugin_CardTitle" xml:space="preserve"><value>Status</value></data>
   <data name="Plugin_Badge_UpdateAvailable" xml:space="preserve"><value>Update available</value></data>
   <data name="Plugin_Row_InstalledVersion" xml:space="preserve"><value>Installed version</value></data>
   <data name="Plugin_Row_LatestVersion" xml:space="preserve"><value>Latest version</value></data>
   <data name="Plugin_Row_Frontend" xml:space="preserve"><value>Frontend</value></data>
-  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Loader (version.dll)</value></data>
-  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium detected. DataJackUI runs alongside it. Installing disables Millennium's own copy of this plugin so only Netrunning injects.</value></data>
-  <data name="Plugin_Footer" xml:space="preserve"><value>Netrunning installs into your Steam folder. This app works as the backend, so if you close it from the tray, the plugin will no longer function!</value></data>
+  <data name="Plugin_Row_Loader" xml:space="preserve"><value>Loader (OpenSteamTool.dll)</value></data>
+  <data name="Plugin_Millennium_Coexisting" xml:space="preserve"><value>Millennium detected. DataJackUI runs alongside it. Installing disables Millennium's own copy of this plugin so only NetLoader injects.</value></data>
+  <data name="Plugin_Footer" xml:space="preserve"><value>NetLoader installs into your Steam folder. This app works as the backend, so if you close it from the tray, the plugin will no longer function!</value></data>
   <data name="Plugin_Btn_Install" xml:space="preserve"><value>Install</value></data>
   <data name="Plugin_Btn_Update" xml:space="preserve"><value>Update</value></data>
   <data name="Plugin_Btn_Reinstall" xml:space="preserve"><value>Reinstall</value></data>

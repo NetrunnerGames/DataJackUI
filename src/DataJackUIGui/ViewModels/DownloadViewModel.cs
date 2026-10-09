@@ -488,6 +488,8 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         _payment = payment;
         _denuvo = denuvo;
         _ = _denuvo.EnsureFreshAsync();
+        _ = _appList.EnsureLoadedAsync();
+        _ = _hardware.EnsureFreshAsync();
         Drop = drop;
         _fastFetch = settings.FastFetch;
         InitPageSize(settings.AddPageSize);
@@ -525,7 +527,18 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         return true;
     }
 
-    // ── Search ──────────────────────────────────────────────────────
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName is nameof(ShowItems) or nameof(HasItems) or nameof(Items) or nameof(IsLoading))
+        {
+            OnPropertyChanged(nameof(ShowResultsGrid));
+        }
+        if (e.PropertyName is nameof(ShowPager) or nameof(TotalPages) or nameof(CurrentPage))
+        {
+            OnPropertyChanged(nameof(ShowPagerView));
+        }
+    }
 
     partial void OnSearchTextChanged(string value)
     {
@@ -562,7 +575,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         var cts = _searchCts = new CancellationTokenSource();
         try
         {
-            await Task.Delay(350, cts.Token);
+            await Task.Delay(150, cts.Token);
             string q = query.Trim();
             if (string.IsNullOrWhiteSpace(q))
             {

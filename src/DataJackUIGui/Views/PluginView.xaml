@@ -80,7 +80,7 @@
                         <Grid Margin="0,16,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="26" />
-                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
@@ -91,7 +91,7 @@
 
                             <!-- Version -->
                             <ui:SymbolIcon Grid.Row="0" Grid.Column="0" Margin="0,4" VerticalAlignment="Center" FontSize="16" Foreground="#7c8593" Symbol="Tag24" />
-                            <TextBlock Grid.Row="0" Grid.Column="1" Margin="0,4" VerticalAlignment="Center" FontSize="12.5" Foreground="#7c8593" Text="{x:Static res:Strings.Plugin_Row_InstalledVersion}" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Margin="0,4,16,4" VerticalAlignment="Center" FontSize="12.5" Foreground="#7c8593" Text="{x:Static res:Strings.Plugin_Row_InstalledVersion}" />
                             <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,4" VerticalAlignment="Center" Orientation="Horizontal">
                                 <TextBlock FontSize="12.5" FontWeight="SemiBold" Foreground="#e5e7eb" Text="{Binding InstalledVersion}" />
                                 <!-- Update available: arrow to the newer tag, amber. -->
@@ -111,16 +111,16 @@
                                 <ui:SymbolIcon FontSize="16" Foreground="#4ade80" Symbol="CheckmarkCircle24" Visibility="{Binding FrontendInstalled, Converter={StaticResource BoolToVis}}" />
                                 <ui:SymbolIcon FontSize="16" Foreground="#7c8593" Symbol="DismissCircle24" Visibility="{Binding FrontendInstalled, Converter={StaticResource InverseBoolToVis}}" />
                             </Grid>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,4" VerticalAlignment="Center" FontSize="12.5" Foreground="#7c8593" Text="{x:Static res:Strings.Plugin_Row_Frontend}" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,4,16,4" VerticalAlignment="Center" FontSize="12.5" Foreground="#7c8593" Text="{x:Static res:Strings.Plugin_Row_Frontend}" />
                             <TextBlock Grid.Row="1" Grid.Column="2" Margin="0,4" VerticalAlignment="Center" FontSize="12.5" Foreground="#e5e7eb" Text="{Binding FrontendStatus}" />
 
-                            <!-- Loader (winmm.dll) -->
+                            <!-- Loader (version.dll) -->
                             <Grid Grid.Row="2" Grid.Column="0" Margin="0,4" VerticalAlignment="Center">
                                 <ui:SymbolIcon FontSize="16" Foreground="#4ade80" Symbol="CheckmarkCircle24" Visibility="{Binding DllOk, Converter={StaticResource BoolToVis}}" />
                                 <ui:SymbolIcon FontSize="16" Foreground="#fbbf24" Symbol="Warning24" Visibility="{Binding DllOutOfDate, Converter={StaticResource BoolToVis}}" />
-                                <ui:SymbolIcon FontSize="16" Foreground="#7c8593" Symbol="DismissCircle24" Visibility="{Binding DllNotInstalled, Converter={StaticResource BoolToVis}}" />
+                                <ui:SymbolIcon FontSize="16" Foreground="#7c8593" Symbol="DismissCircle24" Visibility="{Binding DllNotInstalled, Converter={StaticResource InverseBoolToVis}}" />
                             </Grid>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,4" VerticalAlignment="Center" FontSize="12.5" Foreground="#7c8593" Text="{Binding LoaderRowTitle}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,4,16,4" VerticalAlignment="Center" FontSize="12.5" Foreground="#7c8593" Text="{Binding LoaderRowTitle}" />
                             <TextBlock Grid.Row="2" Grid.Column="2" Margin="0,4" VerticalAlignment="Center" FontSize="12.5" Foreground="#e5e7eb" Text="{Binding DllStatus}" />
                         </Grid>
 

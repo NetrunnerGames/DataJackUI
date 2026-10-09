@@ -91,26 +91,32 @@ public class DataJackUIApiClient
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
 
-        try
+        var localTask = Task.Run(async () =>
         {
-            await _appList.EnsureLoadedAsync();
-        }
-        catch { /* best effort */ }
+            try { await _appList.EnsureLoadedAsync(); } catch { }
+            return _appList.Search(query, maxResults: 12);
+        }, ct);
 
-        var localResults = _appList.Search(query, maxResults: 12);
-
-        List<SteamSearchResult> storeResults = [];
-        var url = $"{AppConfig.SteamStoreSearchUrl}?term={Uri.EscapeDataString(query)}&l=english&cc=US";
-        try
+        var storeTask = Task.Run(async () =>
         {
-            var res = await _http.GetAsync(url, ct);
-            if (res.IsSuccessStatusCode)
+            var url = $"{AppConfig.SteamStoreSearchUrl}?term={Uri.EscapeDataString(query)}&l=english&cc=US";
+            try
             {
-                var data = await ReadJsonAsync<SteamStoreSearchResponse>(res, ct);
-                storeResults = (data?.Items ?? []).Take(8).Select(i => new SteamSearchResult { AppId = i.Id, Name = i.Name }).ToList();
+                var res = await _http.GetAsync(url, ct);
+                if (res.IsSuccessStatusCode)
+                {
+                    var data = await ReadJsonAsync<SteamStoreSearchResponse>(res, ct);
+                    return (data?.Items ?? []).Take(8).Select(i => new SteamSearchResult { AppId = i.Id, Name = i.Name }).ToList();
+                }
             }
-        }
-        catch { }
+            catch { }
+            return new List<SteamSearchResult>();
+        }, ct);
+
+        await Task.WhenAll(localTask, storeTask);
+
+        var localResults = localTask.Result;
+        var storeResults = storeTask.Result;
 
         var combined = localResults
             .Concat(storeResults)

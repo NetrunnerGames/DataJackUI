@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using DataJackUIGui.Services;
 using DataJackUIGui.ViewModels;
 using DataJackUIGui.Views;
@@ -34,7 +34,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     // ── System tray ─────────────────────────────────────────────────
     private void InitializeTrayIcon()
     {
-        _trayIcon = new System.Windows.Forms.NotifyIcon { Text = "DataJackUI", Visible = false };
+        _trayIcon = new System.Windows.Forms.NotifyIcon { Text = "DataJackUI", Visible = true };
         try
         {
             using var stream = Application.GetResourceStream(new Uri("pack://application:,,,/icon.ico"))?.Stream;
@@ -86,7 +86,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     {
         Show();
         WindowState = WindowState.Normal;
-        if (_trayIcon is not null) _trayIcon.Visible = false;
+        if (_trayIcon is not null) _trayIcon.Visible = true;
 
         // Activate() alone often loses to Windows' foreground rules when the request comes from another
         // process (a relaunch). Bouncing Topmost reliably pulls the window to the front.

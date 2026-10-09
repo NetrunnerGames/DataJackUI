@@ -265,7 +265,14 @@ public partial class FixItemVm(DenuvoFix f) : ObservableObject
 
     private static string? FormatSize(long? bytes, string? explicitSize)
     {
-        if (!string.IsNullOrWhiteSpace(explicitSize) && !string.Equals(explicitSize, "Fix archive", StringComparison.OrdinalIgnoreCase)) return explicitSize;
+        if (!string.IsNullOrWhiteSpace(explicitSize) && !string.Equals(explicitSize, "Fix archive", StringComparison.OrdinalIgnoreCase))
+        {
+            if (long.TryParse(explicitSize, out long parsedBytes))
+                bytes = parsedBytes;
+            else
+                return explicitSize;
+        }
+
         if (bytes is null or <= 0) return null;
         double b = bytes.Value;
         if (b >= 1024 * 1024 * 1024) return $"{b / (1024 * 1024 * 1024):0.##} GB";

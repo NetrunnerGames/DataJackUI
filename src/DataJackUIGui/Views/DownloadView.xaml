@@ -171,23 +171,18 @@
             </StackPanel>
 
             <!-- Search result game grid -->
-            <vwp:VirtualizingItemsControl
+            <ItemsControl
                 x:Name="CardScroller"
                 Margin="0,14,0,0"
                 ItemsSource="{Binding Items}"
                 PreviewMouseWheel="CardScroller_PreviewMouseWheel"
-                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                ScrollViewer.VerticalScrollBarVisibility="Auto"
-                Visibility="{Binding ShowResultsGrid, Converter={StaticResource BoolToVis}}"
-                VirtualizingPanel.CacheLengthUnit="Page"
-                VirtualizingPanel.ScrollUnit="Pixel"
-                VirtualizingPanel.VirtualizationMode="Standard">
-                <vwp:VirtualizingItemsControl.ItemsPanel>
+                Visibility="{Binding ShowResultsGrid, Converter={StaticResource BoolToVis}}">
+                <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="StartAndEndOnly" StretchItems="False" />
+                        <WrapPanel Orientation="Horizontal" />
                     </ItemsPanelTemplate>
-                </vwp:VirtualizingItemsControl.ItemsPanel>
-                <vwp:VirtualizingItemsControl.ItemTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Button
                             Width="196"
@@ -247,8 +242,8 @@
                             </Button.Template>
                         </Button>
                     </DataTemplate>
-                </vwp:VirtualizingItemsControl.ItemTemplate>
-            </vwp:VirtualizingItemsControl>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
 
             <!-- Pager -->
             <Grid Margin="0,8,0,0" Visibility="{Binding ShowPagerView, Converter={StaticResource BoolToVis}}">

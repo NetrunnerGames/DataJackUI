@@ -189,7 +189,7 @@ public static class SourceMeta
         ["Ryuu"] = new(DiscordUrl: "https://discord.gg/manifests"),
         ["TwentyTwo Cloud"] = new(DiscordUrl: "https://discord.gg/RrukXPyv5b"),
         ["Sushi"] = new(DiscordUrl: "https://discord.gg/hMdv5dQhcN"),
-        ["Skyflare"] = new(DiscordUrl: "https://discord.gg/datajackui"),
+        ["Skyflare"] = new(DiscordUrl: "https://github.com/skyflarefox"),
         ["Sadie (Morrenus)"] = new(DisplayName: "Sadie (Hubcap)", DiscordUrl: "https://discord.gg/hubcapsmanifest", RequiresUserKey: true),
     };
 

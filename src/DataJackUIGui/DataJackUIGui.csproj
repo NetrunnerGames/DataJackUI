@@ -9,7 +9,7 @@
     <AssemblyName>DataJackUI</AssemblyName>
     <AssemblyTitle>DataJackUI</AssemblyTitle>
     <Product>DataJackUI</Product>
-    <Version>2.10.3</Version>
+    <Version>2.10.5</Version>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <!-- Velopack needs a custom Main (Program.Main) that runs before WPF -->
     <StartupObject>DataJackUIGui.Program</StartupObject>

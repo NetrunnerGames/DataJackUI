@@ -109,8 +109,44 @@ public class DenuvoFix
     [JsonPropertyName("fileSize")]
     public long? FileSizeCamel { set => FileSize = value; }
 
+    [JsonPropertyName("size_bytes")]
+    public long? SizeBytes { set => FileSize = value; }
+
+    [JsonPropertyName("bytes")]
+    public long? Bytes { set => FileSize = value; }
+
+    [JsonPropertyName("size")]
+    public System.Text.Json.JsonElement? SizeRaw
+    {
+        set
+        {
+            if (value is { } elem)
+            {
+                if (elem.ValueKind == System.Text.Json.JsonValueKind.Number && elem.TryGetInt64(out long l))
+                    FileSize = l;
+                else if (elem.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    string s = elem.GetString() ?? "";
+                    if (long.TryParse(s, out long parsedL))
+                        FileSize = parsedL;
+                    else if (!string.IsNullOrWhiteSpace(s))
+                        SizeStr = s;
+                }
+            }
+        }
+    }
+
     [JsonPropertyName("size_str")]
     public string? SizeStr { get; set; }
+
+    [JsonPropertyName("sizeStr")]
+    public string? SizeStrCamel { set => SizeStr = value; }
+
+    [JsonPropertyName("size_formatted")]
+    public string? SizeFormatted { set => SizeStr = value; }
+
+    [JsonPropertyName("formatted_size")]
+    public string? FormattedSize { set => SizeStr = value; }
 
     [JsonPropertyName("download_url")]
     public string? DownloadUrl { get; set; }
