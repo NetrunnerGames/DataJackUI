@@ -166,12 +166,58 @@ public class AuthService
                 DiscordId = userIdProp.ValueKind == JsonValueKind.String ? userIdProp.GetString() : userIdProp.ToString();
             }
 
+            if (root.TryGetProperty("is_owner", out var isOwnerProp) && (isOwnerProp.ValueKind == JsonValueKind.True || isOwnerProp.ValueKind == JsonValueKind.False))
+            {
+                bool isOwner = isOwnerProp.GetBoolean();
+                string tier = root.TryGetProperty("tier", out var tierProp) && tierProp.ValueKind == JsonValueKind.String ? tierProp.GetString() ?? "single" : "single";
+                bool isBanned = root.TryGetProperty("is_banned", out var bannedProp) && bannedProp.ValueKind == JsonValueKind.True;
+                CurrentEntitlement = new UserEntitlement
+                {
+                    DiscordId = DiscordId ?? "",
+                    IsOwner = isOwner,
+                    IsBanned = isBanned,
+                    Tier = isOwner ? "premium" : tier
+                };
+            }
+
+            await RefreshEntitlementsAsync(ct);
+
             return true;
         }
         catch
         {
             // Network glitch: preserve session
             return true;
+        }
+    }
+
+    /// <summary>
+    /// Refresh user entitlement profile from server API.
+    /// </summary>
+    public async Task RefreshEntitlementsAsync(CancellationToken ct = default)
+    {
+        if (!IsSignedIn || string.IsNullOrEmpty(_accessToken))
+            return;
+
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, $"{AppConfig.ApiBaseUrl}/api/entitlements");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+            var res = await _http.SendAsync(req, ct);
+            if (res.IsSuccessStatusCode)
+            {
+                string json = await res.Content.ReadAsStringAsync(ct);
+                var ent = JsonSerializer.Deserialize<UserEntitlement>(json);
+                if (ent is not null)
+                {
+                    CurrentEntitlement = ent;
+                    NotifyAuthStateChanged();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AuthService] RefreshEntitlementsAsync error: {ex.Message}");
         }
     }
 
@@ -210,6 +256,7 @@ public class AuthService
                ?? throw new AuthException("Invalid session returned from auth worker.");
 
         ApplySession(session);
+        await RefreshEntitlementsAsync(ct);
         NotifyAuthStateChanged();
     }
 

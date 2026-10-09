@@ -141,7 +141,7 @@
     </UserControl.Resources>
 
     <Grid x:Name="Root">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <ScrollViewer x:Name="MainScrollViewer" VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="640" Margin="8,16,8,24">
 
             <TextBlock
@@ -175,9 +175,10 @@
                 x:Name="CardScroller"
                 Margin="0,14,0,0"
                 ItemsSource="{Binding Items}"
+                PreviewMouseWheel="CardScroller_PreviewMouseWheel"
                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                Visibility="{Binding ShowItems, Converter={StaticResource BoolToVis}}"
+                Visibility="{Binding ShowResultsGrid, Converter={StaticResource BoolToVis}}"
                 VirtualizingPanel.CacheLengthUnit="Page"
                 VirtualizingPanel.ScrollUnit="Pixel"
                 VirtualizingPanel.VirtualizationMode="Standard">
@@ -250,7 +251,7 @@
             </vwp:VirtualizingItemsControl>
 
             <!-- Pager -->
-            <Grid Margin="0,8,0,0" Visibility="{Binding ShowPager, Converter={StaticResource BoolToVis}}">
+            <Grid Margin="0,8,0,0" Visibility="{Binding ShowPagerView, Converter={StaticResource BoolToVis}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -314,9 +315,19 @@
                 </StackPanel>
             </Grid>
 
+            <!-- Back button (shown when a game is selected) -->
+            <ui:Button
+                Margin="0,14,0,0"
+                HorizontalAlignment="Left"
+                Command="{Binding BackToSearchCommand}"
+                Content="{x:Static res:Strings.Add_BackToSearch}"
+                Cursor="Hand"
+                Icon="{ui:SymbolIcon ArrowLeft24}"
+                Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}" />
+
             <!-- Game info card -->
             <Border
-                Margin="0,14,0,0"
+                Margin="0,10,0,0"
                 Background="#0DFFFFFF"
                 BorderBrush="#12FFFFFF"
                 BorderThickness="1"
@@ -796,13 +807,15 @@
             </StackPanel>
 
             <!-- Already have files? Drag them in -->
-            <TextBlock
-                Margin="0,24,0,0"
-                FontSize="13"
-                FontWeight="SemiBold"
-                Foreground="#d1d5db"
-                Text="{x:Static res:Strings.Add_AlreadyHaveFiles}" />
-            <views:DropZone Margin="0,8,0,0" DataContext="{Binding Drop}" />
+            <StackPanel Visibility="{Binding HasDetails, Converter={StaticResource InverseBoolToVis}}">
+                <TextBlock
+                    Margin="0,24,0,0"
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    Foreground="#d1d5db"
+                    Text="{x:Static res:Strings.Add_AlreadyHaveFiles}" />
+                <views:DropZone Margin="0,8,0,0" DataContext="{Binding Drop}" />
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 

@@ -1,6 +1,6 @@
 param(
     [Alias("d")]
-    [string]$DataJackVersion = "2.10.0",
+    [string]$DataJackVersion = "",
 
     [Alias("p")]
     [string]$PluginVersion = "1.0.0",
@@ -20,9 +20,9 @@ Usage:
 
 Options:
   -d, -DataJackVersion <VERSION>  Version string for the DataJackUI application
-                                  (e.g., '1.0.0'). Packages DataJackUI-win-Setup.exe
+                                  (e.g., '2.10.1'). Packages DataJackUI-win-Setup.exe
                                   and Velopack delta packages for NetrunnerGames/DataJackUI.
-                                  [default: 1.0.0]
+                                  [default: dynamically read from DataJackUIGui.csproj]
 
   -p, -PluginVersion   <VERSION>  Version string for the Jack-in Steam plugin
                                   (e.g., '1.0.0'). Updates plugin.json and packages
@@ -32,8 +32,8 @@ Options:
   -h, -Help                       Display this help message and exit.
 
 Examples:
-  .\build_release.ps1 -d 1.0.0 -p 1.0.0
-  .\build_release.ps1 -d 1.0.1 -p 1.1.0
+  .\build_release.ps1
+  .\build_release.ps1 -d 2.10.1 -p 1.0.0
   .\build_release.ps1 -h
 ====================================================================
 "@ -ForegroundColor Cyan
@@ -42,6 +42,17 @@ Examples:
 
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName "System.IO.Compression.FileSystem"
+
+if ([string]::IsNullOrWhiteSpace($DataJackVersion)) {
+    $csprojPath = Join-Path $PSScriptRoot "src/DataJackUIGui/DataJackUIGui.csproj"
+    if (Test-Path $csprojPath) {
+        [xml]$csprojXml = Get-Content $csprojPath
+        $DataJackVersion = $csprojXml.Project.PropertyGroup.Version
+    }
+    if ([string]::IsNullOrWhiteSpace($DataJackVersion)) {
+        $DataJackVersion = "2.10.1"
+    }
+}
 
 Write-Host "====================================================" -ForegroundColor Cyan
 Write-Host " Building DataJackUI v$DataJackVersion | Plugin v$PluginVersion" -ForegroundColor Cyan

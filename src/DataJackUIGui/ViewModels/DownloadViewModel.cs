@@ -164,10 +164,14 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasDetails))]
     [NotifyPropertyChangedFor(nameof(ShowFeatured))]
+    [NotifyPropertyChangedFor(nameof(ShowResultsGrid))]
+    [NotifyPropertyChangedFor(nameof(ShowPagerView))]
     [NotifyCanExecuteChangedFor(nameof(FetchCommand))]
     private GameDetails? _details;
 
     public bool HasDetails => Details is not null;
+    public bool ShowResultsGrid => ShowItems && !HasDetails;
+    public bool ShowPagerView => ShowPager && !HasDetails;
     public string GenresText => Details is null ? "" : string.Join(", ", Details.Genres);
 
     [ObservableProperty]
@@ -631,6 +635,14 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         }
         catch (OperationCanceledException) { }
         catch { RunOnUi(() => Details = null); }
+    }
+
+    [RelayCommand]
+    private void BackToSearch()
+    {
+        _detailsCts?.Cancel();
+        Details = null;
+        ResetResults();
     }
 
     [RelayCommand]

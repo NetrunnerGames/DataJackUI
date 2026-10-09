@@ -367,6 +367,7 @@ This deletes the .lua files from Steam\config\stplug-in.</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Enter an App ID, paste a Steam link, or search by game name</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Enter App ID or search games...</value></data>
   <data name="Add_Searching" xml:space="preserve"><value>Searching games…</value></data>
+  <data name="Add_BackToSearch" xml:space="preserve"><value>Back to search results</value></data>
   <data name="Add_Featured_TopSellers" xml:space="preserve"><value>Top Sellers</value></data>
   <data name="Add_Featured_NewReleases" xml:space="preserve"><value>New Releases</value></data>
   <data name="Add_Released" xml:space="preserve"><value>Released {0}</value></data>

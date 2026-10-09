@@ -26,4 +26,13 @@ public partial class DownloadView : UserControl
         sv.ScrollToHorizontalOffset(sv.HorizontalOffset - e.Delta);
         e.Handled = true;
     }
+
+    /// <summary>Forward mouse wheel events on inner items grid directly to the outer page ScrollViewer
+    /// so scrolling works anywhere over the listings.</summary>
+    private void CardScroller_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.Handled || MainScrollViewer is null) return;
+        MainScrollViewer.ScrollToVerticalOffset(MainScrollViewer.VerticalOffset - (e.Delta * 0.8));
+        e.Handled = true;
+    }
 }
