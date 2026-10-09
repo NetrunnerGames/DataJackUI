@@ -335,9 +335,11 @@
                 Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
                 <StackPanel>
                     <Border
-                        MaxHeight="180"
+                        Height="280"
                         CornerRadius="8,8,0,0">
-                        <Image Source="{Binding Details.HeaderImage}" Stretch="UniformToFill" />
+                        <Border.Background>
+                            <ImageBrush ImageSource="{Binding Details.HeaderImage, Converter={StaticResource ImagePathToSource}}" Stretch="UniformToFill" />
+                        </Border.Background>
                     </Border>
                     <StackPanel Margin="12,8,12,10">
                         <StackPanel Orientation="Horizontal">
