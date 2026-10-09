@@ -32,23 +32,27 @@ if (-not (Test-Path "$PublishDir/DataJackUI.exe")) {
     dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --self-contained false -o $PublishDir
 }
 
-# 3. Create Standard ZIP (uncompressed / store mode, 100% native Windows Explorer extraction support)
+# 3. Create Standard ZIP (compatible with native Windows Explorer extraction, optimized <10MB for Discord)
 $ReleasesDir = "Releases"
 if (-not (Test-Path $ReleasesDir)) { New-Item -ItemType Directory -Path $ReleasesDir | Out-Null }
 
 $ZipPath = "$ReleasesDir/DataJackUI-v$Version-Standard.zip"
-if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
+$RootZip = "DataJackUI-v$Version.zip"
 
-Write-Host "Creating Standard ZIP archive ($ZipPath)..." -ForegroundColor Yellow
+if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
+if (Test-Path $RootZip) { Remove-Item -Force $RootZip }
+
+Write-Host "Creating Standard ZIP archive..." -ForegroundColor Yellow
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_Zip_$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $tempDir | Out-Null
 Copy-Item "$PublishDir/*" $tempDir -Recurse -Force
 
-[System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $ZipPath, [System.IO.Compression.CompressionLevel]::NoCompression, $false)
+[System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+Copy-Item $RootZip $ZipPath -Force
 Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
 
-$zipSizeMb = [math]::Round((Get-Item $ZipPath).Length / 1MB, 2)
-Write-Host "Created Standard ZIP ($zipSizeMb MB) at: $ZipPath" -ForegroundColor Green
+$zipSizeMb = [math]::Round((Get-Item $RootZip).Length / 1MB, 2)
+Write-Host "Created Standard ZIP ($zipSizeMb MB) at: $RootZip" -ForegroundColor Green
 
 # 4. Post Announcement via Worker
 $workerUrl = "https://bots.netrunnergames.workers.dev/api/announce"
@@ -83,6 +87,7 @@ function Add-FormFile ($multiContent, $name, $fileName, $bytes) {
 }
 
 $client = [System.Net.Http.HttpClient]::new()
+$client.Timeout = [TimeSpan]::FromMinutes(2)
 $content = [System.Net.Http.MultipartFormDataContent]::new("----DataJackUIBoundary$([Guid]::NewGuid().ToString('N'))")
 
 Add-FormField $content "version" $Version
@@ -97,7 +102,7 @@ if ($BotSecret) {
     $client.DefaultRequestHeaders.Add("X-Bot-Secret", $BotSecret)
 }
 
-$fileBytes = [System.IO.File]::ReadAllBytes($ZipPath)
+$fileBytes = [System.IO.File]::ReadAllBytes($RootZip)
 Add-FormFile $content "file" "DataJackUI-v$Version.zip" $fileBytes
 
 try {

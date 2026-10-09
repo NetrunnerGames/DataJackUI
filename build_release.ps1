@@ -107,7 +107,7 @@ $ReleasesZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "
 if (Test-Path $RootZip) { Remove-Item -Force $RootZip }
 if (Test-Path $ReleasesZip) { Remove-Item -Force $ReleasesZip }
 
-[System.IO.Compression.ZipFile]::CreateFromDirectory($PublishDir, $RootZip, [System.IO.Compression.CompressionLevel]::NoCompression, $false)
+[System.IO.Compression.ZipFile]::CreateFromDirectory($PublishDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 Copy-Item $RootZip $ReleasesZip -Force
 
 Write-Host "`n====================================================" -ForegroundColor Green
