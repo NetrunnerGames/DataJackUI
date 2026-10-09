@@ -51,8 +51,10 @@ Examples:
 
 ## 4. Release Execution Procedure
 When "publish new build" or `/versioning-and-release` is requested:
-1. Run `./bump_version.ps1 -Type <patch|minor|major>` to bump Semantic Versioning in `src/DataJackUIGui/DataJackUIGui.csproj`.
-2. Execute `./build_release.ps1`. This dynamically reads the version from `DataJackUIGui.csproj`, produces Velopack setup/delta artifacts in `Releases/`, and packages a standard uncompressed executable ZIP (`DataJackUI-v<Version>.zip`) directly into the project root folder.
-3. Commit and tag the git repository (`git tag v<Version>`).
-4. Publish tag and release artifacts to GitHub using `gh release create`.
-5. Execute `./package_and_announce.ps1 -ChangelogText "<[+] changelog entries>" -HighlightsText "<bullet points>"` to dispatch the dynamic release announcement (Components V2 container layout, ANSI colored changelog, custom emotes, repo button, and `DataJackUI-win-Setup.zip` attachment) via `https://bots.netrunnergames.workers.dev/api/announce`.
+Execute `./publish_release.ps1 -Bump <patch|minor|major> -Title "<Title>" -ChangelogText "<[+] changelog entries>" -HighlightsText "<bullet points>"`
+
+This single consolidated script handles all release steps automatically in sequence:
+1. **Version Bumping & Build**: Invokes `./build_release.ps1 -Bump <patch|minor|major>` to update `DataJackUIGui.csproj`, compile the application, generate Velopack installer artifacts, and package `DataJackUI-win-Setup.zip`.
+2. **Git Version Control**: Automatically stages all changes, creates git commit `release: v<Version> - <Title>`, creates tag `v<Version>`, and pushes commit + tags to GitHub.
+3. **GitHub Release**: Publishes release tag `v<Version>` with release notes and binary installer assets via `gh release create`.
+4. **Discord Announcement**: Invokes `./package_and_announce.ps1` to dispatch the Discord Components V2 release announcement (ANSI colored changelog, custom emotes, repo link button, and `DataJackUI-win-Setup.zip` attachment).

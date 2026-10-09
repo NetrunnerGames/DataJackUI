@@ -1,4 +1,8 @@
 param(
+    [Alias("b")]
+    [ValidateSet("patch", "minor", "major", "none")]
+    [string]$Bump = "none",
+
     [Alias("d")]
     [string]$DataJackVersion = "",
 
@@ -9,48 +13,44 @@ param(
     [switch]$Help
 )
 
-if ($Help) {
-    Write-Host @"
-====================================================================
- DataJackUI Release Build & Packaging CLI
-====================================================================
-
-Usage:
-  .\build_release.ps1 [-d <version>] [-p <version>] [-h]
-
-Options:
-  -d, -DataJackVersion <VERSION>  Version string for the DataJackUI application
-                                  (e.g., '2.10.1'). Packages DataJackUI-win-Setup.exe
-                                  and Velopack delta packages for NetrunnerGames/DataJackUI.
-                                  [default: dynamically read from DataJackUIGui.csproj]
-
-  -p, -PluginVersion   <VERSION>  Version string for the Jack-in Steam plugin
-                                  (e.g., '1.0.0'). Updates plugin.json and packages
-                                  plugin.zip for NetrunnerGames/Jack-in.
-                                  [default: 1.0.0]
-
-  -h, -Help                       Display this help message and exit.
-
-Examples:
-  .\build_release.ps1
-  .\build_release.ps1 -d 2.10.1 -p 1.0.0
-  .\build_release.ps1 -h
-====================================================================
-"@ -ForegroundColor Cyan
-    exit 0
-}
-
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName "System.IO.Compression.FileSystem"
 
+$csprojPath = Join-Path $PSScriptRoot "src/DataJackUIGui/DataJackUIGui.csproj"
+
+# 0. Handle version bump if requested (-Bump patch|minor|major)
+if ($Bump -ne "none") {
+    if (Test-Path $csprojPath) {
+        [xml]$xml = Get-Content $csprojPath
+        $currentVer = $xml.Project.PropertyGroup.Version
+        if (-not [string]::IsNullOrWhiteSpace($currentVer)) {
+            $parts = $currentVer.Split('.')
+            if ($parts.Length -ge 3) {
+                [int]$major = [int]$parts[0]
+                [int]$minor = [int]$parts[1]
+                [int]$patch = [int]$parts[2]
+
+                switch ($Bump) {
+                    "major" { $major++; $minor = 0; $patch = 0 }
+                    "minor" { $minor++; $patch = 0 }
+                    "patch" { $patch++ }
+                }
+                $DataJackVersion = "$major.$minor.$patch"
+                $xml.Project.PropertyGroup.Version = $DataJackVersion
+                $xml.Save($csprojPath)
+                Write-Host "Bumped DataJackUI version from v$currentVer to v$DataJackVersion in DataJackUIGui.csproj" -ForegroundColor Green
+            }
+        }
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($DataJackVersion)) {
-    $csprojPath = Join-Path $PSScriptRoot "src/DataJackUIGui/DataJackUIGui.csproj"
     if (Test-Path $csprojPath) {
         [xml]$csprojXml = Get-Content $csprojPath
         $DataJackVersion = $csprojXml.Project.PropertyGroup.Version
     }
     if ([string]::IsNullOrWhiteSpace($DataJackVersion)) {
-        $DataJackVersion = "2.10.1"
+        $DataJackVersion = "2.10.3"
     }
 }
 
