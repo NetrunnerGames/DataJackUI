@@ -58,13 +58,13 @@ $releaseTitle = "Release v$($Version): $Title"
 try {
     $setupExe = "$PSScriptRoot/Releases/DataJackUI-win-Setup.exe"
     $portableZip = "$PSScriptRoot/Releases/DataJackUI-win-Portable.zip"
-    $nupkgs = Get-ChildItem "$PSScriptRoot/Releases/*.nupkg" | Select-Object -ExpandProperty FullName
+    $currentNupkgs = Get-ChildItem "$PSScriptRoot/Releases/DataJackUI-$Version-*.nupkg" | Select-Object -ExpandProperty FullName
     $releasesFile = "$PSScriptRoot/Releases/RELEASES"
     $assetsWin = "$PSScriptRoot/Releases/assets.win.json"
 
     $uploadAssets = @($setupExe, $portableZip, $releasesFile)
     if (Test-Path $assetsWin) { $uploadAssets += $assetsWin }
-    $uploadAssets += $nupkgs
+    $uploadAssets += $currentNupkgs
 
     gh release create "v$Version" --title "$releaseTitle" --notes "$releaseNotes" $uploadAssets
     Write-Host "GitHub release v$Version created successfully." -ForegroundColor Green

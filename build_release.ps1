@@ -67,9 +67,20 @@ if (Test-Path $PublishDir) {
     Remove-Item -Recurse -Force $PublishDir -ErrorAction SilentlyContinue
 }
 
-# Ensure releases directory exists (preserve previous .nupkg packages so vpk pack generates delta .diff.nupkg updates)
+# Ensure releases directory exists and prune older .nupkg packages so ONLY the previous version's
+# full .nupkg is kept for delta generation (preventing unbounded accumulation of old releases).
 if (-not (Test-Path $ReleasesDir)) {
     New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
+} else {
+    # Keep only the latest full .nupkg and delete all delta diffs or older full packages
+    $existingFullNupkgs = Get-ChildItem "$ReleasesDir/*-full.nupkg" | Sort-Object LastWriteTime -Descending
+    if ($existingFullNupkgs.Count -gt 1) {
+        $existingFullNupkgs | Select-Object -Skip 1 | Remove-Item -Force
+    }
+    Get-ChildItem "$ReleasesDir/*-delta.nupkg" -ErrorAction SilentlyContinue | Remove-Item -Force
+    # Clean up obsolete manifest metadata before re-packing
+    Remove-Item "$ReleasesDir/RELEASES" -ErrorAction SilentlyContinue
+    Remove-Item "$ReleasesDir/*.json" -ErrorAction SilentlyContinue
 }
 
 # 1. Update plugin.json version property (if plugin source exists locally)
