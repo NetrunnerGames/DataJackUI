@@ -20,10 +20,21 @@ Write-Host "====================================================" -ForegroundCol
 # 1. Build and optionally bump version
 & "$PSScriptRoot/build_release.ps1" -Bump $Bump
 
-# 2. Read final version from csproj
+# 2. Read final version from csproj and resolve changelog/highlights text files
 $csprojPath = Join-Path $PSScriptRoot "src/DataJackUIGui/DataJackUIGui.csproj"
 [xml]$csprojXml = Get-Content $csprojPath
 $Version = $csprojXml.Project.PropertyGroup.Version
+
+$ChangelogFile = Join-Path $PSScriptRoot "changelog.txt"
+$HighlightsFile = Join-Path $PSScriptRoot "highlights.txt"
+
+if ([string]::IsNullOrWhiteSpace($ChangelogText) -and (Test-Path $ChangelogFile)) {
+    $ChangelogText = [System.IO.File]::ReadAllText($ChangelogFile)
+}
+
+if ([string]::IsNullOrWhiteSpace($HighlightsText) -and (Test-Path $HighlightsFile)) {
+    $HighlightsText = [System.IO.File]::ReadAllText($HighlightsFile)
+}
 
 if ([string]::IsNullOrWhiteSpace($Title)) {
     $Title = "DataJackUI Update"
@@ -42,7 +53,7 @@ git push origin main --tags
 # 4. GitHub Release via gh CLI (best-effort)
 Write-Host "`n2. Publishing GitHub Release v$Version..." -ForegroundColor Yellow
 $releaseNotes = if ($ChangelogText) { $ChangelogText } else { "[+] Release v$Version" }
-$releaseTitle = "Release v$Version: $Title"
+$releaseTitle = "Release v$($Version): $Title"
 
 try {
     $setupExe = "$PSScriptRoot/Releases/DataJackUI-win-Setup.exe"

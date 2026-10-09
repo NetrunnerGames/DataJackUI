@@ -64,20 +64,21 @@ Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
 $zipSizeMb = [math]::Round((Get-Item $RootZip).Length / 1MB, 2)
 Write-Host "Created Standard ZIP ($zipSizeMb MB) at: $RootZip" -ForegroundColor Green
 
-# 4. Post Announcement via Worker
+# 4. Resolve Changelog and Highlights from .txt files if not explicitly provided
+$ChangelogFile = Join-Path $PSScriptRoot "changelog.txt"
+$HighlightsFile = Join-Path $PSScriptRoot "highlights.txt"
+
+if ([string]::IsNullOrWhiteSpace($ChangelogText) -and (Test-Path $ChangelogFile)) {
+    $ChangelogText = [System.IO.File]::ReadAllText($ChangelogFile)
+}
+
+if ([string]::IsNullOrWhiteSpace($HighlightsText) -and (Test-Path $HighlightsFile)) {
+    $HighlightsText = [System.IO.File]::ReadAllText($HighlightsFile)
+}
+
+# 5. Post Announcement via Worker
 $workerUrl = "https://bots.netrunnergames.workers.dev/api/announce"
 Write-Host "Dispatching release payload to $workerUrl..." -ForegroundColor Yellow
-
-if ([string]::IsNullOrWhiteSpace($ChangelogText)) {
-    $ChangelogText = @"
-[+] Automatically refresh server-side entitlements on session restore and OAuth token exchange.
-[+] Refactored Add tab UX: selecting a game card hides search results/dropzone and displays selected game details with a top Back button.
-[+] Added Back to search button to seamlessly return to search results mode.
-[+] Forwarded mouse wheel events on listing cards directly to the main view ScrollViewer for direct mouse wheel scrolling over listings.
-[+] Increased game details header banner height to fit full aspect ratio without vertical cropping.
-[+] Rounded top-left and top-right corners of the header banner image to match card container styling.
-"@
-}
 
 function Add-FormField ($multiContent, $name, $value) {
     if (-not $value) { return }

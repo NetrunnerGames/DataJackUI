@@ -50,11 +50,15 @@ Examples:
 ---
 
 ## 4. Release Execution Procedure
-When "publish new build" or `/versioning-and-release` is requested:
-Execute `./publish_release.ps1 -Bump <patch|minor|major> -Title "<Title>" -ChangelogText "<[+] changelog entries>" -HighlightsText "<bullet points>"`
+Before publishing a release, write/update the unreleased changes into the text files in the project root:
+- `changelog.txt`: Holds the `[+]` / `[-]` changelog lines.
+- `highlights.txt`: Holds the bullet point highlights.
 
-This single consolidated script handles all release steps automatically in sequence:
+Then execute:
+`./publish_release.ps1 -Bump <patch|minor|major> -Title "<Title>"`
+
+This single consolidated script automatically reads `changelog.txt` and `highlights.txt` and handles all release steps in sequence:
 1. **Version Bumping & Build**: Invokes `./build_release.ps1 -Bump <patch|minor|major>` to update `DataJackUIGui.csproj`, compile the application, generate Velopack installer artifacts, and package `DataJackUI-win-Setup.zip`.
 2. **Git Version Control**: Automatically stages all changes, creates git commit `release: v<Version> - <Title>`, creates tag `v<Version>`, and pushes commit + tags to GitHub.
 3. **GitHub Release**: Publishes release tag `v<Version>` with release notes and binary installer assets via `gh release create`.
-4. **Discord Announcement**: Invokes `./package_and_announce.ps1` to dispatch the Discord Components V2 release announcement (ANSI colored changelog, custom emotes, repo link button, and `DataJackUI-win-Setup.zip` attachment).
+4. **Discord Announcement**: Invokes `./package_and_announce.ps1` to dispatch the Discord Components V2 release announcement (reading `changelog.txt` & `highlights.txt`, ANSI colored changelog, custom emotes, repo link button, and `DataJackUI-win-Setup.zip` attachment).
