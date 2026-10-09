@@ -544,12 +544,6 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
             return;
         }
 
-        string? appid = ExtractAppId(value);
-        if (appid is not null)
-        {
-            _ = FetchDetailsDebouncedAsync(appid);
-        }
-
         _ = SearchDebouncedAsync(value);
     }
 

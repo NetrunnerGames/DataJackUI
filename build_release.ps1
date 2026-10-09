@@ -99,16 +99,20 @@ if (Test-Path "src/DataJackUIPlugin") {
     [System.IO.Compression.ZipFile]::CreateFromDirectory($PluginSrc, $ZipTarget)
 }
 
-# 5. Package Standard Uncompressed ZIP in Project Root & Releases/ (100% native Windows Explorer extraction support)
-Write-Host "`n4. Packaging Standard EXE ZIP in Project Root..." -ForegroundColor Yellow
-$RootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-v$DataJackVersion.zip"
-$ReleasesZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/DataJackUI-v$DataJackVersion-Standard.zip"
+# 5. Package Standard ZIP containing ONLY the Setup EXE (zip filename matches exe filename)
+Write-Host "`n4. Packaging Standard Setup EXE ZIP in Project Root..." -ForegroundColor Yellow
+$SetupExePath = "$ReleasesDir/DataJackUI-win-Setup.exe"
+$RootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-win-Setup.zip"
+$ReleasesZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/DataJackUI-win-Setup.zip"
 
 if (Test-Path $RootZip) { Remove-Item -Force $RootZip }
-if (Test-Path $ReleasesZip) { Remove-Item -Force $ReleasesZip }
 
-[System.IO.Compression.ZipFile]::CreateFromDirectory($PublishDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
-Copy-Item $RootZip $ReleasesZip -Force
+$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_Zip_$([Guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $tempDir | Out-Null
+Copy-Item $SetupExePath "$tempDir/DataJackUI-win-Setup.exe" -Force
+
+[System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
 
 Write-Host "`n====================================================" -ForegroundColor Green
 Write-Host " Successfully Created All Release Artifacts:" -ForegroundColor Green

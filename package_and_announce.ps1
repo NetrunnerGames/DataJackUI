@@ -3,11 +3,13 @@ param(
     [string]$ChannelId = "",
     [string]$WebhookUrl = "",
     [string]$BotSecret = "",
-    [string]$ChangelogText = ""
+    [string]$ChangelogText = "",
+    [string]$HighlightsText = ""
 )
 
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName "System.IO.Compression.FileSystem"
+Add-Type -AssemblyName "System.Net.Http"
 
 # 1. Resolve version dynamically from DataJackUIGui.csproj if not specified
 if ([string]::IsNullOrWhiteSpace($Version)) {
@@ -25,27 +27,35 @@ Write-Host "====================================================" -ForegroundCol
 Write-Host " Packaging Standard ZIP & Announcing v$Version" -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
 
-# 2. Publish framework-dependent output if needed
-$PublishDir = "bin/PublishFrameworkDependent"
-if (-not (Test-Path "$PublishDir/DataJackUI.exe")) {
-    Write-Host "Publishing DataJackUI WPF Application..." -ForegroundColor Yellow
-    dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --self-contained false -o $PublishDir
-}
-
-# 3. Create Standard ZIP (compatible with native Windows Explorer extraction, optimized <10MB for Discord)
+# 2. Ensure Velopack installer exe exists
 $ReleasesDir = "Releases"
 if (-not (Test-Path $ReleasesDir)) { New-Item -ItemType Directory -Path $ReleasesDir | Out-Null }
 
-$ZipPath = "$ReleasesDir/DataJackUI-v$Version-Standard.zip"
-$RootZip = "DataJackUI-v$Version.zip"
+$PublishDir = "bin/PublishFrameworkDependent"
+$SetupExe = "$ReleasesDir/DataJackUI-win-Setup.exe"
+
+if (-not (Test-Path $SetupExe)) {
+    if (-not (Test-Path "$PublishDir/DataJackUI.exe")) {
+        Write-Host "Publishing DataJackUI WPF Application..." -ForegroundColor Yellow
+        dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --self-contained false -o $PublishDir
+    }
+    Write-Host "Packaging Velopack Installer..." -ForegroundColor Yellow
+    vpk pack -u DataJackUI -v $Version -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop -o $ReleasesDir
+}
+
+# 3. Create Standard ZIP containing ONLY the Setup EXE (zip filename matches exe filename)
+$ExeName = "DataJackUI-win-Setup.exe"
+$ZipName = "DataJackUI-win-Setup.zip"
+$ZipPath = "$ReleasesDir/$ZipName"
+$RootZip = $ZipName
 
 if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
 if (Test-Path $RootZip) { Remove-Item -Force $RootZip }
 
-Write-Host "Creating Standard ZIP archive..." -ForegroundColor Yellow
+Write-Host "Creating Standard ZIP archive containing $ExeName..." -ForegroundColor Yellow
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_Zip_$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $tempDir | Out-Null
-Copy-Item "$PublishDir/*" $tempDir -Recurse -Force
+Copy-Item $SetupExe "$tempDir/$ExeName" -Force
 
 [System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 Copy-Item $RootZip $ZipPath -Force
@@ -60,12 +70,12 @@ Write-Host "Dispatching release payload to $workerUrl..." -ForegroundColor Yello
 
 if ([string]::IsNullOrWhiteSpace($ChangelogText)) {
     $ChangelogText = @"
-+ Automatically refresh server-side entitlements on session restore and OAuth token exchange.
-+ Refactored Add tab UX: selecting a game card hides search results/dropzone and displays selected game details with a top Back button.
-+ Added Back to search button to seamlessly return to search results mode.
-+ Forwarded mouse wheel events on listing cards directly to the main view ScrollViewer for direct mouse wheel scrolling over listings.
-+ Increased game details header banner height to fit full aspect ratio without vertical cropping.
-+ Rounded top-left and top-right corners of the header banner image to match card container styling.
+[+] Automatically refresh server-side entitlements on session restore and OAuth token exchange.
+[+] Refactored Add tab UX: selecting a game card hides search results/dropzone and displays selected game details with a top Back button.
+[+] Added Back to search button to seamlessly return to search results mode.
+[+] Forwarded mouse wheel events on listing cards directly to the main view ScrollViewer for direct mouse wheel scrolling over listings.
+[+] Increased game details header banner height to fit full aspect ratio without vertical cropping.
+[+] Rounded top-left and top-right corners of the header banner image to match card container styling.
 "@
 }
 
@@ -94,6 +104,7 @@ Add-FormField $content "version" $Version
 Add-FormField $content "title" "DataJackUI v$Version Released!"
 Add-FormField $content "release_url" "https://github.com/NetrunnerGames/DataJackUI/releases/tag/v$Version"
 Add-FormField $content "changelog" $ChangelogText
+if ($HighlightsText) { Add-FormField $content "highlights" $HighlightsText }
 
 if ($ChannelId) { Add-FormField $content "channel_id" $ChannelId }
 if ($WebhookUrl) { Add-FormField $content "webhook_url" $WebhookUrl }
@@ -103,7 +114,7 @@ if ($BotSecret) {
 }
 
 $fileBytes = [System.IO.File]::ReadAllBytes($RootZip)
-Add-FormFile $content "file" "DataJackUI-v$Version.zip" $fileBytes
+Add-FormFile $content "file" $ZipName $fileBytes
 
 try {
     $response = $client.PostAsync($workerUrl, $content).GetAwaiter().GetResult()

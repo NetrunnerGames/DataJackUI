@@ -55,4 +55,4 @@ When "publish new build" or `/versioning-and-release` is requested:
 2. Execute `./build_release.ps1`. This dynamically reads the version from `DataJackUIGui.csproj`, produces Velopack setup/delta artifacts in `Releases/`, and packages a standard uncompressed executable ZIP (`DataJackUI-v<Version>.zip`) directly into the project root folder.
 3. Commit and tag the git repository (`git tag v<Version>`).
 4. Publish tag and release artifacts to GitHub using `gh release create`.
-5. Execute `./package_and_announce.ps1` to dispatch the release announcement (embeds, diff-formatted changelog, action row button, and root ZIP attachment) via `https://bots.netrunnergames.workers.dev/api/announce`.
+5. Execute `./package_and_announce.ps1 -ChangelogText "<[+] changelog entries>" -HighlightsText "<bullet points>"` to dispatch the dynamic release announcement (Components V2 container layout, ANSI colored changelog, custom emotes, repo button, and `DataJackUI-win-Setup.zip` attachment) via `https://bots.netrunnergames.workers.dev/api/announce`.
