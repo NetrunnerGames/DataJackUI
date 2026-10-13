@@ -47,6 +47,13 @@ Examples:
 [-] Removed or deprecated feature
 ```
 
+### Sensitive Information & Privacy Guidelines
+- **Never include internal administrative roles, creator/owner mentions, specific user IDs, or sensitive authentication details** in commit messages, release titles, GitHub release notes, or public announcement highlights.
+- Always use professional, general wording such as:
+  - "Entitlement profile synchronization and session permission handling"
+  - "Access permission verification flow"
+  - "Library authentication and subscription profile updates"
+
 ---
 
 ## 4. Release Execution Procedure
