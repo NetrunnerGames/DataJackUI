@@ -33,6 +33,7 @@
             <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#22d3ee" />
 
             <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+            <local:InverseBooleanConverter x:Key="InverseBool" />
             <local:NullToCollapsedConverter x:Key="NullToCollapsed" />
             <local:StatusToBrushConverter x:Key="StatusToBrush" />
             <local:ImagePathToSourceConverter x:Key="ImagePathToSource" />
