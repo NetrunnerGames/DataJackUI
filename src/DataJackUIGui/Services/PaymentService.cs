@@ -65,6 +65,10 @@ public class PaymentService
     /// </summary>
     public async Task<bool> IsAppUnlockedAsync(long appId)
     {
+        // 0. Owner / lifetime bypass
+        if (_auth.IsOwner)
+            return true;
+
         // 1. Check server-granted entitlement
         if (_auth.IsAppAllowed(appId))
             return true;

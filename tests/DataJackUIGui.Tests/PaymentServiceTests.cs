@@ -82,4 +82,13 @@ public class PaymentServiceTests
         };
         Assert.False(normalGame.HasDenuvo);
     }
+
+    [Fact]
+    public void UserEntitlement_Deserializes_Owner_Wildcard()
+    {
+        string json = "{\"discord_id\":\"1017703425263280198\",\"is_banned\":false,\"tier\":\"premium\",\"is_owner\":true,\"allowed_appids\":[\"*\"]}";
+        var ent = System.Text.Json.JsonSerializer.Deserialize<Models.UserEntitlement>(json);
+        Assert.NotNull(ent);
+        Assert.True(ent.IsOwner);
+    }
 }
