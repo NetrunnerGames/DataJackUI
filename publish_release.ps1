@@ -50,26 +50,15 @@ git commit -m "$CommitMessage"
 git tag -a "v$Version" -m "Release v$Version"
 git push origin main --tags
 
-# 4. GitHub Release via gh CLI (best-effort)
-Write-Host "`n2. Publishing GitHub Release v$Version..." -ForegroundColor Yellow
-$releaseNotes = if ($ChangelogText) { $ChangelogText } else { "[+] Release v$Version" }
+# 4. GitHub Release & Asset Upload via Git Credentials
+Write-Host "`n2. Publishing GitHub Release v$Version & Uploading Velopack Assets..." -ForegroundColor Yellow
 $releaseTitle = "Release v$($Version): $Title"
 
 try {
-    $setupExe = "$PSScriptRoot/Releases/DataJackUI-win-Setup.exe"
-    $portableZip = "$PSScriptRoot/Releases/DataJackUI-win-Portable.zip"
-    $currentNupkgs = Get-ChildItem "$PSScriptRoot/Releases/DataJackUI-$Version-*.nupkg" | Select-Object -ExpandProperty FullName
-    $releasesFile = "$PSScriptRoot/Releases/RELEASES"
-    $assetsWin = "$PSScriptRoot/Releases/assets.win.json"
-
-    $uploadAssets = @($setupExe, $portableZip, $releasesFile)
-    if (Test-Path $assetsWin) { $uploadAssets += $assetsWin }
-    $uploadAssets += $currentNupkgs
-
-    gh release create "v$Version" --title "$releaseTitle" --notes "$releaseNotes" $uploadAssets
-    Write-Host "GitHub release v$Version created successfully." -ForegroundColor Green
+    & "$PSScriptRoot/upload_github_release.ps1" -TagName "v$Version" -ReleaseTitle "$releaseTitle"
+    Write-Host "GitHub release v$Version and all assets published successfully." -ForegroundColor Green
 } catch {
-    Write-Host "Note: gh CLI release creation skipped or warning: $_" -ForegroundColor Yellow
+    Write-Host "Warning: GitHub release asset upload error: $_" -ForegroundColor Yellow
 }
 
 # 5. Discord Announcement
