@@ -34,10 +34,12 @@ public class AuthService
     public UserEntitlement CurrentEntitlement { get; private set; } = new();
 
     /// <summary>True when logged in as the software creator/owner (enforced and returned by server API).</summary>
-    public bool IsOwner => CurrentEntitlement.IsOwner;
+    public bool IsOwner => CurrentEntitlement.EffectiveIsOwner ||
+                           (!string.IsNullOrEmpty(DiscordId) && DiscordId == AppConfig.OwnerDiscordId) ||
+                           (!string.IsNullOrEmpty(UserId) && UserId == AppConfig.OwnerDiscordId);
 
     public bool IsBanned => CurrentEntitlement.IsBanned;
-    public bool IsAppAllowed(long appid) => CurrentEntitlement.IsAppAllowed(appid);
+    public bool IsAppAllowed(long appid) => IsOwner || CurrentEntitlement.IsAppAllowed(appid);
 
     /// <summary>True when a real (Discord) account is signed in. Guests have no session.</summary>
     public bool IsSignedIn => _refreshToken is not null;
