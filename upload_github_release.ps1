@@ -12,25 +12,15 @@ Write-Host " Uploading Assets to GitHub Release $TagName via Git Credential" -Fo
 Write-Host "====================================================" -ForegroundColor Cyan
 
 # 1. Retrieve Git Credential Token for github.com
-$pinfo = New-Object System.Diagnostics.ProcessStartInfo
-$pinfo.FileName = "git"
-$pinfo.Arguments = "credential fill"
-$pinfo.RedirectStandardInput = $true
-$pinfo.RedirectStandardOutput = $true
-$pinfo.RedirectStandardError = $true
-$pinfo.UseShellExecute = $false
-$p = [System.Diagnostics.Process]::Start($pinfo)
+$inputCred = @"
+protocol=https
+host=github.com
 
-$p.StandardInput.WriteLine("protocol=https")
-$p.StandardInput.WriteLine("host=github.com")
-$p.StandardInput.WriteLine("")
-$p.StandardInput.Close()
-
-$out = $p.StandardOutput.ReadToEnd()
-$p.WaitForExit(5000)
+"@
+$out = $inputCred | git credential fill
 
 $token = ""
-foreach ($line in ($out -split "`r?`n")) {
+foreach ($line in $out) {
     $trimmed = $line.Trim()
     if ($trimmed -match '^password=(.+)$') {
         $token = $Matches[1].Trim()
