@@ -348,6 +348,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 
     private bool _suppressSearch;
     private string? _fastFetchSource;
+    private readonly HashSet<string> _triedFastFetchSources = new(StringComparer.OrdinalIgnoreCase);
 
     [ObservableProperty] private bool _fastFetch;
     partial void OnFastFetchChanged(bool value) => _settings.FastFetch = value;
@@ -743,22 +744,39 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 
     private async Task FetchGameAsync()
     {
+        _triedFastFetchSources.Clear();
         var statuses = await _api.CheckSourcesAsync(Details!.AppId.ToString());
+
+        try
+        {
+            bool depotBoxAvail = await _api.CheckDepotBoxManifestAvailabilityAsync(Details.AppId.ToString());
+            if (depotBoxAvail)
+            {
+                statuses["DepotBox"] = "available";
+            }
+        }
+        catch { }
+
         await AddHubcapSourceAsync(statuses, Details.AppId.ToString());
 
-        foreach (var (name, status) in statuses.OrderByDescending(kv => SourceMeta.Get(kv.Key).RequiresUserKey ? 1 : 0))
+        foreach (var (name, status) in statuses.OrderByDescending(kv => SourceMeta.GetPriority(kv.Key)))
             Sources.Add(new SourceRowViewModel(this, name, status));
 
         await ApplyHubcapStateAsync();
 
         if (FastFetch)
         {
-            var best = Sources.FirstOrDefault(s => s.CanDownload);
+            var best = Sources
+                .Where(s => s.CanDownload && !_triedFastFetchSources.Contains(s.Name))
+                .OrderByDescending(s => SourceMeta.GetPriority(s.Name))
+                .FirstOrDefault();
+
             if (best is null)
             {
                 Error = Resources.Strings.Add_FastFetch_NoSource;
                 return;
             }
+            _triedFastFetchSources.Add(best.Name);
             _fastFetchSource = best.DisplayName;
             await DownloadFromSourceAsync(best);
         }
@@ -945,6 +963,24 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     private void OnManifestFinished(DownloadItem item, JobResult? result, bool needsKey)
     {
         _installedAppId = item.AppId; // the banner's "Reveal" target, even after the search is cleared
+
+        bool isFailure = (result is null && item.Status == DownloadStatus.Failed) || (result is not null && !result.Ok);
+
+        if (isFailure && item.Status != DownloadStatus.Cancelled && FastFetch)
+        {
+            var nextSource = Sources
+                .Where(s => s.CanDownload && !_triedFastFetchSources.Contains(s.Name))
+                .OrderByDescending(s => SourceMeta.GetPriority(s.Name))
+                .FirstOrDefault();
+
+            if (nextSource is not null)
+            {
+                _triedFastFetchSources.Add(nextSource.Name);
+                _fastFetchSource = nextSource.DisplayName;
+                _ = DownloadFromSourceAsync(nextSource);
+                return;
+            }
+        }
 
         if (result is null)
         {
@@ -1178,6 +1214,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         Error = null;
         LastDownload = null;
         _fastFetchSource = null;
+        _triedFastFetchSources.Clear();
     }
 
     /// <summary>

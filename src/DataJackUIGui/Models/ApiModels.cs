@@ -186,12 +186,22 @@ public static class SourceMeta
 
     public static readonly Dictionary<string, Meta> All = new()
     {
+        ["DepotBox"] = new(DisplayName: "DepotBox", DiscordUrl: "https://depotbox.org"),
         ["Ryuu"] = new(DiscordUrl: "https://discord.gg/manifests"),
         ["TwentyTwo Cloud"] = new(DiscordUrl: "https://discord.gg/RrukXPyv5b"),
         ["Sushi"] = new(DiscordUrl: "https://discord.gg/hMdv5dQhcN"),
         ["Skyflare"] = new(DiscordUrl: "https://github.com/skyflarefox"),
         ["Sadie (Morrenus)"] = new(DisplayName: "Sadie (Hubcap)", DiscordUrl: "https://discord.gg/hubcapsmanifest", RequiresUserKey: true),
     };
+
+    public static int GetPriority(string name)
+    {
+        if (string.Equals(name, "DepotBox", StringComparison.OrdinalIgnoreCase)) return 100;
+        if (string.Equals(name, "Ryuu", StringComparison.OrdinalIgnoreCase)) return 90;
+        var meta = Get(name);
+        if (meta.RequiresUserKey) return 10;
+        return 50;
+    }
 
     public static Meta Get(string name) => All.TryGetValue(name, out var m) ? m : new Meta();
 }

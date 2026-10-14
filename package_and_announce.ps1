@@ -27,18 +27,20 @@ Write-Host "====================================================" -ForegroundCol
 Write-Host " Packaging Standard ZIP & Announcing v$Version" -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
 
-# 2. Unconditionally publish application to bin/PublishFrameworkDependent and package Velopack installer
+# 2. Publish application and package Velopack installer (if not already packaged by build_release.ps1)
 $ReleasesDir = "Releases"
 if (-not (Test-Path $ReleasesDir)) { New-Item -ItemType Directory -Path $ReleasesDir | Out-Null }
 
 $PublishDir = "bin/PublishFrameworkDependent"
 $SetupExe = "$ReleasesDir/DataJackUI-win-Setup.exe"
 
-Write-Host "Publishing DataJackUI WPF Application..." -ForegroundColor Yellow
-dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --self-contained false -o $PublishDir
+if (-not (Test-Path "$ReleasesDir/DataJackUI-$Version-full.nupkg")) {
+    Write-Host "Publishing DataJackUI WPF Application..." -ForegroundColor Yellow
+    dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --self-contained false -o $PublishDir
 
-Write-Host "Packaging Velopack Installer..." -ForegroundColor Yellow
-vpk pack -u DataJackUI -v $Version -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop -o $ReleasesDir
+    Write-Host "Packaging Velopack Installer..." -ForegroundColor Yellow
+    vpk pack -u DataJackUI -v $Version -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop -o $ReleasesDir
+}
 
 # 3. Create Standard ZIP containing ONLY the Setup EXE (zip filename matches exe filename)
 $ExeName = "DataJackUI-win-Setup.exe"

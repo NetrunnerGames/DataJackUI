@@ -44,9 +44,14 @@ public class ManifestJobFactory(
             title,
             SourceMeta.Get(sourceName).DisplayName ?? sourceName,
             covers.GetLocalPath(appId),
-            (_, progress, ct) => needsKey
-                ? hubcap.DownloadManifestAsync(appId.ToString(), settings.HubcapApiKey ?? "", progress, ct)
-                : api.DownloadManifestAsync(appId.ToString(), sourceName, gameName, progress, ct),
+            (_, progress, ct) =>
+            {
+                if (string.Equals(sourceName, "DepotBox", StringComparison.OrdinalIgnoreCase))
+                    return api.DownloadDepotBoxManifestAsync(appId.ToString(), gameName, progress, ct);
+                if (needsKey)
+                    return hubcap.DownloadManifestAsync(appId.ToString(), settings.HubcapApiKey ?? "", progress, ct);
+                return api.DownloadManifestAsync(appId.ToString(), sourceName, gameName, progress, ct);
+            },
             (file, _, _) => Task.FromResult(InstallManifest(file, appId, title)),
             confirm,
             onFinished,

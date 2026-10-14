@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.IO;
 using DataJackUIGui.Models;
 using DataJackUIGui.Services.Downloads;
@@ -49,6 +49,7 @@ public class PluginAddService(
         public bool InstallFailed;
         public string? Error;
         public bool Busy; // a download+install is running
+        public HashSet<string> TriedSources = new(StringComparer.OrdinalIgnoreCase);
     }
 
     private readonly ConcurrentDictionary<long, AddState> _states = new();
@@ -112,11 +113,6 @@ public class PluginAddService(
                 hubcapAvailable = hs?.ManifestFileExists == true;
             }
 
-            if (state.FastFetch && hubcapAvailable)
-            {
-                if (await TryFastFetchHubcapAsync(appId, state, key!, nameTask)) return;
-            }
-
             var rows = await BuildSourceRowsAsync(appId, key, hubcapAvailable);
             var keyRows = rows.Where(r => r.NeedsKey).ToList();
             if (keyRows.Count > 0 && string.IsNullOrEmpty(key))
@@ -141,32 +137,20 @@ public class PluginAddService(
         }
     }
 
-    private async Task<bool> TryFastFetchHubcapAsync(long appId, AddState state, string key, Task<string?>? nameTask)
-    {
-        var stats = await hubcap.GetStatsAsync(key);
-        if (stats?.CanMakeRequests != true) return false;
-
-        var hubMeta = SourceMeta.Get(HubcapSourceName);
-        var hubRow = new SourceRow
-        {
-            Name = HubcapSourceName,
-            DisplayName = hubMeta.DisplayName ?? HubcapSourceName,
-            Status = "available",
-            NeedsKey = true,
-            Stats = $"{stats.DailyUsage}/{stats.DailyLimit}",
-        };
-        if (nameTask is not null) state.GameName = await nameTask;
-        PublishSources(state, new List<SourceRow> { hubRow }, appId);
-        await DownloadAsync(appId, state, hubRow);
-        return true;
-    }
-
     private async Task<List<SourceRow>> BuildSourceRowsAsync(long appId, string? key, bool hubcapAvailable)
     {
         var statuses = await api.CheckSourcesAsync(appId.ToString());
+        try
+        {
+            bool depotBoxAvail = await api.CheckDepotBoxManifestAvailabilityAsync(appId.ToString());
+            if (depotBoxAvail)
+                statuses["DepotBox"] = "available";
+        }
+        catch { }
+
         statuses[HubcapSourceName] = string.IsNullOrEmpty(key) ? "unknown" : (hubcapAvailable ? "available" : "unavailable");
 
-        return statuses.OrderByDescending(kv => SourceMeta.Get(kv.Key).RequiresUserKey ? 1 : 0)
+        return statuses.OrderByDescending(kv => SourceMeta.GetPriority(kv.Key))
             .Select(kv =>
             {
                 var meta = SourceMeta.Get(kv.Key);
@@ -180,8 +164,12 @@ public class PluginAddService(
             await FillHubcapBadgeAsync(keyRows, key);
         PublishSources(state, rows, appId);
 
-        var best = rows.FirstOrDefault(r => r.CanDownload);
+        var best = rows
+            .Where(r => r.CanDownload && !state.TriedSources.Contains(r.Name))
+            .OrderByDescending(r => SourceMeta.GetPriority(r.Name))
+            .FirstOrDefault();
         if (best is null) { state.Error = Resources.Strings.Err_NoSourceAvailable; PluginLog.Log($"PluginAdd.Check appid={appId} FastFetch: no downloadable source"); return; }
+        state.TriedSources.Add(best.Name);
         await DownloadAsync(appId, state, best);
     }
 
@@ -285,9 +273,28 @@ public class PluginAddService(
 
                 if (result is null || !result.Ok)
                 {
+                    PluginLog.Log($"PluginAdd.Download appid={appId} source='{row.Name}' FAILED: {result?.Message ?? item.Message}");
+
+                    if (state.FastFetch)
+                    {
+                        var nextRow = state.Sources
+                            .Where(r => r.CanDownload && !state.TriedSources.Contains(r.Name))
+                            .OrderByDescending(r => SourceMeta.GetPriority(r.Name))
+                            .FirstOrDefault();
+                        if (nextRow is not null)
+                        {
+                            PluginLog.Log($"PluginAdd.Download appid={appId} falling back to next source='{nextRow.Name}'");
+                            state.TriedSources.Add(nextRow.Name);
+                            row.Downloading = false;
+                            row.Indeterminate = false;
+                            state.Busy = false;
+                            await DownloadAsync(appId, state, nextRow);
+                            return;
+                        }
+                    }
+
                     state.Error = result?.Message ?? item.Message;
                     state.InstallFailed = true;
-                    PluginLog.Log($"PluginAdd.Download appid={appId} source='{row.Name}' FAILED: {state.Error}");
                 }
                 else
                 {
@@ -301,9 +308,28 @@ public class PluginAddService(
         }
         catch (Exception ex)
         {
+            PluginLog.Log($"PluginAdd.Download appid={appId} source='{row.Name}' EXCEPTION: {ex}");
+
+            if (state.FastFetch)
+            {
+                var nextRow = state.Sources
+                    .Where(r => r.CanDownload && !state.TriedSources.Contains(r.Name))
+                    .OrderByDescending(r => SourceMeta.GetPriority(r.Name))
+                    .FirstOrDefault();
+                if (nextRow is not null)
+                {
+                    PluginLog.Log($"PluginAdd.Download appid={appId} falling back after exception to next source='{nextRow.Name}'");
+                    state.TriedSources.Add(nextRow.Name);
+                    row.Downloading = false;
+                    row.Indeterminate = false;
+                    state.Busy = false;
+                    await DownloadAsync(appId, state, nextRow);
+                    return;
+                }
+            }
+
             state.Error = ex.Message;
             state.InstallFailed = true;
-            PluginLog.Log($"PluginAdd.Download appid={appId} source='{row.Name}' EXCEPTION: {ex}");
         }
         finally
         {

@@ -409,6 +409,45 @@ public class DataJackUIApiClient
         return DownloadFileAsync(url, $"{appid}.zip", progress, ct);
     }
 
+    public async Task<bool> CheckDepotBoxManifestAvailabilityAsync(string appid, CancellationToken ct = default)
+    {
+        if (_auth.IsGuest) return false;
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, $"/api/depotbox/api/games/{appid}/availability");
+            string? token = await _auth.GetValidAccessTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var res = await _http.SendAsync(req, ct);
+            if (!res.IsSuccessStatusCode) return false;
+            using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            if (doc.RootElement.TryGetProperty("available", out var avail) && avail.GetBoolean())
+                return true;
+            if (doc.RootElement.TryGetProperty("success", out var succ) && succ.GetBoolean())
+            {
+                if (doc.RootElement.TryGetProperty("data", out var data) && data.TryGetProperty("availability", out var a))
+                    return true;
+            }
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public Task<DownloadedFile> DownloadDepotBoxManifestAsync(
+        string appid, string? gameName,
+        IProgress<DownloadProgress>? progress, CancellationToken ct = default)
+    {
+        var content = new StringContent(
+            JsonSerializer.Serialize(new { appid }),
+            System.Text.Encoding.UTF8,
+            "application/json");
+        return DownloadPostFileAsync("/api/depotbox/api/direct-download", content, $"{appid}.zip", progress, ct);
+    }
+
     /// <summary>
     /// One depot's raw <c>.manifest</c> by id, so a depot download no longer depends on Steam happening
     /// to have the file in its depotcache.
@@ -844,6 +883,32 @@ public class DataJackUIApiClient
         string url, string fallbackName, IProgress<DownloadProgress>? progress, CancellationToken ct)
     {
         var res = await SendAsync(HttpMethod.Get, url, ct, HttpCompletionOption.ResponseHeadersRead);
+        return await HttpFileDownloader.SaveResponseAsync(res, fallbackName, progress, ct);
+    }
+
+    private async Task<DownloadedFile> DownloadPostFileAsync(
+        string url, HttpContent content, string fallbackName, IProgress<DownloadProgress>? progress, CancellationToken ct)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = content
+        };
+        string? token = await _auth.GetValidAccessTokenAsync();
+        if (!string.IsNullOrEmpty(token))
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!res.IsSuccessStatusCode)
+        {
+            string message = string.Format(Resources.Strings.Api_Err_RequestFailed, (int)res.StatusCode);
+            try
+            {
+                var err = JsonSerializer.Deserialize<ApiError>(await res.Content.ReadAsStringAsync(ct), JsonOpts);
+                if (!string.IsNullOrWhiteSpace(err?.Error)) message = err.Error;
+            }
+            catch { }
+            throw new ApiException(message, res.StatusCode);
+        }
         return await HttpFileDownloader.SaveResponseAsync(res, fallbackName, progress, ct);
     }
 
