@@ -401,10 +401,24 @@ public partial class App : Application
         _ = _host.Services.GetRequiredService<AnalyticsService>().TrackAppLaunchAsync();
         _ = _host.Services.GetRequiredService<HardwareAppIdService>().EnsureFreshAsync();
         _ = _host.Services.GetRequiredService<DepotCacheMigrationService>().RunAsync();
+
+        // Check for updates automatically on every startup, and repeat every 6 hours
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                await System.Threading.Tasks.Task.Delay(1500);
+                await Updates.CheckForUpdatesAndPromptAsync();
+                Updates.StartPeriodicChecks(TimeSpan.FromHours(6));
+            }
+            catch { /* offline or uninstalled */ }
+        });
     }
 
     protected override async void OnExit(ExitEventArgs e)
     {
+        Updates.StopPeriodicChecks();
+
         // If an update was downloaded but not yet applied, stage it for after exit.
         if (Updates.HasStagedUpdate)
             Updates.ApplyOnExit();

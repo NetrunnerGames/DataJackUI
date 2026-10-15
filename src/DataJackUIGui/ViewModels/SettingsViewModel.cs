@@ -335,11 +335,16 @@ public partial class SettingsViewModel : ObservableObject
 
         try
         {
-            await _updateService.CheckAndStageAsync();
+            bool updated = await _updateService.CheckForUpdatesAndPromptAsync();
 
-            if (_updateService.HasStagedUpdate)
+            if (updated)
             {
-                UpdateStatusText = "Update downloaded and staged! It will apply on next restart.";
+                UpdateStatusText = "Update initiated! Restarting application...";
+                UpdateStatusColor = "#22c55e";
+            }
+            else if (_updateService.HasStagedUpdate)
+            {
+                UpdateStatusText = "Update staged! It will apply on next restart.";
                 UpdateStatusColor = "#22c55e";
             }
             else
