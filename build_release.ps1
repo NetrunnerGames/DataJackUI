@@ -122,7 +122,14 @@ New-Item -ItemType Directory -Path $tempDir | Out-Null
 Copy-Item $SetupExePath "$tempDir/DataJackUI-win-Setup.exe" -Force
 
 [System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+Copy-Item $RootZip $ReleasesZip -Force
 Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
+
+# 6. Package Portable ZIP from publish output
+Write-Host "`n5. Packaging Portable ZIP in Releases..." -ForegroundColor Yellow
+$PortableZip = "$ReleasesDir/DataJackUI-win-Portable.zip"
+if (Test-Path $PortableZip) { Remove-Item -Force $PortableZip }
+[System.IO.Compression.ZipFile]::CreateFromDirectory((Resolve-Path $PublishDir), $PortableZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 
 Write-Host "`n====================================================" -ForegroundColor Green
 Write-Host " Successfully Created All Release Artifacts:" -ForegroundColor Green
