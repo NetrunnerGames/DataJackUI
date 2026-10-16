@@ -12,12 +12,7 @@ Write-Host " Uploading Assets to GitHub Release $TagName via Git Credential" -Fo
 Write-Host "====================================================" -ForegroundColor Cyan
 
 # 1. Retrieve Git Credential Token for github.com
-$inputCred = @"
-protocol=https
-host=github.com
-
-"@
-$out = $inputCred | git credential fill
+$out = @("protocol=https", "host=github.com", "") | git credential fill
 
 $token = ""
 foreach ($line in $out) {
