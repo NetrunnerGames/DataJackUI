@@ -78,8 +78,9 @@ public static class AppConfig
     // first `.zip` asset, extracts it straight into ToolDir, and then expects DepotDownloaderMod.exe at the
     // archive ROOT (unlike PluginInstallerService, it has no single-top-level-folder hoisting).
     public const string DepotDownloaderRepo = "mendy-tools/DepotDownloaderMod";
-    public const string ManifestBackendUrl = "http://167.235.229.108";
+    public const string ManifestBackendUrl = "https://generator.ryuu.lol";
     public const string ManifestBackendUserAgent = "secretgoonpoon";
+    public const string DefaultUserAgent = "DataJackUI/2.0";
 
     // The donate-keys endpoint gates on a DIFFERENT User-Agent than the manifest backend (it 403s
     // otherwise). This matches the DataJackUI plugin's config.USER_AGENT.

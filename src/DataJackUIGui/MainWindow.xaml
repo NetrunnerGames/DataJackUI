@@ -92,6 +92,11 @@
                             <ui:SymbolIcon Symbol="PuzzlePiece24" />
                         </ui:NavigationViewItem.Icon>
                     </ui:NavigationViewItem>
+                    <ui:NavigationViewItem Content="{x:Static res:Strings.Nav_CloudSaves}" TargetPageType="{x:Type views:CloudSavesView}">
+                        <ui:NavigationViewItem.Icon>
+                            <ui:SymbolIcon Symbol="Cloud24" />
+                        </ui:NavigationViewItem.Icon>
+                    </ui:NavigationViewItem>
                 </ui:NavigationView.MenuItems>
 
                 <ui:NavigationView.FooterMenuItems>

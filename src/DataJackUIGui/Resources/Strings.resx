@@ -65,6 +65,7 @@
   <data name="Nav_Manage" xml:space="preserve"><value>Manage</value></data>
   <data name="Nav_Mode" xml:space="preserve"><value>Mode</value></data>
   <data name="Nav_Fixes" xml:space="preserve"><value>Fixes</value></data>
+  <data name="Nav_CloudSaves" xml:space="preserve"><value>Cloud Saves</value></data>
   <data name="Nav_OnlineFix" xml:space="preserve"><value>Online Fix</value></data>
   <data name="Nav_RestartSteam" xml:space="preserve"><value>Restart Steam</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>
@@ -653,4 +654,20 @@ Cancel - keep downloading</value></data>
   <data name="Depot_Err_NoKeyFor" xml:space="preserve"><value>No decryption key in Lua for depot {0}.</value></data>
   <data name="Builds_Select_SharedHint" xml:space="preserve"><value>Shared runtime — usually already installed. Tick to download anyway.</value></data>
   <data name="Downloads_ClearHistory_Confirm" xml:space="preserve"><value>Remove all {0} entries from the download history? Downloaded files are not affected.</value></data>
+  <data name="CloudSaves_Title" xml:space="preserve"><value>Cloud Saves</value></data>
+  <data name="CloudSaves_Subtitle" xml:space="preserve"><value>Backup saves rejected by Steam and sync them seamlessly to OneDrive, Google Drive, or Rclone.</value></data>
+  <data name="CloudSaves_Scan" xml:space="preserve"><value>Scan Saves</value></data>
+  <data name="CloudSaves_BackupAll" xml:space="preserve"><value>Backup All</value></data>
+  <data name="CloudSaves_SyncCloud" xml:space="preserve"><value>Sync to Cloud</value></data>
+  <data name="CloudSaves_RestoreCloud" xml:space="preserve"><value>Restore from Cloud</value></data>
+  <data name="CloudSaves_Provider" xml:space="preserve"><value>Cloud Provider</value></data>
+  <data name="CloudSaves_ConfigureRclone" xml:space="preserve"><value>Configure Rclone</value></data>
+  <data name="CloudSaves_AutoSync" xml:space="preserve"><value>Auto-sync to cloud after backup</value></data>
+  <data name="CloudSaves_Snapshots" xml:space="preserve"><value>Snapshots</value></data>
+  <data name="CloudSaves_Restore" xml:space="preserve"><value>Restore</value></data>
+  <data name="CloudSaves_Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="CloudSaves_BackupNow" xml:space="preserve"><value>Backup Now</value></data>
+  <data name="CloudSaves_OpenFolder" xml:space="preserve"><value>Open Folder</value></data>
+  <data name="CloudSaves_NoSavesFound" xml:space="preserve"><value>No game saves detected yet.</value></data>
+  <data name="CloudSaves_NoSnapshots" xml:space="preserve"><value>No snapshots yet for this game.</value></data>
 </root>

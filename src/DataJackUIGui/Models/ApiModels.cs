@@ -196,12 +196,95 @@ public static class SourceMeta
 
     public static int GetPriority(string name)
     {
+        // 1st Priority: DepotBox
         if (string.Equals(name, "DepotBox", StringComparison.OrdinalIgnoreCase)) return 100;
-        if (string.Equals(name, "Ryuu", StringComparison.OrdinalIgnoreCase)) return 90;
+
+        // 2nd Priority: Ryuu / Ryuu Direct
+        if (string.Equals(name, "Ryuu", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Ryuu", StringComparison.OrdinalIgnoreCase)) return 90;
+
         var meta = Get(name);
         if (meta.RequiresUserKey) return 10;
+
+        // 3rd Priority: Public / community sources (Sushi, TwentyTwo Cloud, Skyflare, etc.)
         return 50;
     }
 
     public static Meta Get(string name) => All.TryGetValue(name, out var m) ? m : new Meta();
 }
+
+public class RyuuManifestInfo
+{
+    [JsonPropertyName("app_id")] public string? AppId { get; set; }
+    [JsonPropertyName("available_branches")] public List<string>? AvailableBranches { get; set; }
+    [JsonPropertyName("default_branch")] public string? DefaultBranch { get; set; }
+    [JsonPropertyName("branch_manifests")] public Dictionary<string, RyuuBranchManifest>? BranchManifests { get; set; }
+    [JsonPropertyName("depot_dlc_map")] public Dictionary<string, string>? DepotDlcMap { get; set; }
+    [JsonPropertyName("depot_oslist_map")] public Dictionary<string, string>? DepotOslistMap { get; set; }
+    [JsonPropertyName("dlc")] public List<RyuuDlcInfo>? Dlc { get; set; }
+    [JsonPropertyName("local_branches")] public List<string>? LocalBranches { get; set; }
+    [JsonPropertyName("timestamp")] public string? Timestamp { get; set; }
+    [JsonPropertyName("workshop_depot")] public int WorkshopDepot { get; set; }
+    [JsonPropertyName("workshop_in_lua")] public bool WorkshopInLua { get; set; }
+    [JsonPropertyName("status")] public string? Status { get; set; }
+
+    [JsonIgnore]
+    public bool IsAvailable =>
+        !string.Equals(Status, "warming", StringComparison.OrdinalIgnoreCase) &&
+        BranchManifests != null &&
+        BranchManifests.Count > 0;
+
+    [JsonIgnore]
+    public IReadOnlyDictionary<string, string> LatestSteamDepots
+    {
+        get
+        {
+            if (BranchManifests != null &&
+                BranchManifests.TryGetValue(DefaultBranch ?? "public", out var b) &&
+                b.Depots != null)
+            {
+                return b.Depots;
+            }
+            return new Dictionary<string, string>();
+        }
+    }
+
+    [JsonIgnore]
+    public IReadOnlyList<string> DatabaseFiles
+    {
+        get
+        {
+            if (BranchManifests != null &&
+                BranchManifests.TryGetValue(DefaultBranch ?? "public", out var b) &&
+                b.Files != null)
+            {
+                return b.Files;
+            }
+            return Array.Empty<string>();
+        }
+    }
+}
+
+public class RyuuBranchManifest
+{
+    [JsonPropertyName("depots")] public Dictionary<string, string>? Depots { get; set; }
+    [JsonPropertyName("files")] public List<string>? Files { get; set; }
+}
+
+public class RyuuDlcInfo
+{
+    [JsonPropertyName("appid")] public long AppId { get; set; }
+    [JsonPropertyName("name")] public string? Name { get; set; }
+    [JsonPropertyName("in_lua")] public bool InLua { get; set; }
+    [JsonPropertyName("has_depots")] public bool HasDepots { get; set; }
+    [JsonPropertyName("oslist")] public List<string>? OsList { get; set; }
+}
+
+public record GameUpdateCheckResult(
+    bool HasUpdate,
+    bool RyuuHasNewManifests,
+    IReadOnlyDictionary<long, string> OutdatedDepots,
+    IReadOnlyDictionary<string, string> LatestSteamDepots,
+    IReadOnlyList<string> RyuuDatabaseFiles,
+    IReadOnlyList<RyuuDlcInfo> DlcInLua);
+

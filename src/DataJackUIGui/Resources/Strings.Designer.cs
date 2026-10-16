@@ -598,4 +598,21 @@ public static class Strings
     public static string Depot_Err_NoKeyFor => Get(nameof(Depot_Err_NoKeyFor));
     public static string Builds_Select_SharedHint => Get(nameof(Builds_Select_SharedHint));
     public static string Downloads_ClearHistory_Confirm => Get(nameof(Downloads_ClearHistory_Confirm));
+    public static string Nav_CloudSaves => Get(nameof(Nav_CloudSaves));
+    public static string CloudSaves_Title => Get(nameof(CloudSaves_Title));
+    public static string CloudSaves_Subtitle => Get(nameof(CloudSaves_Subtitle));
+    public static string CloudSaves_Scan => Get(nameof(CloudSaves_Scan));
+    public static string CloudSaves_BackupAll => Get(nameof(CloudSaves_BackupAll));
+    public static string CloudSaves_SyncCloud => Get(nameof(CloudSaves_SyncCloud));
+    public static string CloudSaves_RestoreCloud => Get(nameof(CloudSaves_RestoreCloud));
+    public static string CloudSaves_Provider => Get(nameof(CloudSaves_Provider));
+    public static string CloudSaves_ConfigureRclone => Get(nameof(CloudSaves_ConfigureRclone));
+    public static string CloudSaves_AutoSync => Get(nameof(CloudSaves_AutoSync));
+    public static string CloudSaves_Snapshots => Get(nameof(CloudSaves_Snapshots));
+    public static string CloudSaves_Restore => Get(nameof(CloudSaves_Restore));
+    public static string CloudSaves_Delete => Get(nameof(CloudSaves_Delete));
+    public static string CloudSaves_BackupNow => Get(nameof(CloudSaves_BackupNow));
+    public static string CloudSaves_OpenFolder => Get(nameof(CloudSaves_OpenFolder));
+    public static string CloudSaves_NoSavesFound => Get(nameof(CloudSaves_NoSavesFound));
+    public static string CloudSaves_NoSnapshots => Get(nameof(CloudSaves_NoSnapshots));
 }

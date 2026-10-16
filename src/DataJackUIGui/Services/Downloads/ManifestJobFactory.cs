@@ -48,8 +48,13 @@ public class ManifestJobFactory(
             {
                 if (string.Equals(sourceName, "DepotBox", StringComparison.OrdinalIgnoreCase))
                     return api.DownloadDepotBoxManifestAsync(appId.ToString(), gameName, progress, ct);
+                if (string.Equals(sourceName, "Ryuu", StringComparison.OrdinalIgnoreCase) ||
+                    sourceName.StartsWith("Ryuu", StringComparison.OrdinalIgnoreCase))
+                    return api.DownloadRyuuManifestAsync(appId.ToString(), gameName, progress, ct);
                 if (needsKey)
                     return hubcap.DownloadManifestAsync(appId.ToString(), settings.HubcapApiKey ?? "", progress, ct);
+                if (string.Equals(sourceName, "Sushi", StringComparison.OrdinalIgnoreCase))
+                    return api.DownloadPublicSushiManifestAsync(appId.ToString(), progress, ct);
                 return api.DownloadManifestAsync(appId.ToString(), sourceName, gameName, progress, ct);
             },
             (file, _, _) => Task.FromResult(InstallManifest(file, appId, title)),

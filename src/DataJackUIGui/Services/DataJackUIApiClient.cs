@@ -337,16 +337,193 @@ public class DataJackUIApiClient
         return details;
     }
 
-    /// <summary>Source name → "available" | "unavailable" | other status.</summary>
+    /// <summary>
+    /// Fetches manifest info via auth worker proxy (or direct Ryuu backend).
+    /// Returns Steam's latest depot manifests, files in Ryuu DB, and DLC list without downloading any files or spamming the server.
+    /// </summary>
+    public async Task<RyuuManifestInfo?> GetRyuuManifestInfoAsync(string appid, CancellationToken ct = default)
+    {
+        string[] endpoints =
+        [
+            $"{AppConfig.ApiBaseUrl}/api/ryuu/manifestinfo/{appid}",
+            $"{AppConfig.ManifestBackendUrl}/manifestinfo/{appid}"
+        ];
+
+        foreach (var endpoint in endpoints)
+        {
+            try
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                req.Headers.TryAddWithoutValidation("User-Agent", AppConfig.DefaultUserAgent);
+                using var res = await _http.SendAsync(req, ct);
+                if (res.IsSuccessStatusCode)
+                {
+                    var parsed = await ReadJsonAsync<RyuuManifestInfo>(res, ct);
+                    if (parsed != null) return parsed;
+                }
+            }
+            catch { }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Sends a HEAD request to check if Ryuu has manifest information for this appid.
+    /// Per Ryuu's API guidelines, HEAD requests don't download any files and are safe for availability checking.
+    /// </summary>
+    public async Task<bool> CheckRyuuAvailabilityHeadAsync(string appid, CancellationToken ct = default)
+    {
+        string[] endpoints =
+        [
+            $"{AppConfig.ApiBaseUrl}/api/ryuu/manifestinfo/{appid}",
+            $"{AppConfig.ManifestBackendUrl}/manifestinfo/{appid}"
+        ];
+
+        foreach (var endpoint in endpoints)
+        {
+            try
+            {
+                var req = new HttpRequestMessage(HttpMethod.Head, endpoint);
+                req.Headers.TryAddWithoutValidation("User-Agent", AppConfig.DefaultUserAgent);
+                using var res = await _http.SendAsync(req, ct);
+                if (res.StatusCode == HttpStatusCode.OK) return true;
+            }
+            catch { }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Requests Ryuu to update manifests for an AppID on the specified branch via auth worker.
+    /// </summary>
+    public async Task<bool> RequestRyuuUpdateAsync(string appid, string branch = "public", CancellationToken ct = default)
+    {
+        string[] endpoints =
+        [
+            $"{AppConfig.ApiBaseUrl}/api/ryuu/requestupdate?appid={Uri.EscapeDataString(appid)}&branch={Uri.EscapeDataString(branch)}",
+            $"{AppConfig.ManifestBackendUrl}/requestupdate?appid={Uri.EscapeDataString(appid)}&branch={Uri.EscapeDataString(branch)}"
+        ];
+
+        foreach (var endpoint in endpoints)
+        {
+            try
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                req.Headers.TryAddWithoutValidation("User-Agent", AppConfig.DefaultUserAgent);
+                using var res = await _http.SendAsync(req, ct);
+                if (res.IsSuccessStatusCode) return true;
+            }
+            catch { }
+        }
+
+        return false;
+    }
+
+    /// <summary>Source name → "available" | "unavailable" | other status. Priority: 1. DepotBox, 2. Ryuu, 3. Public.</summary>
     public async Task<Dictionary<string, string>> CheckSourcesAsync(string appid, CancellationToken ct = default)
     {
-        // Calls the manifest backend directly (no lua.tools, no auth). The backend is gated
-        // by a fixed User-Agent rather than a token, so guests can check availability.
-        var req = new HttpRequestMessage(HttpMethod.Get, $"{AppConfig.ManifestBackendUrl}/check_apis?appid={appid}");
-        req.Headers.TryAddWithoutValidation("User-Agent", AppConfig.ManifestBackendUserAgent);
-        var res = await _http.SendAsync(req, ct);
-        if (!res.IsSuccessStatusCode) return [];
-        return await ReadJsonAsync<Dictionary<string, string>>(res, ct) ?? [];
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // 1. DepotBox availability check (Primary / 1st priority)
+        try
+        {
+            if (await CheckDepotBoxManifestAvailabilityAsync(appid, ct))
+                result["DepotBox"] = "available";
+        }
+        catch { }
+
+        // 2. Ryuu availability check via HEAD request to generator.ryuu.lol/manifestinfo/{appid} (Secondary / 2nd priority)
+        bool ryuuAvailable = await CheckRyuuAvailabilityHeadAsync(appid, ct);
+        result["Ryuu"] = ryuuAvailable ? "available" : "unavailable";
+
+        // 3. Public sources availability check (Tertiary / 3rd priority)
+        try
+        {
+            bool sushiAvailable = await CheckSushiAvailabilityHeadAsync(appid, ct);
+            result["Sushi"] = sushiAvailable ? "available" : "unavailable";
+        }
+        catch { }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Checks public manifest repository availability using a lightweight HEAD request (0 download bytes).
+    /// </summary>
+    public async Task<bool> CheckSushiAvailabilityHeadAsync(string appid, CancellationToken ct = default)
+    {
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Head, $"https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/{appid}.zip");
+            req.Headers.UserAgent.ParseAdd(AppConfig.DefaultUserAgent);
+            using var res = await _http.SendAsync(req, ct);
+            return res.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Checks if a game needs an update by comparing installed depot manifests against
+    /// Steam's latest depot manifests from generator.ryuu.lol/manifestinfo/{appid}.
+    /// Does NOT download any manifest files, completely avoiding rate-limit or bandwidth warnings.
+    /// </summary>
+    public async Task<GameUpdateCheckResult> CheckGameUpdateAsync(
+        long appId,
+        IReadOnlyDictionary<long, string> installedDepots,
+        CancellationToken ct = default)
+    {
+        var info = await GetRyuuManifestInfoAsync(appId.ToString(), ct);
+        if (info == null || !info.IsAvailable)
+        {
+            return new GameUpdateCheckResult(
+                HasUpdate: false,
+                RyuuHasNewManifests: false,
+                OutdatedDepots: new Dictionary<long, string>(),
+                LatestSteamDepots: new Dictionary<string, string>(),
+                RyuuDatabaseFiles: Array.Empty<string>(),
+                DlcInLua: Array.Empty<RyuuDlcInfo>());
+        }
+
+        var steamDepots = info.LatestSteamDepots;
+        var ryuuFiles = info.DatabaseFiles;
+        var outdated = new Dictionary<long, string>();
+        bool ryuuHasAnyNew = false;
+
+        if (installedDepots != null && installedDepots.Count > 0)
+        {
+            foreach (var (depotId, installedManifest) in installedDepots)
+            {
+                if (steamDepots.TryGetValue(depotId.ToString(), out string? latestSteamManifest))
+                {
+                    if (!string.Equals(installedManifest, latestSteamManifest, StringComparison.OrdinalIgnoreCase))
+                    {
+                        outdated[depotId] = latestSteamManifest;
+
+                        // Check if Ryuu's database has the updated manifest file
+                        string manifestFilename = $"{depotId}_{latestSteamManifest}.manifest";
+                        if (ryuuFiles.Any(f => string.Equals(f, manifestFilename, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            ryuuHasAnyNew = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        var dlcInLua = info.Dlc?.Where(d => d.InLua).ToList() ?? [];
+
+        return new GameUpdateCheckResult(
+            HasUpdate: outdated.Count > 0,
+            RyuuHasNewManifests: ryuuHasAnyNew,
+            OutdatedDepots: outdated,
+            LatestSteamDepots: steamDepots,
+            RyuuDatabaseFiles: ryuuFiles,
+            DlcInLua: dlcInLua);
     }
 
     /// <summary>
@@ -446,6 +623,28 @@ public class DataJackUIApiClient
             System.Text.Encoding.UTF8,
             "application/json");
         return DownloadPostFileAsync("/api/depotbox/api/direct-download", content, $"{appid}.zip", progress, ct);
+    }
+
+    /// <summary>
+    /// Downloads manifest zip from Ryuu via auth worker secure_download endpoint (2nd priority).
+    /// Uses server-side auth_code and user verification.
+    /// </summary>
+    public Task<DownloadedFile> DownloadRyuuManifestAsync(
+        string appid, string? gameName,
+        IProgress<DownloadProgress>? progress, CancellationToken ct = default)
+    {
+        string url = $"/api/ryuu/secure_download?appid={Uri.EscapeDataString(appid)}";
+        return DownloadFileAsync(url, $"{appid}.zip", progress, ct);
+    }
+
+    /// <summary>
+    /// Downloads manifest zip directly from public Sushi manifest repository (3rd priority fallback).
+    /// </summary>
+    public Task<DownloadedFile> DownloadPublicSushiManifestAsync(
+        string appid, IProgress<DownloadProgress>? progress, CancellationToken ct = default)
+    {
+        string url = $"https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/{appid}.zip";
+        return DownloadFromUrlAsync(url, $"{appid}.zip", progress, ct);
     }
 
     /// <summary>

@@ -67,6 +67,14 @@ public class AppSettings
 
     // App IDs unlocked via payment
     public List<long>? UnlockedAppIds { get; set; }
+
+    // Cloud Saves settings
+    public string? CloudSavesProvider { get; set; }
+    public string? CloudSavesLocalPath { get; set; }
+    public string? CloudSavesRcloneRemote { get; set; }
+    public string? CloudSavesRcloneExePath { get; set; }
+    public bool? CloudSavesAutoSync { get; set; }
+    public Dictionary<long, string>? CustomSavePaths { get; set; }
 }
 
 public class SettingsService
@@ -276,6 +284,55 @@ public class SettingsService
         {
             Save();
         }
+    }
+
+    /// <summary>Cloud save backup provider ("OneDrive", "GoogleDrive", "Rclone", "Local").</summary>
+    public string CloudSavesProvider
+    {
+        get => _settings.CloudSavesProvider ?? "OneDrive";
+        set { _settings.CloudSavesProvider = value; Save(); }
+    }
+
+    /// <summary>Custom local destination path for cloud save backups.</summary>
+    public string? CloudSavesLocalPath
+    {
+        get => _settings.CloudSavesLocalPath;
+        set { _settings.CloudSavesLocalPath = string.IsNullOrWhiteSpace(value) ? null : value; Save(); }
+    }
+
+    /// <summary>Rclone remote name and path (e.g. "gdrive:DataJackUI_Saves").</summary>
+    public string CloudSavesRcloneRemote
+    {
+        get => _settings.CloudSavesRcloneRemote ?? "gdrive:DataJackUI_Saves";
+        set { _settings.CloudSavesRcloneRemote = value; Save(); }
+    }
+
+    /// <summary>Custom path to rclone.exe if user provided one.</summary>
+    public string? CloudSavesRcloneExePath
+    {
+        get => _settings.CloudSavesRcloneExePath;
+        set { _settings.CloudSavesRcloneExePath = string.IsNullOrWhiteSpace(value) ? null : value; Save(); }
+    }
+
+    /// <summary>When true, automatically sync to cloud after creating a local backup.</summary>
+    public bool CloudSavesAutoSync
+    {
+        get => _settings.CloudSavesAutoSync ?? false;
+        set { _settings.CloudSavesAutoSync = value; Save(); }
+    }
+
+    /// <summary>Custom save location path overrides per App ID.</summary>
+    public string? GetCustomSavePath(long appId) =>
+        _settings.CustomSavePaths != null && _settings.CustomSavePaths.TryGetValue(appId, out var p) ? p : null;
+
+    public void SetCustomSavePath(long appId, string? path)
+    {
+        _settings.CustomSavePaths ??= new();
+        if (string.IsNullOrWhiteSpace(path))
+            _settings.CustomSavePaths.Remove(appId);
+        else
+            _settings.CustomSavePaths[appId] = path;
+        Save();
     }
 
     private void Save()

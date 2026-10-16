@@ -68,6 +68,7 @@ public partial class App : Application
                 // can call ReloadPluginFilesAsync() after install/uninstall. Same pattern as HttpServerService.
                 services.AddSingleton<CefInjectorService>();
                 services.AddHostedService(sp => sp.GetRequiredService<CefInjectorService>());
+                services.AddSingleton<CloudSavesService>();
                 services.AddSingleton<DownloadViewModel>();
                 services.AddSingleton<SettingsViewModel>();
                 services.AddSingleton<ManageViewModel>();
@@ -78,6 +79,7 @@ public partial class App : Application
                 services.AddSingleton<FixesViewModel>();
                 services.AddSingleton<DownloadsViewModel>();
                 services.AddSingleton<PluginViewModel>();
+                services.AddSingleton<CloudSavesViewModel>();
                 services.AddSingleton<OnboardingViewModel>();
                 services.AddSingleton<MainViewModel>();
                 // Pages resolved by NavigationView via the DI service provider.
@@ -89,6 +91,7 @@ public partial class App : Application
                 services.AddSingleton<ModeView>();
                 services.AddSingleton<FixesView>();
                 services.AddSingleton<PluginView>();
+                services.AddSingleton<CloudSavesView>();
                 services.AddSingleton<SettingsView>();
                 services.AddSingleton<MainWindow>();
             })

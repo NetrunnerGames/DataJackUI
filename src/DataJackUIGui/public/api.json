@@ -1,19 +1,24 @@
 {
   "api_list": [
     {
+      "name": "DepotBox",
+      "url": "https://depotbox.org/api/direct-download",
+      "weight": 300
+    },
+    {
       "name": "Ryuu",
-      "url": "https://generator.ryuu.lol/<appid>",
+      "url": "https://generator.ryuu.lol/manifestinfo/<appid>",
       "weight": 200
     },
     {
       "name": "Ryuu Direct",
-      "url": "http://167.235.229.108/<appid>",
+      "url": "https://generator.ryuu.lol/api/download/<appid>?file_type=manifest",
       "weight": 200
     },
     {
       "name": "Sushi",
       "url": "https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/<appid>.zip",
-      "weight": 200
+      "weight": 100
     }
   ]
 }

@@ -31,7 +31,7 @@ public class HttpServerService : IHostedService
     private bool _apiSourcesLoaded = false;
 
     private static readonly string TempDir = Path.Combine(Path.GetTempPath(), "DataJackUI", "downloads");
-    private const string ManifestBackendUrl = "http://167.235.229.108/check_apis";
+    private const string ManifestBackendUrl = "https://generator.ryuu.lol";
 
     public HttpServerService(LuaInstaller installer, SteamService steam, CacheService cache,
         IServiceProvider services, ILogger<HttpServerService> logger)
@@ -68,8 +68,9 @@ public class HttpServerService : IHostedService
         _log.LogWarning("api.json not found, using fallback sources");
         _apiSources = new()
         {
-            new("Ryuu", "https://generator.ryuu.lol/<appid>", 200),
-            new("Ryuu Direct", "http://167.235.229.108/<appid>", 200),
+            new("DepotBox", "https://depotbox.org/api/direct-download", 200),
+            new("Ryuu", "https://generator.ryuu.lol/manifestinfo/<appid>", 200),
+            new("Ryuu Direct", "https://generator.ryuu.lol/api/download/<appid>?file_type=manifest", 200),
             new("Sushi", "https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/<appid>.zip", 200),
         };
     }
@@ -339,6 +340,7 @@ public class HttpServerService : IHostedService
             var api = _services.GetRequiredService<DataJackUIApiClient>();
             var statuses = await api.CheckSourcesAsync(appId.ToString());
             var results = statuses
+                .OrderByDescending(kv => Models.SourceMeta.GetPriority(kv.Key))
                 .Select(kv => (object)new { name = kv.Key, available = kv.Value == "available", url = (string?)null })
                 .ToList();
             return (200, Json(new { success = true, results }));

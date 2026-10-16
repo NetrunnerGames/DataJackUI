@@ -20,6 +20,7 @@ public class SourcePriorityTests
 
         // 2. Ryuu is #2 priority
         Assert.Equal(90, ryuuPriority);
+        Assert.Equal(90, SourceMeta.GetPriority("Ryuu Direct"));
         Assert.True(depotBoxPriority > ryuuPriority, "DepotBox must have higher priority than Ryuu");
 
         // 3. Public sources are #3 priority
