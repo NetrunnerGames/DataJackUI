@@ -320,7 +320,7 @@
                     Visibility="{Binding HasFilteredGames, Converter={StaticResource InverseBoolToVis}}">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                         <ui:SymbolIcon
-                            Symbol="FolderDismiss24"
+                            Symbol="Folder24"
                             FontSize="32"
                             Foreground="#475569"
                             HorizontalAlignment="Center" />

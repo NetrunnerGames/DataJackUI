@@ -315,4 +315,45 @@ public class CloudSavesTests : IDisposable
         Assert.True(vm.HasBackups);
         Assert.Equal("Roaming AppData", vm.LocationDisplay);
     }
+
+    [Fact]
+    public void AllXamlViews_AllSymbolIcons_AreValidEnumMembers()
+    {
+        string[] candidateDirs = [
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "src", "DataJackUIGui"),
+            Path.Combine(Directory.GetCurrentDirectory(), "src", "DataJackUIGui"),
+            Path.Combine(Directory.GetCurrentDirectory(), "..", "src", "DataJackUIGui")
+        ];
+
+        string? foundDir = candidateDirs.FirstOrDefault(Directory.Exists);
+        if (foundDir != null)
+        {
+            var xamlFiles = Directory.GetFiles(foundDir, "*.xaml", SearchOption.AllDirectories);
+            Assert.NotEmpty(xamlFiles);
+
+            foreach (var file in xamlFiles)
+            {
+                string content = File.ReadAllText(file);
+                var regex = new System.Text.RegularExpressions.Regex(@"Symbol=""([^""]+)""");
+                foreach (System.Text.RegularExpressions.Match match in regex.Matches(content))
+                {
+                    string sym = match.Groups[1].Value;
+                    if (sym.Contains('{')) continue; // skip bindings
+                    Assert.True(
+                        Enum.TryParse<Wpf.Ui.Controls.SymbolRegular>(sym, out _),
+                        $"Symbol '{sym}' in {Path.GetFileName(file)} must exist in Wpf.Ui.Controls.SymbolRegular");
+                }
+
+                var regexIcon = new System.Text.RegularExpressions.Regex(@"Icon=""{ui:SymbolIcon ([^}]+)}""");
+                foreach (System.Text.RegularExpressions.Match match in regexIcon.Matches(content))
+                {
+                    string sym = match.Groups[1].Value.Trim();
+                    if (sym.Contains('{')) continue;
+                    Assert.True(
+                        Enum.TryParse<Wpf.Ui.Controls.SymbolRegular>(sym, out _),
+                        $"Icon symbol '{sym}' in {Path.GetFileName(file)} must exist in Wpf.Ui.Controls.SymbolRegular");
+                }
+            }
+        }
+    }
 }
