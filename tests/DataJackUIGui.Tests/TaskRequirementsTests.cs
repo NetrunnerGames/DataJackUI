@@ -16,8 +16,6 @@ public class TaskRequirementsTests
         Assert.False(settings.DonateKeys);
     }
 
-
-
     [Fact]
     public void SettingsViewModel_ExposesUsernameAndUserId()
     {
