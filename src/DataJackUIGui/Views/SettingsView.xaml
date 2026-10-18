@@ -33,51 +33,40 @@
             <Setter Property="Margin" Value="14,0" />
         </Style>
 
-        <!-- Round Camera Button Template (WinUI 3 notification acrylic style) -->
+        <!-- Round Camera Button Template (clean dark slate with accent border) -->
         <ControlTemplate x:Key="RoundCameraButtonTemplate" TargetType="Button">
             <Border
                 x:Name="CamBorder"
-                Width="22"
-                Height="22"
-                CornerRadius="11"
-                Background="#E6141622"
-                BorderThickness="1">
-                <Border.BorderBrush>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Offset="0.0" Color="#4AFFFFFF" />
-                        <GradientStop Offset="1.0" Color="#1EFFFFFF" />
-                    </LinearGradientBrush>
-                </Border.BorderBrush>
+                Width="26"
+                Height="26"
+                CornerRadius="13"
+                Background="#1E293B"
+                BorderBrush="#38BDF8"
+                BorderThickness="1.5">
                 <Border.Effect>
                     <DropShadowEffect
-                        BlurRadius="8"
+                        BlurRadius="6"
                         Color="#000000"
                         Direction="270"
-                        Opacity="0.65"
-                        ShadowDepth="2" />
+                        Opacity="0.45"
+                        ShadowDepth="1" />
                 </Border.Effect>
-                <Grid>
-                    <!-- Top specular highlight -->
-                    <Border
-                        Height="1"
-                        VerticalAlignment="Top"
-                        Background="#33FFFFFF"
-                        CornerRadius="11,11,0,0"
-                        IsHitTestVisible="False" />
-                    <ui:SymbolIcon
-                        x:Name="CamIcon"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        FontSize="11"
-                        Foreground="#CBD5E1"
-                        Symbol="Camera20" />
-                </Grid>
+                <ui:SymbolIcon
+                    x:Name="CamIcon"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    FontSize="13"
+                    Foreground="#38BDF8"
+                    Symbol="Camera20" />
             </Border>
             <ControlTemplate.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="CamBorder" Property="Background" Value="#F21E2235" />
-                    <Setter TargetName="CamBorder" Property="BorderBrush" Value="#6638BDF8" />
-                    <Setter TargetName="CamIcon" Property="Foreground" Value="#38BDF8" />
+                    <Setter TargetName="CamBorder" Property="Background" Value="#0284C7" />
+                    <Setter TargetName="CamBorder" Property="BorderBrush" Value="#7DD3FC" />
+                    <Setter TargetName="CamIcon" Property="Foreground" Value="#FFFFFF" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter TargetName="CamBorder" Property="Background" Value="#0369A1" />
                 </Trigger>
             </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -110,13 +99,12 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <!-- Profile Picture with round Camera button on bottom-right border (hover-only) -->
+                            <!-- Profile Picture with round Camera button on bottom-right border (visible in edit mode) -->
                             <Grid
                                 x:Name="SignedInPfpContainer"
-                                Width="52"
-                                Height="52"
-                                Background="Transparent"
-                                ToolTip="{x:Static res:Strings.Settings_ProfilePicture_ChangeTooltip}">
+                                Width="54"
+                                Height="54"
+                                Background="Transparent">
                                 <Border
                                     Width="48"
                                     Height="48"
@@ -146,36 +134,69 @@
                                     Template="{StaticResource RoundCameraButtonTemplate}"
                                     HorizontalAlignment="Right"
                                     VerticalAlignment="Bottom"
-                                    Width="22"
-                                    Height="22"
+                                    Width="26"
+                                    Height="26"
                                     Padding="0"
-                                    Cursor="Hand">
-                                    <Button.Style>
-                                        <Style TargetType="Button">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=SignedInPfpContainer}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
+                                    Cursor="Hand"
+                                    ToolTip="{x:Static res:Strings.Settings_ProfilePicture_ChangeTooltip}"
+                                    Visibility="{Binding IsEditingProfile, Converter={StaticResource BoolToVis}}" />
                             </Grid>
 
                             <!-- Custom Username input + UserId -->
                             <StackPanel
                                 Grid.Column="1"
-                                Margin="12,0"
+                                Margin="14,0"
                                 VerticalAlignment="Center">
-                                <ui:TextBox
-                                    Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                    PlaceholderText="anonymous"
-                                    FontSize="14"
-                                    FontWeight="SemiBold"
-                                    Height="32"
-                                    Padding="8,4"
-                                    VerticalContentAlignment="Center" />
+                                <!-- Read-only View Mode -->
+                                <StackPanel
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding IsEditingProfile, Converter={StaticResource InverseBoolToVis}}">
+                                    <TextBlock
+                                        Text="{Binding Username}"
+                                        FontSize="15"
+                                        FontWeight="SemiBold"
+                                        VerticalAlignment="Center" />
+                                    <ui:Button
+                                        Margin="8,0,0,0"
+                                        Padding="6,4"
+                                        Appearance="Secondary"
+                                        Command="{Binding StartEditProfileCommand}"
+                                        ToolTip="{x:Static res:Strings.Settings_EditProfile}"
+                                        VerticalAlignment="Center">
+                                        <ui:SymbolIcon Symbol="Edit20" FontSize="14" />
+                                    </ui:Button>
+                                </StackPanel>
+
+                                <!-- Edit Mode -->
+                                <StackPanel
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding IsEditingProfile, Converter={StaticResource BoolToVis}}">
+                                    <ui:TextBox
+                                        Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        PlaceholderText="anonymous"
+                                        FontSize="14"
+                                        FontWeight="SemiBold"
+                                        Height="32"
+                                        MinWidth="160"
+                                        MaxWidth="240"
+                                        Padding="8,4"
+                                        VerticalContentAlignment="Center" />
+                                    <ui:Button
+                                        Margin="8,0,0,0"
+                                        Padding="10,5"
+                                        Appearance="Primary"
+                                        Command="{Binding FinishEditProfileCommand}"
+                                        ToolTip="{x:Static res:Strings.Settings_DoneEditing}"
+                                        VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Checkmark20" FontSize="14" Margin="0,0,4,0" />
+                                            <TextBlock Text="{x:Static res:Strings.Settings_DoneEditing}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </ui:Button>
+                                </StackPanel>
+
                                 <TextBlock
                                     Margin="2,4,0,0"
                                     FontSize="12"
@@ -238,13 +259,12 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <!-- Profile Picture with round Camera button on bottom-right border (hover-only) -->
+                            <!-- Profile Picture with round Camera button on bottom-right border (visible in edit mode) -->
                             <Grid
                                 x:Name="GuestPfpContainer"
-                                Width="52"
-                                Height="52"
-                                Background="Transparent"
-                                ToolTip="{x:Static res:Strings.Settings_ProfilePicture_ChangeTooltip}">
+                                Width="54"
+                                Height="54"
+                                Background="Transparent">
                                 <Border
                                     Width="48"
                                     Height="48"
@@ -274,36 +294,69 @@
                                     Template="{StaticResource RoundCameraButtonTemplate}"
                                     HorizontalAlignment="Right"
                                     VerticalAlignment="Bottom"
-                                    Width="22"
-                                    Height="22"
+                                    Width="26"
+                                    Height="26"
                                     Padding="0"
-                                    Cursor="Hand">
-                                    <Button.Style>
-                                        <Style TargetType="Button">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=GuestPfpContainer}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
+                                    Cursor="Hand"
+                                    ToolTip="{x:Static res:Strings.Settings_ProfilePicture_ChangeTooltip}"
+                                    Visibility="{Binding IsEditingProfile, Converter={StaticResource BoolToVis}}" />
                             </Grid>
 
                             <!-- Custom Username input + Guest hint -->
                             <StackPanel
                                 Grid.Column="1"
-                                Margin="12,0"
+                                Margin="14,0"
                                 VerticalAlignment="Center">
-                                <ui:TextBox
-                                    Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                    PlaceholderText="anonymous"
-                                    FontSize="14"
-                                    FontWeight="SemiBold"
-                                    Height="32"
-                                    Padding="8,4"
-                                    VerticalContentAlignment="Center" />
+                                <!-- Read-only View Mode -->
+                                <StackPanel
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding IsEditingProfile, Converter={StaticResource InverseBoolToVis}}">
+                                    <TextBlock
+                                        Text="{Binding Username}"
+                                        FontSize="15"
+                                        FontWeight="SemiBold"
+                                        VerticalAlignment="Center" />
+                                    <ui:Button
+                                        Margin="8,0,0,0"
+                                        Padding="6,4"
+                                        Appearance="Secondary"
+                                        Command="{Binding StartEditProfileCommand}"
+                                        ToolTip="{x:Static res:Strings.Settings_EditProfile}"
+                                        VerticalAlignment="Center">
+                                        <ui:SymbolIcon Symbol="Edit20" FontSize="14" />
+                                    </ui:Button>
+                                </StackPanel>
+
+                                <!-- Edit Mode -->
+                                <StackPanel
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding IsEditingProfile, Converter={StaticResource BoolToVis}}">
+                                    <ui:TextBox
+                                        Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        PlaceholderText="anonymous"
+                                        FontSize="14"
+                                        FontWeight="SemiBold"
+                                        Height="32"
+                                        MinWidth="160"
+                                        MaxWidth="240"
+                                        Padding="8,4"
+                                        VerticalContentAlignment="Center" />
+                                    <ui:Button
+                                        Margin="8,0,0,0"
+                                        Padding="10,5"
+                                        Appearance="Primary"
+                                        Command="{Binding FinishEditProfileCommand}"
+                                        ToolTip="{x:Static res:Strings.Settings_DoneEditing}"
+                                        VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Checkmark20" FontSize="14" Margin="0,0,4,0" />
+                                            <TextBlock Text="{x:Static res:Strings.Settings_DoneEditing}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </ui:Button>
+                                </StackPanel>
+
                                 <TextBlock
                                     Margin="2,4,0,0"
                                     FontSize="12"

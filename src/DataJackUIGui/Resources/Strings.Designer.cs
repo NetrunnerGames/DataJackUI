@@ -56,6 +56,8 @@ public static class Strings
     public static string Settings_ProfilePicture_Reset => Get(nameof(Settings_ProfilePicture_Reset));
     public static string Settings_ProfilePicture_Cancel => Get(nameof(Settings_ProfilePicture_Cancel));
     public static string Settings_ProfilePicture_ChangeTooltip => Get(nameof(Settings_ProfilePicture_ChangeTooltip));
+    public static string Settings_EditProfile => Get(nameof(Settings_EditProfile));
+    public static string Settings_DoneEditing => Get(nameof(Settings_DoneEditing));
     public static string Settings_ManageKeyHintPrefix => Get(nameof(Settings_ManageKeyHintPrefix));
     public static string Settings_Section_Hubcap => Get(nameof(Settings_Section_Hubcap));
     public static string Settings_HubcapKey => Get(nameof(Settings_HubcapKey));

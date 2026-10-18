@@ -44,6 +44,7 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private bool _isAvatarDialogOpen;
     [ObservableProperty] private string _avatarUrlInput = "";
+    [ObservableProperty] private bool _isEditingProfile;
 
     public bool HasCustomAvatar => !string.IsNullOrWhiteSpace(_settings.CustomAvatarPath);
 
@@ -280,7 +281,7 @@ public partial class SettingsViewModel : ObservableObject
         {
             IsGuest = _auth.IsGuest;
             DisplayName = _auth.DisplayName;
-            Username = _settings.CustomUsername;
+            Username = _settings.CustomUsername ?? "anonymous";
             UserId = _auth.UserId ?? _auth.DiscordId;
             Email = _auth.Email;
             AvatarUrl = _auth.AvatarUrl;
@@ -296,6 +297,36 @@ public partial class SettingsViewModel : ObservableObject
         else
         {
             Update();
+        }
+    }
+
+    [RelayCommand]
+    private void StartEditProfile() => IsEditingProfile = true;
+
+    [RelayCommand]
+    private void FinishEditProfile()
+    {
+        if (string.IsNullOrWhiteSpace(Username))
+        {
+            Username = "anonymous";
+        }
+        else
+        {
+            Username = Username.Trim();
+        }
+        IsEditingProfile = false;
+    }
+
+    [RelayCommand]
+    private void ToggleEditProfile()
+    {
+        if (IsEditingProfile)
+        {
+            FinishEditProfile();
+        }
+        else
+        {
+            StartEditProfile();
         }
     }
 

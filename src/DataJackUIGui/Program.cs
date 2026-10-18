@@ -44,6 +44,7 @@ public static class Program
         bool startMinimized = false;
         bool trayLocked = false;
         bool force = false;
+        bool isRestarted = false;
         if (args is { Length: > 0 })
         {
             foreach (var arg in args)
@@ -63,6 +64,10 @@ public static class Program
                 else if (arg.Equals("--force", StringComparison.OrdinalIgnoreCase) || arg.Equals("-f", StringComparison.OrdinalIgnoreCase))
                 {
                     force = true;
+                }
+                else if (arg.Equals("--restarted", StringComparison.OrdinalIgnoreCase) || arg.StartsWith("--veloapp", StringComparison.OrdinalIgnoreCase))
+                {
+                    isRestarted = true;
                 }
             }
         }
@@ -86,48 +91,66 @@ public static class Program
 
         // Only one instance may run: two copies share %AppData%\DataJackUIGui (auth.dat,
         // caches) and would lock each other's files (e.g. a token write failing on login).
-        using var single = new Mutex(initiallyOwned: true, "DataJackUIGui.SingleInstance", out bool isFirst);
-        if (!isFirst)
+        Mutex? single = null;
+        bool isFirst = false;
+        try
         {
-            // Launched from a browser protocol link → write the URL to a temp file so the live
-            // instance can pick it up, then signal it to surface and handle the URL.
-            if (protocolUrl is not null)
-                Services.ProtocolService.WritePending(protocolUrl);
-
-            // Already running (possibly hidden in the tray). Poke the live instance to surface its
-            // window, then bow out. This is what users expect when they relaunch the app.
-            // Exception: a --minimized relaunch explicitly wants to stay silent (this is what our
-            // Steam DLL hijack passes on every launch: steam.exe loads it into more than one
-            // process/thread per boot, so DllMain and this whole Main() can legitimately run more
-            // than once in the same Steam startup). Don't surface the window for that duplicate.
-            if (!startMinimized) SignalEvent(ShowWindowEventName);
-
-            if (trayLocked)
+            single = new Mutex(initiallyOwned: true, "DataJackUIGui.SingleInstance", out isFirst);
+            if (!isFirst && isRestarted)
             {
-                SignalEvent(EnableTrayLockEventName);
-                SignalEvent(RecheckUpdatesEventName);
+                // Relaunching from update: wait up to 5s for the exiting instance to release the mutex
+                isFirst = single.WaitOne(TimeSpan.FromSeconds(5));
             }
-            return;
+        }
+        catch (AbandonedMutexException)
+        {
+            isFirst = true;
         }
 
-        // First instance: store the URL so App.OnStartup can route it.
-        StartupUrl = protocolUrl;
-        StartMinimized = startMinimized;
-        SessionTrayLock = trayLocked;
+        using (single)
+        {
+            if (!isFirst)
+            {
+                // Launched from a browser protocol link → write the URL to a temp file so the live
+                // instance can pick it up, then signal it to surface and handle the URL.
+                if (protocolUrl is not null)
+                    Services.ProtocolService.WritePending(protocolUrl);
 
-        // The live instance listens on this named event; a second launch sets it (above) to ask us to
-        // restore/focus the main window. Created before App.Run so it exists before any relaunch races us.
-        ShowWindowSignal = new EventWaitHandle(false, EventResetMode.AutoReset, ShowWindowEventName);
-        EnableTrayLockSignal = new EventWaitHandle(false, EventResetMode.AutoReset, EnableTrayLockEventName);
-        RecheckUpdatesSignal = new EventWaitHandle(false, EventResetMode.AutoReset, RecheckUpdatesEventName);
+                // Already running (possibly hidden in the tray). Poke the live instance to surface its
+                // window, then bow out. This is what users expect when they relaunch the app.
+                // Exception: a --minimized relaunch explicitly wants to stay silent (this is what our
+                // Steam DLL hijack passes on every launch: steam.exe loads it into more than one
+                // process/thread per boot, so DllMain and this whole Main() can legitimately run more
+                // than once in the same Steam startup). Don't surface the window for that duplicate.
+                if (!startMinimized) SignalEvent(ShowWindowEventName);
 
-        var app = new App();
-        app.InitializeComponent();
-        app.Run();
+                if (trayLocked)
+                {
+                    SignalEvent(EnableTrayLockEventName);
+                    SignalEvent(RecheckUpdatesEventName);
+                }
+                return;
+            }
 
-        ShowWindowSignal.Dispose();
-        EnableTrayLockSignal.Dispose();
-        RecheckUpdatesSignal.Dispose();
+            // First instance: store the URL so App.OnStartup can route it.
+            StartupUrl = protocolUrl;
+            StartMinimized = startMinimized;
+            SessionTrayLock = trayLocked;
+
+            // The live instance listens on this named event; a second launch sets it (above) to ask us to
+            // restore/focus the main window. Created before App.Run so it exists before any relaunch races us.
+            ShowWindowSignal = new EventWaitHandle(false, EventResetMode.AutoReset, ShowWindowEventName);
+            EnableTrayLockSignal = new EventWaitHandle(false, EventResetMode.AutoReset, EnableTrayLockEventName);
+            RecheckUpdatesSignal = new EventWaitHandle(false, EventResetMode.AutoReset, RecheckUpdatesEventName);
+
+            var app = new App();
+            app.InitializeComponent();
+            app.Run();
+
+            ShowWindowSignal.Dispose();
+            EnableTrayLockSignal.Dispose();
+            RecheckUpdatesSignal.Dispose();
+        }
     }
 
     /// <summary>Named event a second instance sets to ask the running one to surface its window.</summary>

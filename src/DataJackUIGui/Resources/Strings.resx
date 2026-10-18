@@ -96,6 +96,8 @@
   <data name="Settings_ProfilePicture_Reset" xml:space="preserve"><value>Reset to Default</value></data>
   <data name="Settings_ProfilePicture_Cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="Settings_ProfilePicture_ChangeTooltip" xml:space="preserve"><value>Change profile picture</value></data>
+  <data name="Settings_EditProfile" xml:space="preserve"><value>Edit profile</value></data>
+  <data name="Settings_DoneEditing" xml:space="preserve"><value>Done</value></data>
   <data name="Settings_ManageKeyHintPrefix" xml:space="preserve"><value>Manage your Hubcap API key and profile on</value></data>
   <data name="Settings_Section_Hubcap" xml:space="preserve"><value>HUBCAP</value></data>
   <data name="Settings_HubcapKey" xml:space="preserve"><value>Hubcap API key</value></data>

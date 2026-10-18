@@ -16,10 +16,13 @@ public class TaskRequirementsTests
         Assert.False(settings.DonateKeys);
     }
 
+
+
     [Fact]
     public void SettingsViewModel_ExposesUsernameAndUserId()
     {
         var settings = new SettingsService();
+        settings.CustomUsername = null;
         var auth = new AuthService();
         var steam = new SteamService(settings);
         var hubcap = new HubcapService();
@@ -35,6 +38,7 @@ public class TaskRequirementsTests
     public void SettingsViewModel_CustomUsername_UpdatesAndPersists()
     {
         var settings = new SettingsService();
+        settings.CustomUsername = null;
         var auth = new AuthService();
         var steam = new SteamService(settings);
         var hubcap = new HubcapService();
@@ -49,6 +53,8 @@ public class TaskRequirementsTests
 
         vm.Username = "";
         Assert.Equal("anonymous", settings.CustomUsername);
+
+        settings.CustomUsername = null;
     }
 
     [Fact]
@@ -76,6 +82,38 @@ public class TaskRequirementsTests
         vm.ResetAvatarCommand.Execute(null);
         Assert.False(vm.HasCustomAvatar);
         Assert.Null(settings.CustomAvatarPath);
+    }
+
+    [Fact]
+    public void SettingsViewModel_ProfileEditing_TogglesAndResetsEmptyUsername()
+    {
+        var settings = new SettingsService();
+        settings.CustomUsername = null;
+        var auth = new AuthService();
+        var steam = new SteamService(settings);
+        var hubcap = new HubcapService();
+        var update = new UpdateService();
+
+        var vm = new SettingsViewModel(settings, auth, steam, hubcap, update);
+
+        Assert.False(vm.IsEditingProfile);
+
+        vm.StartEditProfileCommand.Execute(null);
+        Assert.True(vm.IsEditingProfile);
+
+        vm.Username = "   ";
+        vm.FinishEditProfileCommand.Execute(null);
+        Assert.False(vm.IsEditingProfile);
+        Assert.Equal("anonymous", vm.Username);
+
+        vm.ToggleEditProfileCommand.Execute(null);
+        Assert.True(vm.IsEditingProfile);
+        vm.Username = " CyberDeck ";
+        vm.ToggleEditProfileCommand.Execute(null);
+        Assert.False(vm.IsEditingProfile);
+        Assert.Equal("CyberDeck", vm.Username);
+
+        settings.CustomUsername = null;
     }
 
     [Fact]

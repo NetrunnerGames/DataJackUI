@@ -96,13 +96,6 @@ public class UpdateService : IDisposable
             _stagedMgr = mgr;
             _staged = info;
 
-            // Automatically stage it to apply silently on exit without forcing a restart
-            try
-            {
-                mgr.WaitExitThenApplyUpdates(info.TargetFullRelease, silent: true, restart: false);
-            }
-            catch { }
-
             UpdateReady?.Invoke();
             return info;
         }
@@ -187,11 +180,6 @@ public class UpdateService : IDisposable
             }
             else
             {
-                try
-                {
-                    mgr.WaitExitThenApplyUpdates(info.TargetFullRelease, silent: true, restart: false);
-                }
-                catch { }
                 UpdateReady?.Invoke();
                 return false;
             }
@@ -260,7 +248,10 @@ public class UpdateService : IDisposable
     public void ApplyAndRestart(string[]? restartArgs = null)
     {
         if (_stagedMgr is not null && _staged is not null)
-            _stagedMgr.ApplyUpdatesAndRestart(_staged.TargetFullRelease, restartArgs);
+        {
+            var args = restartArgs ?? new[] { "--restarted" };
+            _stagedMgr.ApplyUpdatesAndRestart(_staged.TargetFullRelease, args);
+        }
     }
 
     /// <summary>Apply the staged update after the app exits (no forced restart).</summary>

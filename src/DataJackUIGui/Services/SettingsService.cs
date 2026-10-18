@@ -358,7 +358,7 @@ public class SettingsService
     }
 
     /// <summary>User-chosen custom username override (defaults to "anonymous").</summary>
-    public string CustomUsername
+    public string? CustomUsername
     {
         get => string.IsNullOrWhiteSpace(_settings.CustomUsername) ? "anonymous" : _settings.CustomUsername;
         set
