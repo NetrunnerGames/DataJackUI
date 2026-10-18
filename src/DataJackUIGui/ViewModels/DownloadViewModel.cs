@@ -747,16 +747,6 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         _triedFastFetchSources.Clear();
         var statuses = await _api.CheckSourcesAsync(Details!.AppId.ToString());
 
-        try
-        {
-            bool depotBoxAvail = await _api.CheckDepotBoxManifestAvailabilityAsync(Details.AppId.ToString());
-            if (depotBoxAvail)
-            {
-                statuses["DepotBox"] = "available";
-            }
-        }
-        catch { }
-
         await AddHubcapSourceAsync(statuses, Details.AppId.ToString());
 
         foreach (var (name, status) in statuses.OrderByDescending(kv => SourceMeta.GetPriority(kv.Key)))
@@ -806,8 +796,15 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
             return;
         }
 
-        var status = await _hubcap.CheckStatusAsync(key, appid);
-        statuses[HubcapSourceName] = status?.ManifestFileExists == true ? "available" : "unavailable";
+        try
+        {
+            var status = await _hubcap.CheckStatusAsync(key, appid);
+            statuses[HubcapSourceName] = status?.ManifestFileExists == true ? "available" : "unavailable";
+        }
+        catch
+        {
+            statuses[HubcapSourceName] = "unknown";
+        }
     }
 
     private async Task ApplyHubcapStateAsync()
@@ -882,10 +879,16 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 
         long appId = Details.AppId;
         string gameName = Details.Name;
-        bool isDenuvo = await CheckIsDenuvoAsync(appId);
+
+        var isDenuvoTask = CheckIsDenuvoAsync(appId);
+        var isUnlockedTask = _payment.IsAppUnlockedAsync(appId);
+        await Task.WhenAll(isDenuvoTask, isUnlockedTask);
+
+        bool isDenuvo = isDenuvoTask.Result;
+        bool isUnlocked = isUnlockedTask.Result;
 
         // Check if unlocked via payment
-        if (!await _payment.IsAppUnlockedAsync(appId))
+        if (!isUnlocked)
         {
             ShowPaymentModal(appId, gameName, isDenuvo, async () =>
             {

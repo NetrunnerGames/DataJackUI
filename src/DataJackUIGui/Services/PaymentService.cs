@@ -78,13 +78,24 @@ public class PaymentService
             return true;
 
         // 2. If logged in to Discord, query the AuthNetrunnerGames worker for cloud entitlement
-        string? discordId = _auth.DiscordId;
+        string? discordId = !string.IsNullOrEmpty(_auth.DiscordId) ? _auth.DiscordId : _auth.UserId;
         if (!string.IsNullOrEmpty(discordId))
         {
             try
             {
                 var url = $"{AppConfig.ApiBaseUrl}/api/payment/check?discord_id={Uri.EscapeDataString(discordId)}&appid={appId}";
-                var res = await _http.GetAsync(url);
+                var req = new HttpRequestMessage(HttpMethod.Get, url);
+                if (_auth.IsSignedIn)
+                {
+                    try
+                    {
+                        var token = await _auth.GetValidAccessTokenAsync();
+                        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                    }
+                    catch { }
+                }
+
+                var res = await _http.SendAsync(req);
                 if (res.IsSuccessStatusCode)
                 {
                     using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync());
@@ -115,7 +126,24 @@ public class PaymentService
             return (false, "Please enter a valid 12-digit UPI Reference / UTR number.");
         }
 
-        string? discordId = _auth.DiscordId;
+        string? discordId = !string.IsNullOrEmpty(_auth.DiscordId) ? _auth.DiscordId : _auth.UserId;
+        string? token = null;
+        if (_auth.IsSignedIn)
+        {
+            try
+            {
+                token = await _auth.GetValidAccessTokenAsync();
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Authentication error: {ex.Message}. Please sign in again.");
+            }
+        }
+
+        if (string.IsNullOrEmpty(token))
+        {
+            return (false, "Unauthorized. Valid login required to verify payments. Please sign in to Discord first.");
+        }
 
         try
         {
@@ -125,10 +153,18 @@ public class PaymentService
                 appid = appId,
                 utr = cleanUtr,
                 amount = amount,
-                is_denuvo = isDenuvo
+                is_denuvo = isDenuvo,
+                token = token,
+                access_token = token
             };
 
-            var res = await _http.PostAsJsonAsync($"{AppConfig.ApiBaseUrl}/api/payment/verify", payload);
+            var req = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.ApiBaseUrl}/api/payment/verify")
+            {
+                Content = JsonContent.Create(payload)
+            };
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var res = await _http.SendAsync(req);
             if (!res.IsSuccessStatusCode)
             {
                 var errStr = await res.Content.ReadAsStringAsync();

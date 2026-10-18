@@ -384,9 +384,12 @@ public class DataJackUIApiClient
         {
             try
             {
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(2.5));
+
                 var req = new HttpRequestMessage(HttpMethod.Head, endpoint);
                 req.Headers.TryAddWithoutValidation("User-Agent", AppConfig.DefaultUserAgent);
-                using var res = await _http.SendAsync(req, ct);
+                using var res = await _http.SendAsync(req, timeoutCts.Token);
                 if (res.StatusCode == HttpStatusCode.OK) return true;
             }
             catch { }
@@ -426,18 +429,25 @@ public class DataJackUIApiClient
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // 1. Ryuu availability check via HEAD request to generator.ryuu.lol/manifestinfo/{appid} (Secondary / 2nd priority: 90)
-        bool ryuuAvailable = await CheckRyuuAvailabilityHeadAsync(appid, ct);
-        result["Ryuu"] = ryuuAvailable ? "available" : "unavailable";
+        // Run Ryuu, DepotBox, and Sushi checks concurrently in parallel with a strict 3.5s timeout
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(3.5));
 
-        // 2. DepotBox availability check (Primary / 1st priority: 100)
-        // DepotBox tracks 155k+ games and is prioritized above Ryuu.
-        bool depotBoxAvailable = false;
-        try
-        {
-            depotBoxAvailable = await CheckDepotBoxManifestAvailabilityAsync(appid, ct);
-        }
-        catch { }
+        var ryuuTask = CheckRyuuAvailabilityHeadAsync(appid, cts.Token);
+        var depotBoxTask = CheckDepotBoxManifestAvailabilityAsync(appid, cts.Token);
+        var sushiTask = CheckSushiAvailabilityHeadAsync(appid, cts.Token);
+
+        await Task.WhenAll(
+            ryuuTask.ContinueWith(_ => { }),
+            depotBoxTask.ContinueWith(_ => { }),
+            sushiTask.ContinueWith(_ => { })
+        );
+
+        bool ryuuAvailable = ryuuTask.IsCompletedSuccessfully && ryuuTask.Result;
+        bool depotBoxAvailable = depotBoxTask.IsCompletedSuccessfully && depotBoxTask.Result;
+        bool sushiAvailable = sushiTask.IsCompletedSuccessfully && sushiTask.Result;
+
+        result["Ryuu"] = ryuuAvailable ? "available" : "unavailable";
 
         if (depotBoxAvailable || ryuuAvailable || (long.TryParse(appid, out long aid) && aid > 0 && _appList.GetName(aid) != null))
         {
@@ -448,13 +458,7 @@ public class DataJackUIApiClient
             result["DepotBox"] = "unavailable";
         }
 
-        // 3. Public sources availability check (Tertiary / 3rd priority: 50)
-        try
-        {
-            bool sushiAvailable = await CheckSushiAvailabilityHeadAsync(appid, ct);
-            result["Sushi"] = sushiAvailable ? "available" : "unavailable";
-        }
-        catch { }
+        result["Sushi"] = sushiAvailable ? "available" : "unavailable";
 
         return result;
     }
@@ -466,9 +470,12 @@ public class DataJackUIApiClient
     {
         try
         {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(2.5));
+
             var req = new HttpRequestMessage(HttpMethod.Head, $"https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/{appid}.zip");
             req.Headers.UserAgent.ParseAdd(AppConfig.DefaultUserAgent);
-            using var res = await _http.SendAsync(req, ct);
+            using var res = await _http.SendAsync(req, timeoutCts.Token);
             return res.IsSuccessStatusCode;
         }
         catch
@@ -600,15 +607,25 @@ public class DataJackUIApiClient
     {
         try
         {
-            var req = new HttpRequestMessage(HttpMethod.Get, $"/api/depotbox/api/games/{appid}/availability");
-            string? token = await _auth.GetValidAccessTokenAsync();
-            if (!string.IsNullOrEmpty(token))
-                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(2.5));
 
-            var res = await _http.SendAsync(req, ct);
+            var req = new HttpRequestMessage(HttpMethod.Get, $"/api/depotbox/api/games/{appid}/availability");
+            if (_auth.IsSignedIn)
+            {
+                try
+                {
+                    string? token = await _auth.GetValidAccessTokenAsync();
+                    if (!string.IsNullOrEmpty(token))
+                        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                }
+                catch { }
+            }
+
+            var res = await _http.SendAsync(req, timeoutCts.Token);
             if (res.IsSuccessStatusCode)
             {
-                using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(timeoutCts.Token), cancellationToken: timeoutCts.Token);
                 if (doc.RootElement.TryGetProperty("available", out var avail) && avail.GetBoolean())
                     return true;
                 if (doc.RootElement.TryGetProperty("success", out var succ) && succ.GetBoolean())

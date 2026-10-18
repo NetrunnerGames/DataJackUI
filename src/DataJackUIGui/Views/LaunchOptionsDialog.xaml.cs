@@ -13,6 +13,7 @@ public partial class LaunchOptionsDialog : Wpf.Ui.Controls.FluentWindow
     public LaunchOptionsDialog(LaunchOptionsViewModel viewModel, long appId, string gameName)
     {
         InitializeComponent();
+        DataJackUIGui.Services.WindowAcrylicHelper.Apply(this);
         DataContext = _viewModel = viewModel;
 
         // The VM owns the outcome; the window just closes when told to. Guarded because Save can run

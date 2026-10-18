@@ -19,6 +19,17 @@ public partial class App : Application
 
     public App()
     {
+        DispatcherUnhandledException += (s, e) =>
+        {
+            System.Diagnostics.Debug.WriteLine($"[App] Unhandled UI Exception: {e.Exception}");
+            e.Handled = true;
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+        {
+            System.Diagnostics.Debug.WriteLine($"[App] Unhandled Domain Exception: {e.ExceptionObject}");
+        };
+
         _host = Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
             {
