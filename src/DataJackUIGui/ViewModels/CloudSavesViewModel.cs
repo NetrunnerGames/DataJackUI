@@ -38,6 +38,9 @@ public partial class CloudGameItemViewModel : ObservableObject
     [ObservableProperty] private DateTime? _lastModified;
     [ObservableProperty] private int _snapshotCount;
     [ObservableProperty] private DateTime? _lastBackupDate;
+    [ObservableProperty] private bool _isExpanded;
+
+    public ObservableCollection<SaveBackupSnapshot> Snapshots { get; } = [];
 
     public bool HasBackups => SnapshotCount > 0;
     public bool HasSavePath => !string.IsNullOrWhiteSpace(SavePath) && Directory.Exists(SavePath);
@@ -72,6 +75,18 @@ public partial class CloudGameItemViewModel : ObservableObject
         SnapshotCount = count;
         LastBackupDate = lastDate;
         OnPropertyChanged(nameof(HasBackups));
+    }
+
+    public void RefreshSnapshots(CloudSavesService svc)
+    {
+        Snapshots.Clear();
+        var list = svc.GetSnapshots(AppId);
+        foreach (var s in list)
+        {
+            Snapshots.Add(s);
+        }
+        DateTime? lastDate = list.Count > 0 ? list[0].Timestamp : null;
+        UpdateSnapshotCount(list.Count, lastDate);
     }
 }
 
@@ -222,6 +237,7 @@ public partial class CloudSavesViewModel : ObservableObject
             foreach (var t in rawTargets)
             {
                 var vm = new CloudGameItemViewModel(t, _covers.GetLocalPath(t.AppId));
+                vm.RefreshSnapshots(_cloudSaves);
                 _allGames.Add(vm);
             }
 
@@ -267,7 +283,10 @@ public partial class CloudSavesViewModel : ObservableObject
                 FilteredGames.Add(g);
             }
         }
+        OnPropertyChanged(nameof(HasFilteredGames));
     }
+
+    public bool HasFilteredGames => FilteredGames.Count > 0;
 
     private async Task ResolveAllCoversAndNamesAsync()
     {
@@ -396,6 +415,7 @@ public partial class CloudSavesViewModel : ObservableObject
                     try
                     {
                         _cloudSaves.CreateBackupSnapshot(g.AppId, g.GameName, g.SavePath);
+                        g.RefreshSnapshots(_cloudSaves);
                         succeeded++;
                     }
                     catch { }
@@ -519,6 +539,166 @@ public partial class CloudSavesViewModel : ObservableObject
         string dir = _cloudSaves.GetAppBackupDir(SelectedGame.AppId);
         if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
         SteamService.ShowInExplorer(dir);
+    }
+
+    [RelayCommand]
+    public void ToggleGameExpanded(CloudGameItemViewModel? game)
+    {
+        if (game == null) return;
+        SelectedGame = game;
+        game.IsExpanded = !game.IsExpanded;
+        if (game.IsExpanded && game.Snapshots.Count == 0)
+        {
+            game.RefreshSnapshots(_cloudSaves);
+        }
+    }
+
+    [RelayCommand]
+    public async Task BackupGameAsync(CloudGameItemViewModel? game)
+    {
+        var target = game ?? SelectedGame;
+        if (target == null) return;
+        SelectedGame = target;
+
+        if (string.IsNullOrWhiteSpace(target.SavePath) || !Directory.Exists(target.SavePath))
+        {
+            _toast.Show("Cloud Saves", "No valid save path detected for this game.", error: true);
+            return;
+        }
+
+        IsBusy = true;
+        StatusMessage = $"Creating backup snapshot for {target.GameName}…";
+
+        try
+        {
+            var snap = await Task.Run(() =>
+                _cloudSaves.CreateBackupSnapshot(target.AppId, target.GameName, target.SavePath));
+
+            target.RefreshSnapshots(_cloudSaves);
+            target.IsExpanded = true;
+            LoadSnapshotsForSelected();
+            _toast.Show("Cloud Saves", $"Backup created: {snap.SnapshotId} ({snap.FormattedSize})");
+            StatusMessage = $"Backup snapshot {snap.SnapshotId} created successfully.";
+        }
+        catch (Exception ex)
+        {
+            _toast.Show("Backup Failed", ex.Message, error: true);
+            StatusMessage = $"Backup failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task RestoreGameSnapshotAsync(SaveBackupSnapshot? snapshot)
+    {
+        if (snapshot == null) return;
+        var game = _allGames.FirstOrDefault(g => g.AppId == snapshot.AppId) ?? SelectedGame;
+        if (game != null) SelectedGame = game;
+
+        IsBusy = true;
+        StatusMessage = $"Restoring snapshot {snapshot.SnapshotId}…";
+
+        try
+        {
+            string target = (game != null && game.HasSavePath) ? game.SavePath : snapshot.SourcePath;
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                _toast.Show("Restore Failed", "Could not determine target save directory.", error: true);
+                return;
+            }
+
+            await Task.Run(() => _cloudSaves.RestoreSnapshot(snapshot, target));
+
+            game?.RefreshSnapshots(_cloudSaves);
+            LoadSnapshotsForSelected();
+
+            if (game != null)
+            {
+                var s = CloudSavesService.GetDirectoryStats(target);
+                game.UpdateStats(target, game.LocationType, s.Count, s.Bytes, s.LastMod);
+            }
+
+            _toast.Show("Cloud Saves", $"Restored snapshot {snapshot.SnapshotId} (Safety backup saved).");
+            StatusMessage = $"Restored snapshot {snapshot.SnapshotId} successfully.";
+        }
+        catch (Exception ex)
+        {
+            _toast.Show("Restore Failed", ex.Message, error: true);
+            StatusMessage = $"Restore failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    public void DeleteGameSnapshot(SaveBackupSnapshot? snapshot)
+    {
+        if (snapshot == null) return;
+        var game = _allGames.FirstOrDefault(g => g.AppId == snapshot.AppId) ?? SelectedGame;
+
+        try
+        {
+            _cloudSaves.DeleteSnapshot(snapshot);
+            game?.RefreshSnapshots(_cloudSaves);
+            LoadSnapshotsForSelected();
+            _toast.Show("Cloud Saves", $"Deleted snapshot {snapshot.SnapshotId}.");
+        }
+        catch (Exception ex)
+        {
+            _toast.Show("Delete Failed", ex.Message, error: true);
+        }
+    }
+
+    [RelayCommand]
+    public void OpenGameSaveFolder(CloudGameItemViewModel? game)
+    {
+        var target = game ?? SelectedGame;
+        if (target == null || string.IsNullOrWhiteSpace(target.SavePath)) return;
+        SelectedGame = target;
+        SteamService.ShowInExplorer(target.SavePath);
+    }
+
+    [RelayCommand]
+    public void OpenGameSnapshotsFolder(CloudGameItemViewModel? game)
+    {
+        var target = game ?? SelectedGame;
+        if (target == null)
+        {
+            SteamService.ShowInExplorer(_cloudSaves.BaseBackupDir);
+            return;
+        }
+        SelectedGame = target;
+        string dir = _cloudSaves.GetAppBackupDir(target.AppId);
+        if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+        SteamService.ShowInExplorer(dir);
+    }
+
+    [RelayCommand]
+    public void BrowseGameCustomSaveLocation(CloudGameItemViewModel? game)
+    {
+        var target = game ?? SelectedGame;
+        if (target == null) return;
+        SelectedGame = target;
+
+        var dialog = new OpenFolderDialog
+        {
+            Title = $"Select Save Folder for {target.GameName}",
+            InitialDirectory = target.HasSavePath ? target.SavePath : null
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            string chosen = dialog.FolderName;
+            _settings.SetCustomSavePath(target.AppId, chosen);
+            var stats = CloudSavesService.GetDirectoryStats(chosen);
+            target.UpdateStats(chosen, SaveLocationType.Custom, stats.Count, stats.Bytes, stats.LastMod);
+            _toast.Show("Cloud Saves", $"Custom save location set: {chosen}");
+        }
     }
 
     [RelayCommand]
