@@ -32,9 +32,59 @@
             <Setter Property="Background" Value="#10FFFFFF" />
             <Setter Property="Margin" Value="14,0" />
         </Style>
+
+        <!-- Round Camera Button Template (WinUI 3 notification acrylic style) -->
+        <ControlTemplate x:Key="RoundCameraButtonTemplate" TargetType="Button">
+            <Border
+                x:Name="CamBorder"
+                Width="22"
+                Height="22"
+                CornerRadius="11"
+                Background="#E6141622"
+                BorderThickness="1">
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Offset="0.0" Color="#4AFFFFFF" />
+                        <GradientStop Offset="1.0" Color="#1EFFFFFF" />
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+                <Border.Effect>
+                    <DropShadowEffect
+                        BlurRadius="8"
+                        Color="#000000"
+                        Direction="270"
+                        Opacity="0.65"
+                        ShadowDepth="2" />
+                </Border.Effect>
+                <Grid>
+                    <!-- Top specular highlight -->
+                    <Border
+                        Height="1"
+                        VerticalAlignment="Top"
+                        Background="#33FFFFFF"
+                        CornerRadius="11,11,0,0"
+                        IsHitTestVisible="False" />
+                    <ui:SymbolIcon
+                        x:Name="CamIcon"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        FontSize="11"
+                        Foreground="#CBD5E1"
+                        Symbol="Camera20" />
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="CamBorder" Property="Background" Value="#F21E2235" />
+                    <Setter TargetName="CamBorder" Property="BorderBrush" Value="#6638BDF8" />
+                    <Setter TargetName="CamIcon" Property="Foreground" Value="#38BDF8" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="640" Margin="8,16,8,24">
             <TextBlock
                 FontSize="22"
@@ -59,38 +109,80 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Border
-                                Width="40"
-                                Height="40"
-                                Background="#1F2937"
-                                CornerRadius="20">
-                                <Grid>
-                                    <ui:SymbolIcon
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        FontSize="20"
-                                        Foreground="#9CA3AF"
-                                        Symbol="Person24" />
-                                    <Border CornerRadius="20">
-                                        <Border.Background>
-                                            <ImageBrush ImageSource="{Binding AvatarUrl}" Stretch="UniformToFill" />
-                                        </Border.Background>
-                                    </Border>
-                                </Grid>
-                            </Border>
+
+                            <!-- Profile Picture with round Camera button on bottom-right border (hover-only) -->
+                            <Grid
+                                x:Name="SignedInPfpContainer"
+                                Width="52"
+                                Height="52"
+                                Background="Transparent"
+                                ToolTip="{x:Static res:Strings.Settings_ProfilePicture_ChangeTooltip}">
+                                <Border
+                                    Width="48"
+                                    Height="48"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top"
+                                    Background="#1F2937"
+                                    BorderBrush="#25FFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="24">
+                                    <Grid>
+                                        <ui:SymbolIcon
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            FontSize="22"
+                                            Foreground="#9CA3AF"
+                                            Symbol="Person24" />
+                                        <Border CornerRadius="24">
+                                            <Border.Background>
+                                                <ImageBrush ImageSource="{Binding AvatarImage}" Stretch="UniformToFill" />
+                                            </Border.Background>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <Button
+                                    Command="{Binding OpenAvatarDialogCommand}"
+                                    Template="{StaticResource RoundCameraButtonTemplate}"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Bottom"
+                                    Width="22"
+                                    Height="22"
+                                    Padding="0"
+                                    Cursor="Hand">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=SignedInPfpContainer}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+
+                            <!-- Custom Username input + UserId -->
                             <StackPanel
                                 Grid.Column="1"
                                 Margin="12,0"
                                 VerticalAlignment="Center">
-                                <TextBlock
+                                <ui:TextBox
+                                    Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="anonymous"
                                     FontSize="14"
                                     FontWeight="SemiBold"
-                                    Text="{Binding Username}" />
+                                    Height="32"
+                                    Padding="8,4"
+                                    VerticalContentAlignment="Center" />
                                 <TextBlock
+                                    Margin="2,4,0,0"
                                     FontSize="12"
                                     Foreground="#6b7280"
                                     Text="{Binding UserId}" />
                             </StackPanel>
+
                             <ui:Button
                                 Grid.Column="2"
                                 Command="{Binding SignOutCommand}"
@@ -141,21 +233,86 @@
 
                         <Grid>
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock
+
+                            <!-- Profile Picture with round Camera button on bottom-right border (hover-only) -->
+                            <Grid
+                                x:Name="GuestPfpContainer"
+                                Width="52"
+                                Height="52"
+                                Background="Transparent"
+                                ToolTip="{x:Static res:Strings.Settings_ProfilePicture_ChangeTooltip}">
+                                <Border
+                                    Width="48"
+                                    Height="48"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top"
+                                    Background="#1F2937"
+                                    BorderBrush="#25FFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="24">
+                                    <Grid>
+                                        <ui:SymbolIcon
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            FontSize="22"
+                                            Foreground="#9CA3AF"
+                                            Symbol="Person24" />
+                                        <Border CornerRadius="24">
+                                            <Border.Background>
+                                                <ImageBrush ImageSource="{Binding AvatarImage}" Stretch="UniformToFill" />
+                                            </Border.Background>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <Button
+                                    Command="{Binding OpenAvatarDialogCommand}"
+                                    Template="{StaticResource RoundCameraButtonTemplate}"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Bottom"
+                                    Width="22"
+                                    Height="22"
+                                    Padding="0"
+                                    Cursor="Hand">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=GuestPfpContainer}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+
+                            <!-- Custom Username input + Guest hint -->
+                            <StackPanel
+                                Grid.Column="1"
+                                Margin="12,0"
+                                VerticalAlignment="Center">
+                                <ui:TextBox
+                                    Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="anonymous"
                                     FontSize="14"
                                     FontWeight="SemiBold"
-                                    Text="{x:Static res:Strings.Settings_BrowsingAsGuest}" />
+                                    Height="32"
+                                    Padding="8,4"
+                                    VerticalContentAlignment="Center" />
                                 <TextBlock
+                                    Margin="2,4,0,0"
                                     FontSize="12"
                                     Foreground="#6b7280"
                                     Text="{x:Static res:Strings.Settings_GuestHint}" />
                             </StackPanel>
+
                             <ui:Button
-                                Grid.Column="1"
+                                Grid.Column="2"
                                 Appearance="Primary"
                                 Command="{Binding SignInCommand}"
                                 Content="{x:Static res:Strings.Settings_SignInDiscord}"
@@ -596,4 +753,166 @@
             </Border>
         </StackPanel>
     </ScrollViewer>
+
+    <!-- Avatar Picker Modal Dialog Overlay -->
+    <Grid
+        x:Name="AvatarDialogOverlay"
+        Visibility="{Binding IsAvatarDialogOpen, Converter={StaticResource BoolToVis}}"
+        Panel.ZIndex="100">
+        <!-- Semi-transparent dimmed backdrop -->
+        <Border Background="#99000000" />
+
+        <!-- Dialog Floating Card -->
+        <Border
+            Width="440"
+            Margin="24"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Background="#E6141622"
+            BorderThickness="1"
+            CornerRadius="12">
+            <!-- WinUI 3 Elevation Border Stroke -->
+            <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Offset="0.0" Color="#4AFFFFFF" />
+                    <GradientStop Offset="0.3" Color="#2EFFFFFF" />
+                    <GradientStop Offset="1.0" Color="#0DFFFFFF" />
+                </LinearGradientBrush>
+            </Border.BorderBrush>
+            <Border.Effect>
+                <DropShadowEffect
+                    BlurRadius="36"
+                    Color="#000000"
+                    Direction="270"
+                    Opacity="0.65"
+                    ShadowDepth="8" />
+            </Border.Effect>
+
+            <Grid>
+                <!-- Top specular highlight -->
+                <Border
+                    Height="1"
+                    VerticalAlignment="Top"
+                    Background="#2EFFFFFF"
+                    CornerRadius="12,12,0,0"
+                    IsHitTestVisible="False" />
+
+                <StackPanel Margin="24">
+                    <!-- Header: Title + Close '✕' Button -->
+                    <Grid Margin="0,0,0,18">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon
+                                Margin="0,0,10,0"
+                                FontSize="20"
+                                Foreground="#38BDF8"
+                                Symbol="Camera24" />
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontSize="16"
+                                FontWeight="SemiBold"
+                                Text="{x:Static res:Strings.Settings_ProfilePicture_Title}" />
+                        </StackPanel>
+                        <ui:Button
+                            Grid.Column="1"
+                            Appearance="Secondary"
+                            Command="{Binding CloseAvatarDialogCommand}"
+                            Content="✕"
+                            Width="28"
+                            Height="28"
+                            Padding="0" />
+                    </Grid>
+
+                    <!-- Choice 1: Local Image File -->
+                    <Border
+                        Padding="14,12"
+                        Background="#08FFFFFF"
+                        BorderBrush="#15FFFFFF"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock
+                                FontSize="13"
+                                FontWeight="Medium"
+                                Text="{x:Static res:Strings.Settings_ProfilePicture_Local}" />
+                            <TextBlock
+                                Margin="0,2,0,10"
+                                FontSize="11"
+                                Foreground="#9CA3AF"
+                                Text="PNG, JPG, WEBP, BMP, or GIF" />
+                            <ui:Button
+                                Appearance="Secondary"
+                                Command="{Binding PickLocalAvatarCommand}"
+                                Content="{x:Static res:Strings.Settings_ProfilePicture_LocalButton}"
+                                Icon="{ui:SymbolIcon FolderOpen24}"
+                                HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Choice 2: Image URL -->
+                    <Border
+                        Padding="14,12"
+                        Background="#08FFFFFF"
+                        BorderBrush="#15FFFFFF"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock
+                                FontSize="13"
+                                FontWeight="Medium"
+                                Text="{x:Static res:Strings.Settings_ProfilePicture_Url}" />
+                            <TextBlock
+                                Margin="0,2,0,10"
+                                FontSize="11"
+                                Foreground="#9CA3AF"
+                                Text="Direct image link (e.g. HTTPS URL)" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBox
+                                    Text="{Binding AvatarUrlInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="{x:Static res:Strings.Settings_ProfilePicture_UrlPlaceholder}"
+                                    Height="34"
+                                    Padding="8,4"
+                                    VerticalContentAlignment="Center" />
+                                <ui:Button
+                                    Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    Appearance="Primary"
+                                    Command="{Binding ApplyAvatarUrlCommand}"
+                                    Content="{x:Static res:Strings.Settings_ProfilePicture_ApplyUrl}"
+                                    Height="34" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Revert to Default (visible when custom avatar is active) -->
+                    <ui:Button
+                        Appearance="Secondary"
+                        Command="{Binding ResetAvatarCommand}"
+                        Content="{x:Static res:Strings.Settings_ProfilePicture_Reset}"
+                        Icon="{ui:SymbolIcon ArrowReset24}"
+                        HorizontalAlignment="Stretch"
+                        Visibility="{Binding HasCustomAvatar, Converter={StaticResource BoolToVis}}"
+                        Margin="0,0,0,14" />
+
+                    <!-- Cancel Button -->
+                    <ui:Button
+                        Appearance="Secondary"
+                        Command="{Binding CloseAvatarDialogCommand}"
+                        Content="{x:Static res:Strings.Settings_ProfilePicture_Cancel}"
+                        HorizontalAlignment="Right"
+                        MinWidth="90" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Grid>
 </UserControl>

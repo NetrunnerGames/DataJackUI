@@ -47,6 +47,15 @@ public static class Strings
     public static string Settings_GuestHint => Get(nameof(Settings_GuestHint));
     public static string Settings_SignInDiscord => Get(nameof(Settings_SignInDiscord));
     public static string Settings_LoginRequired => Get(nameof(Settings_LoginRequired));
+    public static string Settings_ProfilePicture_Title => Get(nameof(Settings_ProfilePicture_Title));
+    public static string Settings_ProfilePicture_Local => Get(nameof(Settings_ProfilePicture_Local));
+    public static string Settings_ProfilePicture_LocalButton => Get(nameof(Settings_ProfilePicture_LocalButton));
+    public static string Settings_ProfilePicture_Url => Get(nameof(Settings_ProfilePicture_Url));
+    public static string Settings_ProfilePicture_UrlPlaceholder => Get(nameof(Settings_ProfilePicture_UrlPlaceholder));
+    public static string Settings_ProfilePicture_ApplyUrl => Get(nameof(Settings_ProfilePicture_ApplyUrl));
+    public static string Settings_ProfilePicture_Reset => Get(nameof(Settings_ProfilePicture_Reset));
+    public static string Settings_ProfilePicture_Cancel => Get(nameof(Settings_ProfilePicture_Cancel));
+    public static string Settings_ProfilePicture_ChangeTooltip => Get(nameof(Settings_ProfilePicture_ChangeTooltip));
     public static string Settings_ManageKeyHintPrefix => Get(nameof(Settings_ManageKeyHintPrefix));
     public static string Settings_Section_Hubcap => Get(nameof(Settings_Section_Hubcap));
     public static string Settings_HubcapKey => Get(nameof(Settings_HubcapKey));

@@ -27,8 +27,55 @@ public class TaskRequirementsTests
 
         var vm = new SettingsViewModel(settings, auth, steam, hubcap, update);
 
-        Assert.Equal(auth.Username ?? auth.DisplayName, vm.Username);
+        Assert.Equal("anonymous", vm.Username);
         Assert.Equal(auth.UserId ?? auth.DiscordId, vm.UserId);
+    }
+
+    [Fact]
+    public void SettingsViewModel_CustomUsername_UpdatesAndPersists()
+    {
+        var settings = new SettingsService();
+        var auth = new AuthService();
+        var steam = new SteamService(settings);
+        var hubcap = new HubcapService();
+        var update = new UpdateService();
+
+        var vm = new SettingsViewModel(settings, auth, steam, hubcap, update);
+
+        Assert.Equal("anonymous", vm.Username);
+        vm.Username = "Netrunner99";
+        Assert.Equal("Netrunner99", settings.CustomUsername);
+        Assert.Equal("Netrunner99", vm.Username);
+
+        vm.Username = "";
+        Assert.Equal("anonymous", settings.CustomUsername);
+    }
+
+    [Fact]
+    public void SettingsViewModel_CustomAvatarUrl_AppliesAndResets()
+    {
+        var settings = new SettingsService();
+        var auth = new AuthService();
+        var steam = new SteamService(settings);
+        var hubcap = new HubcapService();
+        var update = new UpdateService();
+
+        var vm = new SettingsViewModel(settings, auth, steam, hubcap, update);
+
+        Assert.False(vm.IsAvatarDialogOpen);
+        vm.OpenAvatarDialogCommand.Execute(null);
+        Assert.True(vm.IsAvatarDialogOpen);
+
+        vm.AvatarUrlInput = "https://example.com/pfp.png";
+        vm.ApplyAvatarUrlCommand.Execute(null);
+
+        Assert.False(vm.IsAvatarDialogOpen);
+        Assert.True(vm.HasCustomAvatar);
+        Assert.Equal("https://example.com/pfp.png", settings.CustomAvatarPath);
+
+        vm.ResetAvatarCommand.Execute(null);
+        Assert.False(vm.HasCustomAvatar);
+        Assert.Null(settings.CustomAvatarPath);
     }
 
     [Fact]

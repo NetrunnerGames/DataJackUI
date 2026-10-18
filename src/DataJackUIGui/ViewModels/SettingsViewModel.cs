@@ -1,5 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataJackUIGui.Services;
@@ -27,10 +30,22 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _updateStatusColor = "#9ca3af";
 
     [ObservableProperty] private string? _displayName;
-    [ObservableProperty] private string? _username;
+    [ObservableProperty] private string _username = "anonymous";
+
+    partial void OnUsernameChanged(string value)
+    {
+        _settings.CustomUsername = value;
+    }
+
     [ObservableProperty] private string? _userId;
     [ObservableProperty] private string? _email;
     [ObservableProperty] private string? _avatarUrl;
+    [ObservableProperty] private ImageSource? _avatarImage;
+
+    [ObservableProperty] private bool _isAvatarDialogOpen;
+    [ObservableProperty] private string _avatarUrlInput = "";
+
+    public bool HasCustomAvatar => !string.IsNullOrWhiteSpace(_settings.CustomAvatarPath);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRealUser))]
@@ -265,10 +280,12 @@ public partial class SettingsViewModel : ObservableObject
         {
             IsGuest = _auth.IsGuest;
             DisplayName = _auth.DisplayName;
-            Username = _auth.Username ?? _auth.DisplayName;
+            Username = _settings.CustomUsername;
             UserId = _auth.UserId ?? _auth.DiscordId;
             Email = _auth.Email;
             AvatarUrl = _auth.AvatarUrl;
+            UpdateAvatarImage();
+            OnPropertyChanged(nameof(HasCustomAvatar));
             if (!IsGuest) LoginRequiredMessage = null;
         }
 
@@ -279,6 +296,123 @@ public partial class SettingsViewModel : ObservableObject
         else
         {
             Update();
+        }
+    }
+
+    [RelayCommand]
+    private void OpenAvatarDialog()
+    {
+        AvatarUrlInput = _settings.CustomAvatarPath?.StartsWith("http", StringComparison.OrdinalIgnoreCase) == true
+            ? _settings.CustomAvatarPath
+            : "";
+        IsAvatarDialogOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseAvatarDialog()
+    {
+        IsAvatarDialogOpen = false;
+    }
+
+    [RelayCommand]
+    private void PickLocalAvatar()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose Profile Picture",
+            Filter = "Image Files (*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif|All Files (*.*)|*.*",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                string source = dialog.FileName;
+                string ext = Path.GetExtension(source);
+                string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui");
+                Directory.CreateDirectory(dir);
+                string dest = Path.Combine(dir, $"avatar{ext}");
+                File.Copy(source, dest, overwrite: true);
+                _settings.CustomAvatarPath = dest;
+            }
+            catch
+            {
+                _settings.CustomAvatarPath = dialog.FileName;
+            }
+
+            UpdateAvatarImage();
+            OnPropertyChanged(nameof(HasCustomAvatar));
+            IsAvatarDialogOpen = false;
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyAvatarUrl()
+    {
+        if (!string.IsNullOrWhiteSpace(AvatarUrlInput))
+        {
+            string url = AvatarUrlInput.Trim();
+            if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                url = "https://" + url;
+            }
+            _settings.CustomAvatarPath = url;
+            UpdateAvatarImage();
+            OnPropertyChanged(nameof(HasCustomAvatar));
+            IsAvatarDialogOpen = false;
+        }
+    }
+
+    [RelayCommand]
+    private void ResetAvatar()
+    {
+        _settings.CustomAvatarPath = null;
+        UpdateAvatarImage();
+        OnPropertyChanged(nameof(HasCustomAvatar));
+        IsAvatarDialogOpen = false;
+    }
+
+    private void UpdateAvatarImage()
+    {
+        string? pathOrUrl = _settings.CustomAvatarPath ?? _auth.AvatarUrl;
+        if (string.IsNullOrWhiteSpace(pathOrUrl))
+        {
+            AvatarImage = null;
+            return;
+        }
+
+        try
+        {
+            if (pathOrUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                var bi = new BitmapImage();
+                bi.BeginInit();
+                bi.UriSource = new Uri(pathOrUrl, UriKind.Absolute);
+                bi.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+                bi.CacheOption = BitmapCacheOption.OnLoad;
+                bi.EndInit();
+                AvatarImage = bi;
+            }
+            else if (File.Exists(pathOrUrl))
+            {
+                var bi = new BitmapImage();
+                bi.BeginInit();
+                bi.UriSource = new Uri(pathOrUrl, UriKind.Absolute);
+                bi.CacheOption = BitmapCacheOption.OnLoad;
+                bi.EndInit();
+                bi.Freeze();
+                AvatarImage = bi;
+            }
+            else
+            {
+                AvatarImage = null;
+            }
+        }
+        catch
+        {
+            AvatarImage = null;
         }
     }
 

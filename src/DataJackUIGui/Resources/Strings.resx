@@ -87,6 +87,15 @@
   <data name="Settings_GuestHint" xml:space="preserve"><value>Sign in to download manifests and DLC unlocks</value></data>
   <data name="Settings_SignInDiscord" xml:space="preserve"><value>Sign in with Discord</value></data>
   <data name="Settings_LoginRequired" xml:space="preserve"><value>Login is required for this action.</value></data>
+  <data name="Settings_ProfilePicture_Title" xml:space="preserve"><value>Change Profile Picture</value></data>
+  <data name="Settings_ProfilePicture_Local" xml:space="preserve"><value>Choose from local image file</value></data>
+  <data name="Settings_ProfilePicture_LocalButton" xml:space="preserve"><value>Choose Local File…</value></data>
+  <data name="Settings_ProfilePicture_Url" xml:space="preserve"><value>Or enter an image URL</value></data>
+  <data name="Settings_ProfilePicture_UrlPlaceholder" xml:space="preserve"><value>https://example.com/avatar.png</value></data>
+  <data name="Settings_ProfilePicture_ApplyUrl" xml:space="preserve"><value>Apply</value></data>
+  <data name="Settings_ProfilePicture_Reset" xml:space="preserve"><value>Reset to Default</value></data>
+  <data name="Settings_ProfilePicture_Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Settings_ProfilePicture_ChangeTooltip" xml:space="preserve"><value>Change profile picture</value></data>
   <data name="Settings_ManageKeyHintPrefix" xml:space="preserve"><value>Manage your Hubcap API key and profile on</value></data>
   <data name="Settings_Section_Hubcap" xml:space="preserve"><value>HUBCAP</value></data>
   <data name="Settings_HubcapKey" xml:space="preserve"><value>Hubcap API key</value></data>

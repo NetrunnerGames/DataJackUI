@@ -77,6 +77,10 @@ public class AppSettings
     public string? CloudSavesGDriveAccount { get; set; }
     public string? CloudSavesOneDriveAccount { get; set; }
     public Dictionary<long, string>? CustomSavePaths { get; set; }
+
+    // Custom user profile display overrides
+    public string? CustomUsername { get; set; }
+    public string? CustomAvatarPath { get; set; }
 }
 
 public class SettingsService
@@ -262,6 +266,8 @@ public class SettingsService
         if (s.FastFetch is not null) return false;
         if (s.DnsMode is not null) return false;
         if (s.UnlockedAppIds is { Count: > 0 }) return false;
+        if (s.CustomUsername is not null) return false;
+        if (s.CustomAvatarPath is not null) return false;
         return true;
     }
 
@@ -349,6 +355,34 @@ public class SettingsService
         else
             _settings.CustomSavePaths[appId] = path;
         Save();
+    }
+
+    /// <summary>User-chosen custom username override (defaults to "anonymous").</summary>
+    public string CustomUsername
+    {
+        get => string.IsNullOrWhiteSpace(_settings.CustomUsername) ? "anonymous" : _settings.CustomUsername;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) || value.Trim().Equals("anonymous", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : value.Trim();
+            if (_settings.CustomUsername == normalized) return;
+            _settings.CustomUsername = normalized;
+            Save();
+        }
+    }
+
+    /// <summary>User-chosen custom avatar (local file path or URL).</summary>
+    public string? CustomAvatarPath
+    {
+        get => _settings.CustomAvatarPath;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            if (_settings.CustomAvatarPath == normalized) return;
+            _settings.CustomAvatarPath = normalized;
+            Save();
+        }
     }
 
     private static readonly object _saveLock = new();
