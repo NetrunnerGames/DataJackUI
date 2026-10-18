@@ -405,13 +405,21 @@ public partial class App : Application
         _ = _host.Services.GetRequiredService<HardwareAppIdService>().EnsureFreshAsync();
         _ = _host.Services.GetRequiredService<DepotCacheMigrationService>().RunAsync();
 
-        // Check for updates automatically on every startup, and repeat every 6 hours
+        // Check for updates automatically on every startup, and repeat every 6 hours silently
         _ = System.Threading.Tasks.Task.Run(async () =>
         {
             try
             {
-                await System.Threading.Tasks.Task.Delay(1500);
-                await Updates.CheckForUpdatesAndPromptAsync();
+                await System.Threading.Tasks.Task.Delay(2000);
+                var info = await Updates.CheckAndAutoUpdateAsync();
+                if (info != null)
+                {
+                    var toast = _host.Services.GetRequiredService<ToastService>();
+                    string ver = info.TargetFullRelease.Version.ToString();
+                    Dispatcher.Invoke(() => toast.Show(
+                        "Update Downloaded",
+                        $"DataJackUI v{ver} is ready and will apply automatically when you close the app."));
+                }
                 Updates.StartPeriodicChecks(TimeSpan.FromHours(6));
             }
             catch { /* offline or uninstalled */ }

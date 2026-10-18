@@ -74,6 +74,8 @@ public class AppSettings
     public string? CloudSavesRcloneRemote { get; set; }
     public string? CloudSavesRcloneExePath { get; set; }
     public bool? CloudSavesAutoSync { get; set; }
+    public string? CloudSavesGDriveAccount { get; set; }
+    public string? CloudSavesOneDriveAccount { get; set; }
     public Dictionary<long, string>? CustomSavePaths { get; set; }
 }
 
@@ -321,6 +323,20 @@ public class SettingsService
         set { _settings.CloudSavesAutoSync = value; Save(); }
     }
 
+    /// <summary>Signed-in account / email for Google Drive.</summary>
+    public string? CloudSavesGDriveAccount
+    {
+        get => _settings.CloudSavesGDriveAccount;
+        set { _settings.CloudSavesGDriveAccount = string.IsNullOrWhiteSpace(value) ? null : value; Save(); }
+    }
+
+    /// <summary>Signed-in account / email for OneDrive.</summary>
+    public string? CloudSavesOneDriveAccount
+    {
+        get => _settings.CloudSavesOneDriveAccount;
+        set { _settings.CloudSavesOneDriveAccount = string.IsNullOrWhiteSpace(value) ? null : value; Save(); }
+    }
+
     /// <summary>Custom save location path overrides per App ID.</summary>
     public string? GetCustomSavePath(long appId) =>
         _settings.CustomSavePaths != null && _settings.CustomSavePaths.TryGetValue(appId, out var p) ? p : null;
@@ -335,20 +351,37 @@ public class SettingsService
         Save();
     }
 
+    private static readonly object _saveLock = new();
+
     private void Save()
     {
-        if (IsEmpty(_settings))
+        lock (_saveLock)
         {
-            foreach (var p in new[] { FilePath, BakPath, TmpPath })
-                try { if (File.Exists(p)) File.Delete(p); } catch { }
-            return;
+            if (IsEmpty(_settings))
+            {
+                foreach (var p in new[] { FilePath, BakPath, TmpPath })
+                    try { if (File.Exists(p)) File.Delete(p); } catch { }
+                return;
+            }
+
+            Directory.CreateDirectory(Dir);
+            string json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
+
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    File.WriteAllText(TmpPath, json);
+                    try { if (File.Exists(FilePath)) File.Copy(FilePath, BakPath, overwrite: true); } catch { }
+                    File.Move(TmpPath, FilePath, overwrite: true);
+                    return;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    if (attempt == 4) break;
+                    Thread.Sleep(50);
+                }
+            }
         }
-
-        Directory.CreateDirectory(Dir);
-        string json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
-
-        File.WriteAllText(TmpPath, json);
-        try { if (File.Exists(FilePath)) File.Copy(FilePath, BakPath, overwrite: true); } catch { }
-        File.Move(TmpPath, FilePath, overwrite: true);
     }
 }

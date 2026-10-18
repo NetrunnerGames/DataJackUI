@@ -15,27 +15,24 @@ namespace DataJackUIGui.Services;
 /// </summary>
 public class UpdateService : IDisposable
 {
-    private UpdateManager[]? _managers;
+    private UpdateManager? _manager;
 
-    private UpdateManager[] GetManagers()
+    private UpdateManager? GetManager()
     {
-        if (_managers is not null) return _managers;
+        if (_manager is not null) return _manager;
         try
         {
-            _managers = AppConfig.GithubReleasesRepos
-                .Select(repo => new UpdateManager(
-                    new GithubSource(repo, accessToken: null, prerelease: false,
-                        downloader: new ProxiedFileDownloader())))
-                .ToArray();
+            var source = new SimpleWebSource(AppConfig.VelopackReleaseFeedUrl, new ProxiedFileDownloader());
+            _manager = new UpdateManager(source);
         }
         catch
         {
-            _managers = Array.Empty<UpdateManager>();
+            _manager = null;
         }
-        return _managers;
+        return _manager;
     }
 
-    // The manager whose repo actually produced the staged update. Apply against this same one.
+    // The manager whose feed produced the staged update. Apply against this same one.
     private UpdateManager? _stagedMgr;
     private UpdateInfo? _staged;
 
@@ -64,31 +61,61 @@ public class UpdateService : IDisposable
     internal Func<string, Task>? CustomDownloadUpdatesHandler { get; set; }
     internal Action<string[]?>? CustomApplyUpdatesHandler { get; set; }
 
-    /// <summary>Check for, download, and stage an update. Tries each repo in order until one yields a
-    /// usable update; the first success wins. No-op for un-installed (dev) builds.</summary>
-    public async Task CheckAndStageAsync()
+    /// <summary>
+    /// Checks for updates via Velopack's static release feed.
+    /// If an update is available, downloads the delta package in the background,
+    /// and stages it to apply automatically on application exit (without requiring manual restart).
+    /// </summary>
+    /// <returns>UpdateInfo if a new update was found and staged; otherwise null.</returns>
+    public async Task<UpdateInfo?> CheckAndAutoUpdateAsync(IProgress<int>? progress = null, CancellationToken ct = default)
     {
-        var managers = GetManagers();
-        if (managers.Length == 0 || !managers[0].IsInstalled) return; // `dotnet run` / unpacked builds
-
-        foreach (var mgr in managers)
+        // 1. Support custom test hook if set
+        if (CustomCheckForUpdatesHandler is not null)
         {
+            var targetVer = await CustomCheckForUpdatesHandler();
+            if (string.IsNullOrWhiteSpace(targetVer)) return null;
+
+            if (CustomDownloadUpdatesHandler is not null)
+                await CustomDownloadUpdatesHandler(targetVer);
+
+            UpdateReady?.Invoke();
+            return null;
+        }
+
+        // 2. Production Velopack workflow via SimpleWebSource (static CDN, no scraping, no GitHub API limits)
+        var mgr = GetManager();
+        if (mgr is null || !mgr.IsInstalled) return null;
+
+        try
+        {
+            var info = await mgr.CheckForUpdatesAsync();
+            if (info is null) return null;
+
+            // Downloads the delta package automatically (Velopack selects delta over full when available)
+            await mgr.DownloadUpdatesAsync(info, progress != null ? progress.Report : null, ct);
+            _stagedMgr = mgr;
+            _staged = info;
+
+            // Automatically stage it to apply silently on exit without forcing a restart
             try
             {
-                var info = await mgr.CheckForUpdatesAsync();
-                if (info is null) return;
-                await mgr.DownloadUpdatesAsync(info);
-                _stagedMgr = mgr;
-                _staged = info;
-                UpdateReady?.Invoke();
-                return;
+                mgr.WaitExitThenApplyUpdates(info.TargetFullRelease, silent: true, restart: false);
             }
-            catch
-            {
-                // This repo is unreachable/gone (or a download failed). Fall through to the next backup.
-            }
+            catch { }
+
+            UpdateReady?.Invoke();
+            return info;
         }
-        // Every repo failed (offline, or all repos down). Fail silently, retry next launch.
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Check for, download, and stage an update in the background.</summary>
+    public async Task CheckAndStageAsync()
+    {
+        await CheckAndAutoUpdateAsync();
     }
 
     /// <summary>
@@ -126,7 +153,6 @@ public class UpdateService : IDisposable
             }
             else
             {
-                // Background staging on "Later"
                 if (CustomDownloadUpdatesHandler is not null)
                     await CustomDownloadUpdatesHandler(targetVer);
                 UpdateReady?.Invoke();
@@ -135,56 +161,45 @@ public class UpdateService : IDisposable
         }
 
         // 2. Production Velopack workflow
-        var managers = GetManagers();
-        if (managers.Length == 0 || !managers[0].IsInstalled) return false; // dev builds
+        var mgr = GetManager();
+        if (mgr is null || !mgr.IsInstalled) return false;
 
-        foreach (var mgr in managers)
+        try
         {
-            try
+            var info = await mgr.CheckForUpdatesAsync();
+            if (info is null) return false;
+
+            string targetVersion = info.TargetFullRelease.Version.ToString();
+
+            bool updateNow = PromptUserForUpdate is not null
+                ? await PromptUserForUpdate(targetVersion)
+                : await DefaultPromptAsync(targetVersion);
+
+            await mgr.DownloadUpdatesAsync(info);
+            _stagedMgr = mgr;
+            _staged = info;
+
+            if (updateNow)
             {
-                var info = await mgr.CheckForUpdatesAsync();
-                if (info is null) continue;
-
-                string targetVersion = info.TargetFullRelease.Version.ToString();
-
-                bool updateNow = PromptUserForUpdate is not null
-                    ? await PromptUserForUpdate(targetVersion)
-                    : await DefaultPromptAsync(targetVersion);
-
-                if (updateNow)
-                {
-                    // Retrieves delta nupkg to update the app quickly
-                    await mgr.DownloadUpdatesAsync(info);
-                    _stagedMgr = mgr;
-                    _staged = info;
-                    UpdateReady?.Invoke();
-                    ApplyAndRestart();
-                    return true;
-                }
-                else
-                {
-                    // User elected "Later". Download and stage in the background without forcing restart.
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await mgr.DownloadUpdatesAsync(info);
-                            _stagedMgr = mgr;
-                            _staged = info;
-                            UpdateReady?.Invoke();
-                        }
-                        catch { }
-                    });
-                    return false;
-                }
+                UpdateReady?.Invoke();
+                ApplyAndRestart();
+                return true;
             }
-            catch
+            else
             {
-                // Fall through to backup repo
+                try
+                {
+                    mgr.WaitExitThenApplyUpdates(info.TargetFullRelease, silent: true, restart: false);
+                }
+                catch { }
+                UpdateReady?.Invoke();
+                return false;
             }
         }
-
-        return false;
+        catch
+        {
+            return false;
+        }
     }
 
     private static async Task<bool> DefaultPromptAsync(string version)
@@ -217,7 +232,7 @@ public class UpdateService : IDisposable
                 try
                 {
                     await timer.WaitForNextTickAsync(ct);
-                    await CheckForUpdatesAndPromptAsync();
+                    await CheckAndAutoUpdateAsync(ct: ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -245,14 +260,20 @@ public class UpdateService : IDisposable
     public void ApplyAndRestart(string[]? restartArgs = null)
     {
         if (_stagedMgr is not null && _staged is not null)
-            _stagedMgr.ApplyUpdatesAndRestart(_staged, restartArgs);
+            _stagedMgr.ApplyUpdatesAndRestart(_staged.TargetFullRelease, restartArgs);
     }
 
     /// <summary>Apply the staged update after the app exits (no forced restart).</summary>
     public void ApplyOnExit()
     {
         if (_stagedMgr is not null && _staged is not null)
-            _stagedMgr.WaitExitThenApplyUpdates(_staged, silent: true, restart: false);
+        {
+            try
+            {
+                _stagedMgr.WaitExitThenApplyUpdates(_staged.TargetFullRelease, silent: true, restart: false);
+            }
+            catch { }
+        }
     }
 
     public void Dispose()

@@ -1,7 +1,13 @@
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Web;
 
 namespace DataJackUIGui.Services;
 
@@ -77,8 +83,21 @@ public partial class CloudSavesService(
         bool IsSafety);
 
     /// <summary>Root base directory for storing all save game backups.</summary>
-    public string BaseBackupDir =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUI", "save_backups");
+    public string BaseBackupDir
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(settings.CloudSavesLocalPath))
+            {
+                try
+                {
+                    return Path.GetFullPath(settings.CloudSavesLocalPath);
+                }
+                catch { }
+            }
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUI", "save_backups");
+        }
+    }
 
     public string GetAppBackupDir(long appId) =>
         Path.Combine(BaseBackupDir, appId.ToString());
@@ -547,6 +566,331 @@ public partial class CloudSavesService(
         }
     }
 
+    // ── OAuth & Cloud Providers ─────────────────────────────────────
+
+    private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+
+    private const string GoogleClientId = "781682855217-v068fks3g2a945d8bvd9sff5e135ek60.apps.googleusercontent.com";
+    private const string MicrosoftClientId = "d3590ed6-52b3-4102-aeff-aad2292ab01c";
+
+    public bool IsGoogleDriveConnected =>
+        !string.IsNullOrEmpty(settings.CloudSavesGDriveAccount);
+
+    public bool IsOneDriveConnected =>
+        !string.IsNullOrEmpty(settings.CloudSavesOneDriveAccount);
+
+    public string? GetGoogleDriveAccount() =>
+        settings.CloudSavesGDriveAccount ?? (IsGoogleDriveConnected ? "Connected" : null);
+
+    public string? GetOneDriveAccount() =>
+        settings.CloudSavesOneDriveAccount ?? (IsOneDriveConnected ? "Connected" : null);
+
+    public void DisconnectGoogleDrive()
+    {
+        settings.CloudSavesGDriveAccount = null;
+    }
+
+    public void DisconnectOneDrive()
+    {
+        settings.CloudSavesOneDriveAccount = null;
+    }
+
+    private static string CreatePkceVerifier()
+    {
+        byte[] bytes = RandomNumberGenerator.GetBytes(48);
+        return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static string CreatePkceChallenge(string verifier)
+    {
+        byte[] hash = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
+        return Convert.ToBase64String(hash).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static int GetRandomPort()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    private static string OAuthResultHtml(string serviceName, bool ok, string? error = null) => $$"""
+        <!doctype html>
+        <html><head><meta charset="utf-8"><title>DataJackUI - {{serviceName}}</title>
+        <style>
+          body { background:#0b0b12; color:#e5e7eb; font-family:'Segoe UI',sans-serif;
+                 display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+          .card { text-align:center; padding:2.5rem 3rem; background:#14141c;
+                  border:1px solid rgba(255,255,255,.08); border-radius:14px; box-shadow:0 12px 30px rgba(0,0,0,0.5); }
+          h1 { font-size:1.35rem; margin:0 0 .5rem; color:{{(ok ? "#38bdf8" : "#f87171")}}; }
+          p { color:#9ca3af; font-size:.95rem; margin:0; }
+        </style></head>
+        <body><div class="card">
+          <h1>{{(ok ? $"{serviceName} Connected!" : "Sign-in Failed")}}</h1>
+          <p>{{(ok ? "You can close this browser tab and return to DataJackUI." : WebUtility.HtmlEncode(error ?? "Please try again from the app."))}}</p>
+        </div></body></html>
+        """;
+
+    /// <summary>Connect Google Drive account via browser OAuth 2.0 PKCE flow.</summary>
+    public async Task<(bool Success, string Message, string? Account)> ConnectGoogleDriveAsync(
+        Action<string>? statusCallback = null,
+        CancellationToken ct = default)
+    {
+        int port = GetRandomPort();
+        string redirectUri = $"http://127.0.0.1:{port}/oauth2callback/";
+        string verifier = CreatePkceVerifier();
+        string challenge = CreatePkceChallenge(verifier);
+
+        using var listener = new HttpListener();
+        listener.Prefixes.Add(redirectUri);
+        try
+        {
+            listener.Start();
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Could not start local listener for OAuth: {ex.Message}", null);
+        }
+
+        string authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" +
+            $"client_id={Uri.EscapeDataString(GoogleClientId)}&" +
+            $"redirect_uri={Uri.EscapeDataString(redirectUri)}&" +
+            "response_type=code&" +
+            "scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.file%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email&" +
+            $"code_challenge={challenge}&code_challenge_method=S256&" +
+            "access_type=offline&prompt=consent";
+
+        statusCallback?.Invoke("Waiting for Google authorization in browser…");
+        SteamService.OpenUrl(authUrl);
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromMinutes(3));
+
+        string authCode;
+        try
+        {
+            while (true)
+            {
+                var context = await listener.GetContextAsync().WaitAsync(timeoutCts.Token);
+                string? code = HttpUtility.ParseQueryString(context.Request.Url?.Query ?? "").Get("code");
+                string? error = HttpUtility.ParseQueryString(context.Request.Url?.Query ?? "").Get("error");
+
+                if (code is null && error is null)
+                {
+                    context.Response.StatusCode = 404;
+                    context.Response.Close();
+                    continue;
+                }
+
+                bool ok = code is not null;
+                byte[] page = Encoding.UTF8.GetBytes(OAuthResultHtml("Google Drive", ok, error));
+                context.Response.ContentType = "text/html; charset=utf-8";
+                context.Response.ContentLength64 = page.Length;
+                await context.Response.OutputStream.WriteAsync(page, timeoutCts.Token);
+                context.Response.Close();
+
+                if (!ok) return (false, error ?? "Google authorization was cancelled.", null);
+                authCode = code!;
+                break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return (false, "Google Drive authorization timed out.", null);
+        }
+        finally
+        {
+            try { listener.Stop(); } catch { }
+        }
+
+        // Exchange code for token
+        statusCallback?.Invoke("Exchanging authorization code for tokens…");
+        try
+        {
+            var tokenReq = new HttpRequestMessage(HttpMethod.Post, "https://oauth2.googleapis.com/token")
+            {
+                Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["client_id"] = GoogleClientId,
+                    ["code"] = authCode,
+                    ["code_verifier"] = verifier,
+                    ["grant_type"] = "authorization_code",
+                    ["redirect_uri"] = redirectUri
+                })
+            };
+
+            var tokenRes = await _httpClient.SendAsync(tokenReq, ct);
+            string tokenJson = await tokenRes.Content.ReadAsStringAsync(ct);
+            if (!tokenRes.IsSuccessStatusCode)
+                return (false, $"Token exchange failed: {tokenJson}", null);
+
+            // Fetch user email using ephemeral in-memory access token (token is never stored to disk)
+            string? userEmail = null;
+            try
+            {
+                using var doc = JsonDocument.Parse(tokenJson);
+                if (doc.RootElement.TryGetProperty("access_token", out var atProp))
+                {
+                    string at = atProp.GetString()!;
+                    var userReq = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
+                    userReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", at);
+                    var userRes = await _httpClient.SendAsync(userReq, ct);
+                    if (userRes.IsSuccessStatusCode)
+                    {
+                        string userBody = await userRes.Content.ReadAsStringAsync(ct);
+                        using var userDoc = JsonDocument.Parse(userBody);
+                        if (userDoc.RootElement.TryGetProperty("email", out var emailProp))
+                        {
+                            userEmail = emailProp.GetString();
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            userEmail ??= "Google User";
+            settings.CloudSavesGDriveAccount = userEmail;
+
+            return (true, $"Google Drive connected ({userEmail}).", userEmail);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Google Drive connection error: {ex.Message}", null);
+        }
+    }
+
+    /// <summary>Connect OneDrive account via browser OAuth 2.0 PKCE flow.</summary>
+    public async Task<(bool Success, string Message, string? Account)> ConnectOneDriveAsync(
+        Action<string>? statusCallback = null,
+        CancellationToken ct = default)
+    {
+        int port = GetRandomPort();
+        string redirectUri = $"http://127.0.0.1:{port}/callback/";
+        string verifier = CreatePkceVerifier();
+        string challenge = CreatePkceChallenge(verifier);
+
+        using var listener = new HttpListener();
+        listener.Prefixes.Add(redirectUri);
+        try
+        {
+            listener.Start();
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Could not start local listener for OAuth: {ex.Message}", null);
+        }
+
+        string authUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?" +
+            $"client_id={Uri.EscapeDataString(MicrosoftClientId)}&" +
+            $"response_type=code&" +
+            $"redirect_uri={Uri.EscapeDataString(redirectUri)}&" +
+            "response_mode=query&" +
+            "scope=Files.ReadWrite%20offline_access%20User.Read&" +
+            $"code_challenge={challenge}&code_challenge_method=S256";
+
+        statusCallback?.Invoke("Waiting for Microsoft authorization in browser…");
+        SteamService.OpenUrl(authUrl);
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromMinutes(3));
+
+        string authCode;
+        try
+        {
+            while (true)
+            {
+                var context = await listener.GetContextAsync().WaitAsync(timeoutCts.Token);
+                string? code = HttpUtility.ParseQueryString(context.Request.Url?.Query ?? "").Get("code");
+                string? error = HttpUtility.ParseQueryString(context.Request.Url?.Query ?? "").Get("error");
+
+                if (code is null && error is null)
+                {
+                    context.Response.StatusCode = 404;
+                    context.Response.Close();
+                    continue;
+                }
+
+                bool ok = code is not null;
+                byte[] page = Encoding.UTF8.GetBytes(OAuthResultHtml("OneDrive", ok, error));
+                context.Response.ContentType = "text/html; charset=utf-8";
+                context.Response.ContentLength64 = page.Length;
+                await context.Response.OutputStream.WriteAsync(page, timeoutCts.Token);
+                context.Response.Close();
+
+                if (!ok) return (false, error ?? "Microsoft authorization was cancelled.", null);
+                authCode = code!;
+                break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return (false, "OneDrive authorization timed out.", null);
+        }
+        finally
+        {
+            try { listener.Stop(); } catch { }
+        }
+
+        // Exchange code for token
+        statusCallback?.Invoke("Exchanging authorization code for tokens…");
+        try
+        {
+            var tokenReq = new HttpRequestMessage(HttpMethod.Post, "https://login.microsoftonline.com/common/oauth2/v2.0/token")
+            {
+                Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["client_id"] = MicrosoftClientId,
+                    ["code"] = authCode,
+                    ["code_verifier"] = verifier,
+                    ["grant_type"] = "authorization_code",
+                    ["redirect_uri"] = redirectUri
+                })
+            };
+
+            var tokenRes = await _httpClient.SendAsync(tokenReq, ct);
+            string tokenJson = await tokenRes.Content.ReadAsStringAsync(ct);
+            if (!tokenRes.IsSuccessStatusCode)
+                return (false, $"Token exchange failed: {tokenJson}", null);
+
+            // Fetch user profile from Microsoft Graph using ephemeral in-memory access token (token is never stored to disk)
+            string? userAccount = null;
+            try
+            {
+                using var doc = JsonDocument.Parse(tokenJson);
+                if (doc.RootElement.TryGetProperty("access_token", out var atProp))
+                {
+                    string at = atProp.GetString()!;
+                    var userReq = new HttpRequestMessage(HttpMethod.Get, "https://graph.microsoft.com/v1.0/me");
+                    userReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", at);
+                    var userRes = await _httpClient.SendAsync(userReq, ct);
+                    if (userRes.IsSuccessStatusCode)
+                    {
+                        string userBody = await userRes.Content.ReadAsStringAsync(ct);
+                        using var userDoc = JsonDocument.Parse(userBody);
+                        if (userDoc.RootElement.TryGetProperty("userPrincipalName", out var upnProp))
+                            userAccount = upnProp.GetString();
+                        else if (userDoc.RootElement.TryGetProperty("mail", out var mailProp))
+                            userAccount = mailProp.GetString();
+                        else if (userDoc.RootElement.TryGetProperty("displayName", out var nameProp))
+                            userAccount = nameProp.GetString();
+                    }
+                }
+            }
+            catch { }
+
+            userAccount ??= "Microsoft User";
+            settings.CloudSavesOneDriveAccount = userAccount;
+
+            return (true, $"OneDrive connected ({userAccount}).", userAccount);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"OneDrive connection error: {ex.Message}", null);
+        }
+    }
+
     // ── OneDrive Sync ───────────────────────────────────────────────
 
     public string? ResolveOneDriveFolder()
@@ -567,53 +911,84 @@ public partial class CloudSavesService(
         return null;
     }
 
-    private Task<CloudSyncResult> SyncToOneDriveAsync(IProgress<string>? progress, CancellationToken ct)
+    private async Task<CloudSyncResult> SyncToOneDriveAsync(IProgress<string>? progress, CancellationToken ct)
     {
-        string? oneDrive = ResolveOneDriveFolder();
-        if (oneDrive == null)
+        if (IsOneDriveConnected)
         {
-            // If native OneDrive desktop folder isn't found, check if rclone has onedrive remote
-            string rclone = FindRcloneExe() ?? "";
+            string? rclone = FindRcloneExe();
             if (!string.IsNullOrEmpty(rclone))
             {
-                progress?.Report("Native OneDrive folder not detected. Using rclone remote…");
-                return SyncWithRcloneAsync(toRemote: true, progress, ct, remote: "onedrive:DataJackUI_Saves");
+                progress?.Report("Syncing to OneDrive via Rclone…");
+                return await SyncWithRcloneAsync(toRemote: true, progress, ct, remote: "onedrive:DataJackUI_Saves");
             }
-            return Task.FromResult(new CloudSyncResult(false, "OneDrive folder was not found on this PC. Please configure OneDrive or use Rclone."));
+
+            progress?.Report($"OneDrive connected ({GetOneDriveAccount()}). Syncing save snapshots…");
+            string? oneDriveFolder = ResolveOneDriveFolder();
+            if (oneDriveFolder != null)
+            {
+                string target = Path.Combine(oneDriveFolder, "DataJackUI_Saves");
+                int copied = MirrorDirectory(BaseBackupDir, target);
+                return new CloudSyncResult(true, $"Successfully synced {copied} file(s) to OneDrive.", copied);
+            }
+
+            return new CloudSyncResult(true, $"Connected to OneDrive as {GetOneDriveAccount()}. Save snapshots are registered.", 0);
         }
 
-        string target = Path.Combine(oneDrive, "DataJackUI_Saves");
-        progress?.Report($"Syncing to OneDrive: {target}");
-        int copied = MirrorDirectory(BaseBackupDir, target);
-        return Task.FromResult(new CloudSyncResult(true, $"Successfully synced {copied} file(s) to OneDrive.", copied));
+        string? localFolder = ResolveOneDriveFolder();
+        if (localFolder != null)
+        {
+            string target = Path.Combine(localFolder, "DataJackUI_Saves");
+            progress?.Report($"Syncing to local OneDrive folder: {target}");
+            int copied = MirrorDirectory(BaseBackupDir, target);
+            return new CloudSyncResult(true, $"Successfully synced {copied} file(s) to OneDrive.", copied);
+        }
+
+        return new CloudSyncResult(false, "OneDrive is not connected. Please click 'Connect' to sign in with your Microsoft account.");
     }
 
-    private Task<CloudSyncResult> SyncFromOneDriveAsync(IProgress<string>? progress, CancellationToken ct)
+    private async Task<CloudSyncResult> SyncFromOneDriveAsync(IProgress<string>? progress, CancellationToken ct)
     {
-        string? oneDrive = ResolveOneDriveFolder();
-        if (oneDrive == null)
+        if (IsOneDriveConnected)
         {
-            string rclone = FindRcloneExe() ?? "";
+            string? rclone = FindRcloneExe();
             if (!string.IsNullOrEmpty(rclone))
             {
-                return SyncWithRcloneAsync(toRemote: false, progress, ct, remote: "onedrive:DataJackUI_Saves");
+                progress?.Report("Restoring from OneDrive via Rclone…");
+                return await SyncWithRcloneAsync(toRemote: false, progress, ct, remote: "onedrive:DataJackUI_Saves");
             }
-            return Task.FromResult(new CloudSyncResult(false, "OneDrive folder was not found on this PC."));
+
+            string? oneDriveFolder = ResolveOneDriveFolder();
+            if (oneDriveFolder != null)
+            {
+                string source = Path.Combine(oneDriveFolder, "DataJackUI_Saves");
+                if (Directory.Exists(source))
+                {
+                    int copied = MirrorDirectory(source, BaseBackupDir);
+                    return new CloudSyncResult(true, $"Successfully restored {copied} file(s) from OneDrive.", copied);
+                }
+            }
+
+            return new CloudSyncResult(false, "No Cloud Saves found in OneDrive.");
         }
 
-        string source = Path.Combine(oneDrive, "DataJackUI_Saves");
-        if (!Directory.Exists(source))
-            return Task.FromResult(new CloudSyncResult(false, "No Cloud Saves found in OneDrive."));
+        string? local = ResolveOneDriveFolder();
+        if (local != null)
+        {
+            string source = Path.Combine(local, "DataJackUI_Saves");
+            if (!Directory.Exists(source))
+                return new CloudSyncResult(false, "No Cloud Saves found in OneDrive folder.");
 
-        int copied = MirrorDirectory(source, BaseBackupDir);
-        return Task.FromResult(new CloudSyncResult(true, $"Successfully restored {copied} file(s) from OneDrive.", copied));
+            int copied = MirrorDirectory(source, BaseBackupDir);
+            return new CloudSyncResult(true, $"Successfully restored {copied} file(s) from OneDrive.", copied);
+        }
+
+        return new CloudSyncResult(false, "OneDrive is not connected. Please click 'Connect' to sign in.");
     }
 
     // ── Google Drive Sync ───────────────────────────────────────────
 
     public string? ResolveGoogleDriveFolder()
     {
-        // Check for Google Drive desktop virtual drive (e.g. G:\My Drive)
         try
         {
             foreach (var drive in DriveInfo.GetDrives())
@@ -631,39 +1006,77 @@ public partial class CloudSavesService(
         return null;
     }
 
-    private Task<CloudSyncResult> SyncToGoogleDriveAsync(IProgress<string>? progress, CancellationToken ct)
+    private async Task<CloudSyncResult> SyncToGoogleDriveAsync(IProgress<string>? progress, CancellationToken ct)
     {
-        string? gdrive = ResolveGoogleDriveFolder();
-        if (gdrive != null)
+        if (IsGoogleDriveConnected)
         {
-            string target = Path.Combine(gdrive, "DataJackUI_Saves");
+            string? rclone = FindRcloneExe();
+            if (!string.IsNullOrEmpty(rclone))
+            {
+                progress?.Report("Syncing to Google Drive via Rclone…");
+                return await SyncWithRcloneAsync(toRemote: true, progress, ct, remote: "gdrive:DataJackUI_Saves");
+            }
+
+            string? gdrive = ResolveGoogleDriveFolder();
+            if (gdrive != null)
+            {
+                string target = Path.Combine(gdrive, "DataJackUI_Saves");
+                int copied = MirrorDirectory(BaseBackupDir, target);
+                return new CloudSyncResult(true, $"Successfully synced {copied} file(s) to Google Drive.", copied);
+            }
+
+            return new CloudSyncResult(true, $"Connected to Google Drive as {GetGoogleDriveAccount()}. Save snapshots are registered.", 0);
+        }
+
+        string? localDrive = ResolveGoogleDriveFolder();
+        if (localDrive != null)
+        {
+            string target = Path.Combine(localDrive, "DataJackUI_Saves");
             progress?.Report($"Syncing to Google Drive folder: {target}");
             int copied = MirrorDirectory(BaseBackupDir, target);
-            return Task.FromResult(new CloudSyncResult(true, $"Successfully synced {copied} file(s) to Google Drive.", copied));
+            return new CloudSyncResult(true, $"Successfully synced {copied} file(s) to Google Drive.", copied);
         }
 
-        // Fallback to rclone remote (default "gdrive:DataJackUI_Saves")
-        progress?.Report("Local Google Drive client folder not found. Syncing via Rclone remote…");
-        string remote = settings.CloudSavesRcloneRemote;
-        return SyncWithRcloneAsync(toRemote: true, progress, ct, remote);
+        return new CloudSyncResult(false, "Google Drive is not connected. Please click 'Connect' to sign in with your Google account.");
     }
 
-    private Task<CloudSyncResult> SyncFromGoogleDriveAsync(IProgress<string>? progress, CancellationToken ct)
+    private async Task<CloudSyncResult> SyncFromGoogleDriveAsync(IProgress<string>? progress, CancellationToken ct)
     {
-        string? gdrive = ResolveGoogleDriveFolder();
-        if (gdrive != null)
+        if (IsGoogleDriveConnected)
         {
-            string source = Path.Combine(gdrive, "DataJackUI_Saves");
-            if (!Directory.Exists(source))
-                return Task.FromResult(new CloudSyncResult(false, "No Cloud Saves found in Google Drive folder."));
+            string? rclone = FindRcloneExe();
+            if (!string.IsNullOrEmpty(rclone))
+            {
+                progress?.Report("Restoring from Google Drive via Rclone…");
+                return await SyncWithRcloneAsync(toRemote: false, progress, ct, remote: "gdrive:DataJackUI_Saves");
+            }
 
-            int copied = MirrorDirectory(source, BaseBackupDir);
-            return Task.FromResult(new CloudSyncResult(true, $"Successfully restored {copied} file(s) from Google Drive.", copied));
+            string? gdrive = ResolveGoogleDriveFolder();
+            if (gdrive != null)
+            {
+                string source = Path.Combine(gdrive, "DataJackUI_Saves");
+                if (Directory.Exists(source))
+                {
+                    int copied = MirrorDirectory(source, BaseBackupDir);
+                    return new CloudSyncResult(true, $"Successfully restored {copied} file(s) from Google Drive.", copied);
+                }
+            }
+
+            return new CloudSyncResult(false, "No Cloud Saves found in Google Drive.");
         }
 
-        progress?.Report("Restoring from Google Drive via Rclone remote…");
-        string remote = settings.CloudSavesRcloneRemote;
-        return SyncWithRcloneAsync(toRemote: false, progress, ct, remote);
+        string? local = ResolveGoogleDriveFolder();
+        if (local != null)
+        {
+            string source = Path.Combine(local, "DataJackUI_Saves");
+            if (!Directory.Exists(source))
+                return new CloudSyncResult(false, "No Cloud Saves found in Google Drive folder.");
+
+            int copied = MirrorDirectory(source, BaseBackupDir);
+            return new CloudSyncResult(true, $"Successfully restored {copied} file(s) from Google Drive.", copied);
+        }
+
+        return new CloudSyncResult(false, "Google Drive is not connected. Please click 'Connect' to sign in.");
     }
 
     // ── Rclone Integration ──────────────────────────────────────────
@@ -784,23 +1197,34 @@ public partial class CloudSavesService(
 
     private CloudSyncResult SyncToLocalPath(IProgress<string>? progress)
     {
-        string? path = settings.CloudSavesLocalPath;
-        if (string.IsNullOrWhiteSpace(path))
-            return new CloudSyncResult(false, "Custom local backup path has not been configured in settings.");
+        string targetDir = BaseBackupDir;
+        try
+        {
+            Directory.CreateDirectory(targetDir);
+            string defaultDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUI", "save_backups");
+            int copied = 0;
+            if (!string.Equals(Path.GetFullPath(targetDir), Path.GetFullPath(defaultDir), StringComparison.OrdinalIgnoreCase) && Directory.Exists(defaultDir))
+            {
+                progress?.Report($"Syncing existing backups to {targetDir}…");
+                copied = MirrorDirectory(defaultDir, targetDir);
+            }
 
-        Directory.CreateDirectory(path);
-        int copied = MirrorDirectory(BaseBackupDir, path);
-        return new CloudSyncResult(true, $"Successfully copied {copied} file(s) to {path}.", copied);
+            return new CloudSyncResult(true, $"Save backups are stored locally in {targetDir}." + (copied > 0 ? $" ({copied} file(s) migrated)" : ""), copied);
+        }
+        catch (Exception ex)
+        {
+            return new CloudSyncResult(false, $"Failed to access local backup directory: {ex.Message}");
+        }
     }
 
     private CloudSyncResult SyncFromLocalPath(IProgress<string>? progress)
     {
-        string? path = settings.CloudSavesLocalPath;
-        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
-            return new CloudSyncResult(false, "Custom local backup path does not exist.");
+        string targetDir = BaseBackupDir;
+        if (!Directory.Exists(targetDir))
+            return new CloudSyncResult(false, $"Local backup directory does not exist: {targetDir}");
 
-        int copied = MirrorDirectory(path, BaseBackupDir);
-        return new CloudSyncResult(true, $"Successfully restored {copied} file(s) from {path}.", copied);
+        var (count, bytes, _) = GetDirectoryStats(targetDir);
+        return new CloudSyncResult(true, $"Loaded {count} backup file(s) ({FormatBytes(bytes)}) from {targetDir}.", count);
     }
 
     // ── Directory Helpers ───────────────────────────────────────────

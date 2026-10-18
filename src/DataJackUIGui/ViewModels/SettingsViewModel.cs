@@ -330,26 +330,30 @@ public partial class SettingsViewModel : ObservableObject
     private async Task CheckForUpdatesAsync()
     {
         IsCheckingForUpdates = true;
-        UpdateStatusText = "Checking GitHub for DataJackUI releases...";
+        UpdateStatusText = "Checking for DataJackUI updates…";
         UpdateStatusColor = "#9ca3af";
 
         try
         {
-            bool updated = await _updateService.CheckForUpdatesAndPromptAsync();
+            var info = await _updateService.CheckAndAutoUpdateAsync();
 
-            if (updated)
+            if (info != null)
             {
-                UpdateStatusText = "Update initiated! Restarting application...";
+                string ver = info.TargetFullRelease.Version.ToString();
+                UpdateStatusText = $"Update v{ver} downloaded! It will apply automatically when DataJackUI closes.";
                 UpdateStatusColor = "#22c55e";
+                OnPropertyChanged(nameof(HasStagedUpdate));
             }
             else if (_updateService.HasStagedUpdate)
             {
-                UpdateStatusText = "Update staged! It will apply on next restart.";
+                string? ver = _updateService.StagedUpdate?.TargetFullRelease?.Version?.ToString();
+                UpdateStatusText = $"Update {(ver != null ? $"v{ver} " : "")}is downloaded and ready to apply on exit.";
                 UpdateStatusColor = "#22c55e";
+                OnPropertyChanged(nameof(HasStagedUpdate));
             }
             else
             {
-                UpdateStatusText = "DataJackUI is already up to date.";
+                UpdateStatusText = "DataJackUI is up to date.";
                 UpdateStatusColor = "#38bdf8";
             }
         }
@@ -361,6 +365,17 @@ public partial class SettingsViewModel : ObservableObject
         finally
         {
             IsCheckingForUpdates = false;
+        }
+    }
+
+    public bool HasStagedUpdate => _updateService.HasStagedUpdate;
+
+    [RelayCommand]
+    private void ApplyUpdate()
+    {
+        if (_updateService.HasStagedUpdate)
+        {
+            _updateService.ApplyAndRestart();
         }
     }
 

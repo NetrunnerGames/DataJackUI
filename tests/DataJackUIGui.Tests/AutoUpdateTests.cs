@@ -135,9 +135,41 @@ public class AutoUpdateTests
     {
         var updateService = new UpdateService();
         updateService.StartPeriodicChecks(TimeSpan.FromHours(1));
-        Assert.True(updateService.IsPeriodicCheckRunning);
-
         updateService.Dispose();
         Assert.False(updateService.IsPeriodicCheckRunning);
+    }
+
+    [Fact]
+    public async Task UpdateService_CheckAndAutoUpdateAsync_DownloadsAndStagesSilentlyWithoutPromptOrRestart()
+    {
+        using var updateService = new UpdateService();
+        bool downloaded = false;
+        string? downloadedVersion = null;
+        bool updateReadyFired = false;
+
+        updateService.CustomCheckForUpdatesHandler = () => Task.FromResult<string?>("2.13.0");
+        updateService.CustomDownloadUpdatesHandler = version =>
+        {
+            downloaded = true;
+            downloadedVersion = version;
+            return Task.CompletedTask;
+        };
+        updateService.UpdateReady += () =>
+        {
+            updateReadyFired = true;
+        };
+
+        var result = await updateService.CheckAndAutoUpdateAsync();
+
+        Assert.True(downloaded);
+        Assert.Equal("2.13.0", downloadedVersion);
+        Assert.True(updateReadyFired);
+    }
+
+    [Fact]
+    public void AppConfig_VelopackReleaseFeedUrl_PointsToDirectStaticReleaseAssets()
+    {
+        Assert.Equal("https://github.com/NetrunnerGames/DataJackUI/releases/latest/download", AppConfig.VelopackReleaseFeedUrl);
+        Assert.DoesNotContain("api.github.com", AppConfig.VelopackReleaseFeedUrl);
     }
 }

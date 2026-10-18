@@ -12,19 +12,19 @@
     TextElement.Foreground="{DynamicResource TextFillColorPrimaryBrush}"
     mc:Ignorable="d">
 
-    <Grid x:Name="Root" Margin="12,16,16,12">
+    <Grid x:Name="Root" Margin="14,14,16,12">
         <Grid.RowDefinitions>
-            <!-- Header -->
+            <!-- Header & Action Buttons -->
             <RowDefinition Height="Auto" />
-            <!-- Cloud Provider Setting Bar -->
+            <!-- Cloud Provider Strip / Configuration -->
             <RowDefinition Height="Auto" />
             <!-- Master-Detail Body -->
             <RowDefinition Height="*" />
-            <!-- Status Bar / Progress -->
+            <!-- Status Bar / Progress Indicator -->
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 0. Header -->
+        <!-- 0. Header (Title + Compact Actions) -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -40,103 +40,163 @@
                         Foreground="#38bdf8"
                         Symbol="Cloud24" />
                     <TextBlock
-                        FontSize="22"
+                        FontSize="20"
                         FontWeight="Bold"
                         Text="{x:Static res:Strings.CloudSaves_Title}" />
                 </StackPanel>
                 <TextBlock
                     Margin="32,2,0,0"
-                    FontSize="12.5"
+                    FontSize="12"
                     Foreground="#9ca3af"
                     Text="{x:Static res:Strings.CloudSaves_Subtitle}"
                     TextWrapping="Wrap" />
             </StackPanel>
 
-            <!-- Action buttons in header -->
+            <!-- Compact Action buttons in header (Area 2) -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <ui:Button
-                    Margin="0,0,8,0"
+                    Margin="0,0,6,0"
+                    Padding="10,5"
+                    FontSize="12"
                     Command="{Binding ScanGamesCommand}"
                     Content="{x:Static res:Strings.CloudSaves_Scan}"
+                    ToolTip="{x:Static res:Strings.CloudSaves_ScanTooltip}"
                     Icon="{ui:SymbolIcon ArrowSync24}" />
                 <ui:Button
-                    Margin="0,0,8,0"
+                    Margin="0,0,6,0"
+                    Padding="10,5"
+                    FontSize="12"
                     Command="{Binding BackupAllCommand}"
                     Content="{x:Static res:Strings.CloudSaves_BackupAll}"
+                    ToolTip="{x:Static res:Strings.CloudSaves_BackupAllTooltip}"
                     Icon="{ui:SymbolIcon Save24}" />
                 <ui:Button
-                    Margin="0,0,8,0"
+                    Margin="0,0,6,0"
+                    Padding="12,5"
+                    FontSize="12"
                     Appearance="Primary"
                     Command="{Binding SyncToCloudCommand}"
                     Content="{x:Static res:Strings.CloudSaves_SyncCloud}"
+                    ToolTip="{x:Static res:Strings.CloudSaves_SyncCloudTooltip}"
                     Icon="{ui:SymbolIcon Cloud24}" />
                 <ui:Button
+                    Padding="10,5"
+                    FontSize="12"
                     Command="{Binding SyncFromCloudCommand}"
                     Content="{x:Static res:Strings.CloudSaves_RestoreCloud}"
+                    ToolTip="{x:Static res:Strings.CloudSaves_RestoreCloudTooltip}"
                     Icon="{ui:SymbolIcon ArrowDownload24}" />
             </StackPanel>
         </Grid>
 
-        <!-- 1. Cloud Provider Strip / Configuration -->
+        <!-- 1. Cloud Provider Strip / Configuration (Area 3) -->
         <Border
             Grid.Row="1"
-            Margin="0,14,0,14"
-            Padding="14,10"
+            Margin="0,12,0,12"
+            Padding="12,8"
             Background="#0DFFFFFF"
-            BorderBrush="#1FFFFFFF"
+            BorderBrush="#1AFFFFFF"
             BorderThickness="1"
             CornerRadius="8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="135" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <!-- Provider Label -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
-                    <TextBlock
-                        FontWeight="SemiBold"
-                        FontSize="13"
-                        VerticalAlignment="Center"
-                        Text="{x:Static res:Strings.CloudSaves_Provider}" />
-                </StackPanel>
+                <TextBlock
+                    Grid.Column="0"
+                    Margin="0,0,10,0"
+                    FontWeight="SemiBold"
+                    FontSize="12.5"
+                    VerticalAlignment="Center"
+                    Text="{x:Static res:Strings.CloudSaves_Provider}" />
 
                 <!-- Provider Selector -->
                 <ComboBox
                     Grid.Column="1"
+                    Height="32"
                     VerticalAlignment="Center"
                     ItemsSource="{Binding AvailableProviders}"
                     SelectedItem="{Binding SelectedProvider, Mode=TwoWay}" />
 
-                <!-- Auto-Sync Checkbox -->
+                <!-- Compact Auto-Sync Checkbox (Area 3) -->
                 <CheckBox
                     Grid.Column="2"
                     Margin="16,0,0,0"
                     VerticalAlignment="Center"
+                    FontSize="12.5"
                     IsChecked="{Binding AutoSync, Mode=TwoWay}"
-                    Content="{x:Static res:Strings.CloudSaves_AutoSync}" />
+                    Content="{x:Static res:Strings.CloudSaves_AutoSync}"
+                    ToolTip="{x:Static res:Strings.CloudSaves_AutoSyncTooltip}" />
 
-                <!-- Provider Info / Quick Settings -->
-                <StackPanel Grid.Column="3" Margin="20,0,0,0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <!-- OneDrive details -->
+                <!-- Provider Details & OAuth Flow (Area 3) -->
+                <StackPanel Grid.Column="3" Margin="16,0,0,0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <!-- OneDrive OAuth details -->
                     <StackPanel Orientation="Horizontal" Visibility="{Binding IsOneDriveProvider, Converter={StaticResource BoolToVis}}">
-                        <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#9ca3af" Text="OneDrive: " />
-                        <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#38bdf8" Text="{Binding OneDriveStatus}" TextTrimming="CharacterEllipsis" MaxWidth="280" />
+                        <!-- Connected State -->
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsOneDriveConnected, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="● " Foreground="#22c55e" FontSize="11" VerticalAlignment="Center" />
+                            <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#38bdf8" Text="{Binding OneDriveStatus}" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                            <ui:Button
+                                Margin="10,0,0,0"
+                                Padding="8,3"
+                                FontSize="11"
+                                Appearance="Secondary"
+                                Command="{Binding DisconnectOneDriveCommand}"
+                                Content="{x:Static res:Strings.CloudSaves_Disconnect}" />
+                        </StackPanel>
+
+                        <!-- Not Connected State -->
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsOneDriveConnected, Converter={StaticResource InverseBoolToVis}}">
+                            <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#9ca3af" Text="{Binding OneDriveStatus}" Margin="0,0,10,0" />
+                            <ui:Button
+                                Padding="10,4"
+                                FontSize="11.5"
+                                Appearance="Primary"
+                                Command="{Binding ConnectOneDriveCommand}"
+                                Content="{x:Static res:Strings.CloudSaves_Connect}"
+                                Icon="{ui:SymbolIcon Cloud24}" />
+                        </StackPanel>
                     </StackPanel>
 
-                    <!-- Google Drive details -->
+                    <!-- Google Drive OAuth details -->
                     <StackPanel Orientation="Horizontal" Visibility="{Binding IsGoogleDriveProvider, Converter={StaticResource BoolToVis}}">
-                        <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#9ca3af" Text="Google Drive: " />
-                        <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#34d399" Text="{Binding GoogleDriveStatus}" TextTrimming="CharacterEllipsis" MaxWidth="280" />
+                        <!-- Connected State -->
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsGoogleDriveConnected, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="● " Foreground="#22c55e" FontSize="11" VerticalAlignment="Center" />
+                            <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#34d399" Text="{Binding GoogleDriveStatus}" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                            <ui:Button
+                                Margin="10,0,0,0"
+                                Padding="8,3"
+                                FontSize="11"
+                                Appearance="Secondary"
+                                Command="{Binding DisconnectGoogleDriveCommand}"
+                                Content="{x:Static res:Strings.CloudSaves_Disconnect}" />
+                        </StackPanel>
+
+                        <!-- Not Connected State -->
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsGoogleDriveConnected, Converter={StaticResource InverseBoolToVis}}">
+                            <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#9ca3af" Text="{Binding GoogleDriveStatus}" Margin="0,0,10,0" />
+                            <ui:Button
+                                Padding="10,4"
+                                FontSize="11.5"
+                                Appearance="Primary"
+                                Command="{Binding ConnectGoogleDriveCommand}"
+                                Content="{x:Static res:Strings.CloudSaves_Connect}"
+                                Icon="{ui:SymbolIcon Cloud24}" />
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- Rclone details -->
                     <StackPanel Orientation="Horizontal" Visibility="{Binding IsRcloneProvider, Converter={StaticResource BoolToVis}}">
                         <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#9ca3af" Text="Remote: " />
                         <ui:TextBox
-                            Width="180"
+                            Width="150"
+                            Height="32"
                             Margin="0,0,8,0"
                             FontSize="12"
                             Text="{Binding RcloneRemote, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
@@ -157,41 +217,60 @@
 
                     <!-- Local Path details -->
                     <StackPanel Orientation="Horizontal" Visibility="{Binding IsLocalProvider, Converter={StaticResource BoolToVis}}">
-                        <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#9ca3af" Text="Folder: " />
+                        <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="#9ca3af" Text="Folder: " Margin="0,0,6,0" />
                         <ui:TextBox
-                            Width="220"
-                            Margin="0,0,8,0"
+                            Width="260"
+                            Height="32"
+                            Margin="0,0,6,0"
                             FontSize="12"
+                            PlaceholderText="Default (%APPDATA%\DataJackUI\save_backups)"
+                            ToolTip="{Binding EffectiveLocalBackupPath}"
                             Text="{Binding LocalBackupPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
                         <ui:Button
                             Padding="8,4"
                             FontSize="11.5"
                             Command="{Binding BrowseLocalBackupPathCommand}"
+                            ToolTip="Select custom backup folder"
                             Content="Browse…"
                             Icon="{ui:SymbolIcon FolderOpen24}" />
+                        <ui:Button
+                            Margin="6,0,0,0"
+                            Padding="8,4"
+                            FontSize="11.5"
+                            Command="{Binding OpenLocalBackupFolderCommand}"
+                            ToolTip="Open backup folder in Explorer"
+                            Icon="{ui:SymbolIcon Open24}" />
+                        <ui:Button
+                            Margin="6,0,0,0"
+                            Padding="8,4"
+                            FontSize="11.5"
+                            Command="{Binding ResetLocalBackupPathCommand}"
+                            ToolTip="Reset to default folder"
+                            Visibility="{Binding HasCustomLocalBackupPath, Converter={StaticResource BoolToVis}}"
+                            Icon="{ui:SymbolIcon Dismiss24}" />
                     </StackPanel>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- 2. Master-Detail Body -->
+        <!-- 2. Master-Detail Body (Rearranged 1 & 4) -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <!-- Game List Panel -->
-                <ColumnDefinition Width="360" MinWidth="260" MaxWidth="500" />
+                <!-- Game List Panel (Area 1) -->
+                <ColumnDefinition Width="320" MinWidth="260" MaxWidth="420" />
                 <ColumnDefinition Width="12" />
-                <!-- Selected Game & Snapshots Detail Panel -->
+                <!-- Selected Game & Snapshots Detail Panel (Area 4) -->
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left Panel: Search & Games List -->
+            <!-- Left Panel: Search & Games List (Area 1) -->
             <Border
                 Grid.Column="0"
-                Background="#0AFFFFFF"
-                BorderBrush="#1FFFFFFF"
+                Background="#08FFFFFF"
+                BorderBrush="#18FFFFFF"
                 BorderThickness="1"
-                CornerRadius="10"
-                Padding="10">
+                CornerRadius="8"
+                Padding="8">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -201,7 +280,8 @@
                     <!-- Search Input -->
                     <ui:TextBox
                         Grid.Row="0"
-                        Margin="0,0,0,10"
+                        Height="34"
+                        Margin="0,0,0,8"
                         Icon="{ui:SymbolIcon Search24}"
                         PlaceholderText="{x:Static res:Strings.Common_SearchPlaceholder}"
                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
@@ -218,28 +298,28 @@
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                 <Setter Property="Padding" Value="0" />
-                                <Setter Property="Margin" Value="0,0,0,6" />
+                                <Setter Property="Margin" Value="0,0,0,5" />
                                 <Setter Property="Background" Value="Transparent" />
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border
                                                 x:Name="CardBorder"
-                                                Padding="8"
-                                                Background="#08FFFFFF"
-                                                BorderBrush="#15FFFFFF"
+                                                Padding="7,6"
+                                                Background="#07FFFFFF"
+                                                BorderBrush="#12FFFFFF"
                                                 BorderThickness="1"
-                                                CornerRadius="8"
+                                                CornerRadius="7"
                                                 Cursor="Hand">
                                                 <ContentPresenter />
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="CardBorder" Property="Background" Value="#15FFFFFF" />
+                                                    <Setter TargetName="CardBorder" Property="Background" Value="#14FFFFFF" />
                                                     <Setter TargetName="CardBorder" Property="BorderBrush" Value="#4038bdf8" />
                                                 </Trigger>
                                                 <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="CardBorder" Property="Background" Value="#2006b6d4" />
+                                                    <Setter TargetName="CardBorder" Property="Background" Value="#1E06b6d4" />
                                                     <Setter TargetName="CardBorder" Property="BorderBrush" Value="#06b6d4" />
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
@@ -252,28 +332,29 @@
                             <DataTemplate DataType="{x:Type vm:CloudGameItemViewModel}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="58" />
+                                        <ColumnDefinition Width="76" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Cover thumbnail -->
+                                    <!-- Cover thumbnail (Proper ~2.12:1 Steam Header Aspect Ratio) -->
                                     <Border
                                         Grid.Column="0"
-                                        Width="54"
-                                        Height="36"
-                                        CornerRadius="4"
+                                        Width="72"
+                                        Height="34"
+                                        CornerRadius="5"
                                         ClipToBounds="True"
                                         Background="#15FFFFFF">
                                         <Grid>
                                             <ui:SymbolIcon
                                                 Symbol="Games24"
-                                                FontSize="18"
+                                                FontSize="16"
                                                 Foreground="#475569"
                                                 HorizontalAlignment="Center"
                                                 VerticalAlignment="Center" />
                                             <Image
                                                 Source="{Binding CoverPath, Converter={StaticResource ImagePathToSource}}"
-                                                Stretch="UniformToFill" />
+                                                Stretch="UniformToFill"
+                                                RenderOptions.BitmapScalingMode="HighQuality" />
                                         </Grid>
                                     </Border>
 
@@ -287,7 +368,7 @@
                                             <TextBlock
                                                 Grid.Column="0"
                                                 FontWeight="SemiBold"
-                                                FontSize="13"
+                                                FontSize="12.5"
                                                 Text="{Binding GameName}"
                                                 TextTrimming="CharacterEllipsis" />
                                             <!-- Snapshot count badge -->
@@ -299,7 +380,7 @@
                                                 Background="#2210b981"
                                                 Visibility="{Binding HasBackups, Converter={StaticResource BoolToVis}}">
                                                 <TextBlock
-                                                    FontSize="10"
+                                                    FontSize="9.5"
                                                     FontWeight="SemiBold"
                                                     Foreground="#34d399">
                                                     <Run Text="{Binding SnapshotCount, Mode=OneWay}" />
@@ -308,18 +389,20 @@
                                             </Border>
                                         </Grid>
 
-                                        <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                                             <TextBlock
-                                                FontSize="11"
+                                                FontSize="10.5"
                                                 Foreground="#94a3b8"
-                                                Text="{Binding LocationDisplay}" />
+                                                Text="{Binding LocationDisplay}"
+                                                TextTrimming="CharacterEllipsis"
+                                                MaxWidth="120" />
                                             <TextBlock
-                                                FontSize="11"
+                                                FontSize="10.5"
                                                 Foreground="#64748b"
                                                 Text=" · " />
                                             <TextBlock
-                                                FontSize="11"
-                                                Foreground="#94a3b8"
+                                                FontSize="10.5"
+                                                Foreground="#cbd5e1"
                                                 Text="{Binding FormattedSize}" />
                                         </StackPanel>
                                     </StackPanel>
@@ -330,14 +413,14 @@
                 </Grid>
             </Border>
 
-            <!-- Right Panel: Selected Game Detail & Snapshot History -->
+            <!-- Right Panel: Selected Game Detail & Snapshot History (Area 4) -->
             <Border
                 Grid.Column="2"
-                Background="#0AFFFFFF"
-                BorderBrush="#1FFFFFFF"
+                Background="#08FFFFFF"
+                BorderBrush="#18FFFFFF"
                 BorderThickness="1"
-                CornerRadius="10"
-                Padding="16">
+                CornerRadius="8"
+                Padding="14">
                 <!-- When game is selected -->
                 <Grid Visibility="{Binding SelectedGame, Converter={StaticResource NullToCollapsed}}">
                     <Grid.RowDefinitions>
@@ -347,26 +430,26 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <!-- Game Overview Header Card -->
+                    <!-- Game Overview Header Card (Area 4) -->
                     <Border
                         Grid.Row="0"
-                        Padding="14"
+                        Padding="12,10"
                         Background="#0DFFFFFF"
-                        BorderBrush="#1FFFFFFF"
+                        BorderBrush="#1CFFFFFF"
                         BorderThickness="1"
                         CornerRadius="8">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="100" />
+                                <ColumnDefinition Width="130" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <!-- Big Cover -->
+                            <!-- Big Cover Banner (2.14:1 ratio) -->
                             <Border
                                 Grid.Column="0"
-                                Width="94"
-                                Height="60"
+                                Width="120"
+                                Height="56"
                                 CornerRadius="6"
                                 ClipToBounds="True"
                                 Background="#15FFFFFF">
@@ -379,18 +462,20 @@
                                         VerticalAlignment="Center" />
                                     <Image
                                         Source="{Binding SelectedGame.CoverPath, Converter={StaticResource ImagePathToSource}}"
-                                        Stretch="UniformToFill" />
+                                        Stretch="UniformToFill"
+                                        RenderOptions.BitmapScalingMode="HighQuality" />
                                 </Grid>
                             </Border>
 
                             <!-- Game Info & Live Path -->
-                            <StackPanel Grid.Column="1" Margin="14,0,10,0" VerticalAlignment="Center">
+                            <StackPanel Grid.Column="1" Margin="12,0,10,0" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock
                                         FontSize="16"
                                         FontWeight="Bold"
                                         Text="{Binding SelectedGame.GameName}"
-                                        TextTrimming="CharacterEllipsis" />
+                                        TextTrimming="CharacterEllipsis"
+                                        MaxWidth="280" />
                                     <Border
                                         Margin="8,0,0,0"
                                         Padding="5,1"
@@ -405,41 +490,55 @@
                                     </Border>
                                 </StackPanel>
 
-                                <TextBlock
+                                <!-- Save Path Display with Tooltip -->
+                                <Border
                                     Margin="0,4,0,0"
-                                    FontSize="11.5"
-                                    Foreground="#9ca3af"
-                                    TextTrimming="CharacterEllipsis"
+                                    Padding="6,2"
+                                    Background="#08FFFFFF"
+                                    BorderBrush="#10FFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    HorizontalAlignment="Left"
                                     ToolTip="{Binding SelectedGame.SavePath}">
-                                    <Run Text="Save Path: " />
-                                    <Run Text="{Binding SelectedGame.SavePath, Mode=OneWay}" Foreground="#cbd5e1" />
-                                </TextBlock>
+                                    <TextBlock
+                                        FontSize="11"
+                                        Foreground="#9ca3af"
+                                        TextTrimming="CharacterEllipsis"
+                                        MaxWidth="340">
+                                        <Run Text="Path: " Foreground="#64748b" />
+                                        <Run Text="{Binding SelectedGame.SavePath, Mode=OneWay}" Foreground="#cbd5e1" />
+                                    </TextBlock>
+                                </Border>
 
-                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                                    <TextBlock FontSize="11" Foreground="#64748b" Text="Location: " />
-                                    <TextBlock FontSize="11" Foreground="#a5b4fc" Text="{Binding SelectedGame.LocationDisplay, Mode=OneWay}" />
-                                    <TextBlock FontSize="11" Foreground="#64748b" Text="  •  Size: " />
-                                    <TextBlock FontSize="11" Foreground="#e2e8f0" Text="{Binding SelectedGame.FormattedSize, Mode=OneWay}" />
-                                    <TextBlock FontSize="11" Foreground="#64748b" Text=" (" />
-                                    <TextBlock FontSize="11" Foreground="#e2e8f0" Text="{Binding SelectedGame.FileCount, Mode=OneWay, StringFormat='{}{0} files'}" />
-                                    <TextBlock FontSize="11" Foreground="#64748b" Text=")" />
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                    <Border Padding="5,1" Background="#186366f1" CornerRadius="4" Margin="0,0,6,0">
+                                        <TextBlock FontSize="10.5" Foreground="#a5b4fc" Text="{Binding SelectedGame.LocationDisplay, Mode=OneWay}" />
+                                    </Border>
+                                    <Border Padding="5,1" Background="#1838bdf8" CornerRadius="4" Margin="0,0,6,0">
+                                        <TextBlock FontSize="10.5" Foreground="#7dd3fc" Text="{Binding SelectedGame.FormattedSize, Mode=OneWay}" />
+                                    </Border>
+                                    <Border Padding="5,1" Background="#15FFFFFF" CornerRadius="4">
+                                        <TextBlock FontSize="10.5" Foreground="#94a3b8" Text="{Binding SelectedGame.FileCount, Mode=OneWay, StringFormat='{}{0} files'}" />
+                                    </Border>
                                 </StackPanel>
                             </StackPanel>
 
                             <!-- Actions for this game -->
                             <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
                                 <ui:Button
-                                    MinWidth="130"
+                                    MinWidth="120"
+                                    Padding="12,5"
+                                    FontSize="12"
                                     Appearance="Primary"
                                     Command="{Binding BackupSelectedCommand}"
                                     Content="{x:Static res:Strings.CloudSaves_BackupNow}"
                                     Icon="{ui:SymbolIcon Save24}" />
-                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Right">
                                     <ui:Button
                                         Padding="6,4"
                                         FontSize="11.5"
                                         Command="{Binding OpenLiveSaveFolderCommand}"
-                                        ToolTip="Open live game save folder in File Explorer"
+                                        ToolTip="Open save directory in File Explorer"
                                         Icon="{ui:SymbolIcon FolderOpen24}" />
                                     <ui:Button
                                         Margin="4,0,0,0"
@@ -467,36 +566,59 @@
                         </Grid>
                     </Border>
 
-                    <!-- Snapshots History List -->
-                    <Grid Grid.Row="1" Margin="0,14,0,0">
+                    <!-- Snapshots History List (Area 4) -->
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
                             <TextBlock
-                                FontSize="15"
+                                FontSize="14"
                                 FontWeight="SemiBold"
                                 Text="{x:Static res:Strings.CloudSaves_Snapshots}" />
                             <TextBlock
                                 Margin="6,0,0,0"
-                                FontSize="13"
+                                FontSize="12.5"
                                 VerticalAlignment="Center"
                                 Foreground="#94a3b8"
                                 Text="{Binding Snapshots.Count, StringFormat='({0})'}" />
                         </StackPanel>
 
-                        <!-- Empty Snapshots message -->
-                        <TextBlock
+                        <!-- Compact Empty Snapshots State -->
+                        <Border
                             Grid.Row="1"
-                            Margin="0,30,0,0"
+                            Margin="0,16,0,0"
+                            Padding="20,16"
+                            Background="#06FFFFFF"
+                            BorderBrush="#10FFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="8"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Top"
-                            Foreground="#64748b"
-                            FontSize="13"
-                            Text="{x:Static res:Strings.CloudSaves_NoSnapshots}"
-                            Visibility="{Binding Snapshots.Count, Converter={StaticResource InverseBoolToVis}}" />
+                            Visibility="{Binding Snapshots.Count, Converter={StaticResource InverseBoolToVis}}">
+                            <StackPanel HorizontalAlignment="Center">
+                                <ui:SymbolIcon
+                                    Symbol="History24"
+                                    FontSize="26"
+                                    Foreground="#475569"
+                                    HorizontalAlignment="Center" />
+                                <TextBlock
+                                    Margin="0,8,0,0"
+                                    HorizontalAlignment="Center"
+                                    Foreground="#94a3b8"
+                                    FontSize="12.5"
+                                    FontWeight="SemiBold"
+                                    Text="{x:Static res:Strings.CloudSaves_NoSnapshots}" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    HorizontalAlignment="Center"
+                                    Foreground="#64748b"
+                                    FontSize="11"
+                                    Text="Click 'Backup Now' above to create a restore point." />
+                            </StackPanel>
+                        </Border>
 
                         <!-- Snapshots Collection -->
                         <ListBox
@@ -509,17 +631,17 @@
                                 <Style TargetType="ListBoxItem">
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                     <Setter Property="Padding" Value="0" />
-                                    <Setter Property="Margin" Value="0,0,0,6" />
+                                    <Setter Property="Margin" Value="0,0,0,5" />
                                     <Setter Property="Background" Value="Transparent" />
                                     <Setter Property="Template">
                                         <Setter.Value>
                                             <ControlTemplate TargetType="ListBoxItem">
                                                 <Border
-                                                    Padding="12,10"
-                                                    Background="#08FFFFFF"
+                                                    Padding="10,8"
+                                                    Background="#07FFFFFF"
                                                     BorderBrush="#14FFFFFF"
                                                     BorderThickness="1"
-                                                    CornerRadius="8">
+                                                    CornerRadius="7">
                                                     <ContentPresenter />
                                                 </Border>
                                             </ControlTemplate>
@@ -540,52 +662,52 @@
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock
                                                     FontWeight="SemiBold"
-                                                    FontSize="13.5"
+                                                    FontSize="13"
                                                     Text="{Binding FormattedDate}" />
 
                                                 <!-- Badge: Safety vs User Snapshot -->
                                                 <Border
-                                                    Margin="10,0,0,0"
+                                                    Margin="8,0,0,0"
                                                     Padding="6,1"
                                                     CornerRadius="4"
                                                     Background="#25f59e0b"
                                                     Visibility="{Binding IsSafetyBackup, Converter={StaticResource BoolToVis}}">
                                                     <TextBlock
-                                                        FontSize="10"
+                                                        FontSize="9.5"
                                                         FontWeight="SemiBold"
                                                         Foreground="#fbbf24"
                                                         Text="Safety Pre-Restore" />
                                                 </Border>
 
                                                 <Border
-                                                    Margin="10,0,0,0"
+                                                    Margin="8,0,0,0"
                                                     Padding="6,1"
                                                     CornerRadius="4"
                                                     Background="#2506b6d4"
                                                     Visibility="{Binding IsSafetyBackup, Converter={StaticResource InverseBoolToVis}}">
                                                     <TextBlock
-                                                        FontSize="10"
+                                                        FontSize="9.5"
                                                         FontWeight="SemiBold"
                                                         Foreground="#22d3ee"
                                                         Text="Manual Backup" />
                                                 </Border>
                                             </StackPanel>
 
-                                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                <TextBlock FontSize="11.5" Foreground="#94a3b8" Text="{Binding SnapshotId}" />
-                                                <TextBlock FontSize="11.5" Foreground="#64748b" Text="  •  " />
-                                                <TextBlock FontSize="11.5" Foreground="#cbd5e1" Text="{Binding FormattedSize}" />
-                                                <TextBlock FontSize="11.5" Foreground="#64748b" Text=" (" />
-                                                <TextBlock FontSize="11.5" Foreground="#cbd5e1" Text="{Binding FileCount, StringFormat='{}{0} files'}" />
-                                                <TextBlock FontSize="11.5" Foreground="#64748b" Text=")" />
+                                            <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                                <TextBlock FontSize="11" Foreground="#94a3b8" Text="{Binding SnapshotId}" />
+                                                <TextBlock FontSize="11" Foreground="#64748b" Text="  •  " />
+                                                <TextBlock FontSize="11" Foreground="#cbd5e1" Text="{Binding FormattedSize}" />
+                                                <TextBlock FontSize="11" Foreground="#64748b" Text=" (" />
+                                                <TextBlock FontSize="11" Foreground="#cbd5e1" Text="{Binding FileCount, StringFormat='{}{0} files'}" />
+                                                <TextBlock FontSize="11" Foreground="#64748b" Text=")" />
                                             </StackPanel>
                                         </StackPanel>
 
                                         <!-- Action buttons: Restore / Delete -->
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                             <ui:Button
-                                                Padding="12,5"
-                                                FontSize="12"
+                                                Padding="10,4"
+                                                FontSize="11.5"
                                                 Appearance="Secondary"
                                                 Command="{Binding DataContext.RestoreSnapshotCommand, ElementName=Root}"
                                                 CommandParameter="{Binding}"
@@ -593,8 +715,8 @@
                                                 Icon="{ui:SymbolIcon ArrowClockwise24}" />
                                             <ui:Button
                                                 Margin="6,0,0,0"
-                                                Padding="8,5"
-                                                FontSize="12"
+                                                Padding="6,4"
+                                                FontSize="11.5"
                                                 Foreground="#f87171"
                                                 Command="{Binding DataContext.DeleteSnapshotCommand, ElementName=Root}"
                                                 CommandParameter="{Binding}"

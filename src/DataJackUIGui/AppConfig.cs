@@ -90,17 +90,18 @@ public static class AppConfig
     public const string AnalyticsEndpoint = "https://analytics.netrunnergames.workers.dev/api/launch";
 
     /// <summary>
-    /// Public GitHub repos hosting Velopack release assets, in priority order. The auto-updater reads its
-    /// feed from the FIRST repo; if that whole repo is unreachable or gone (e.g. banned / DMCA'd / account
-    /// removed. A failure the GitHub proxy mirrors can't fix, since they'd still point at a dead repo), it
-    /// falls through to the next. Mirror repos are populated MANUALLY (re-upload the same Velopack assets to
-    /// the backup only if the primary goes down). Each is still individually proxied for blocked regions.
-    /// TODO: set the real primary repo before the first `vpk upload`; add a backup repo URL when one exists.
+    /// Direct Velopack release assets feed URL.
+    /// Hosts releases.win.json, full packages, and delta diff packages.
+    /// Uses static CDN distribution without requiring GitHub REST API calls or HTML scraping.
+    /// </summary>
+    public const string VelopackReleaseFeedUrl = "https://github.com/NetrunnerGames/DataJackUI/releases/latest/download";
+
+    /// <summary>
+    /// Public GitHub repo hosting Velopack release assets.
     /// </summary>
     public static readonly string[] GithubReleasesRepos =
     [
         "https://github.com/NetrunnerGames/DataJackUI",   // primary
-        "https://github.com/NetrunnerGames/DataJackUI-Backup",  // backup
     ];
 
     /// <summary>The primary releases repo (first in <see cref="GithubReleasesRepos"/>).</summary>

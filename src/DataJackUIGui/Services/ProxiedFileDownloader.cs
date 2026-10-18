@@ -33,14 +33,15 @@ public class ProxiedFileDownloader : IFileDownloader
         throw last ?? new Exception($"Failed to download {url} from GitHub or any mirror.");
     }
 
-    public async Task<byte[]> DownloadBytes(string url, IDictionary<string, string>? headers = null, double timeout = 30)
+    public async Task<byte[]> DownloadBytes(string url, IDictionary<string, string>? headers = null, double timeout = 15)
     {
         Exception? last = null;
+        double effectiveTimeout = Math.Min(timeout, 15);
         foreach (var candidate in GithubProxy.Candidates(url))
         {
             try
             {
-                return await _inner.DownloadBytes(candidate, headers, timeout);
+                return await _inner.DownloadBytes(candidate, headers, effectiveTimeout);
             }
             catch (Exception ex)
             {
@@ -50,14 +51,15 @@ public class ProxiedFileDownloader : IFileDownloader
         throw last ?? new Exception($"Failed to download {url} from GitHub or any mirror.");
     }
 
-    public async Task<string> DownloadString(string url, IDictionary<string, string>? headers = null, double timeout = 30)
+    public async Task<string> DownloadString(string url, IDictionary<string, string>? headers = null, double timeout = 10)
     {
         Exception? last = null;
+        double effectiveTimeout = Math.Min(timeout, 10);
         foreach (var candidate in GithubProxy.Candidates(url))
         {
             try
             {
-                return await _inner.DownloadString(candidate, headers, timeout);
+                return await _inner.DownloadString(candidate, headers, effectiveTimeout);
             }
             catch (Exception ex)
             {

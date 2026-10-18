@@ -6,7 +6,7 @@
 
 A modern desktop interface for Steam manifest management, native hook injection, and store plugin integration.
 
-<a href="https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.13.0"><img src="https://img.shields.io/badge/DataJackUI-v2.13.0-090a0f?style=for-the-badge&labelColor=090a0f&logo=github&logoColor=00ffff" height="42" alt="DataJackUI Release" /></a>
+<a href="https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.13.1"><img src="https://img.shields.io/badge/DataJackUI-v2.13.1-090a0f?style=for-the-badge&labelColor=090a0f&logo=github&logoColor=00ffff" height="42" alt="DataJackUI Release" /></a>
 <a href="https://github.com/NetrunnerGames/Jack-in/releases/tag/v1.0"><img src="https://img.shields.io/badge/Jack--in_Plugin-v1.0-090a0f?style=for-the-badge&labelColor=090a0f&logo=steam&logoColor=00adf0" height="42" alt="Jack-in Plugin" /></a>
 <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/Framework-.NET_8.0_WPF-090a0f?style=for-the-badge&labelColor=090a0f&logo=dotnet&logoColor=512bd4" height="42" alt="Framework" /></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-090a0f?style=for-the-badge&labelColor=090a0f&logo=open-source-initiative&logoColor=3da639" height="42" alt="License" /></a>
@@ -31,7 +31,14 @@ DataJackUI provides an interface for Steam manifest acquisition, native DLL hook
 * **Jack-in Plugin Backend**: Native RPC integration matching the `Jack-in` Steam CEF store plugin for 1-click manifest addition inside the Steam client.
 * **Hook & Unlocker Administration**: Management interface for OpenSteamTools backend hooks and CloudRedirect configurations.
 * **Fixes & Diagnostics**: Integrated game fix repository and repair workflows with file backups.
+* **Cloud Saves**: Backup, sync, and restore game saves locally or to cloud providers (OneDrive, Google Drive, Rclone) with automatic pre-restore safety snapshots and customizable local backup paths.
 * **Cloudflare DoH Resolution**: Fallback DNS over HTTPS (`https://1.1.1.1/dns-query`) for networks where DNS lookup is restricted or throttled.
+
+## Privacy & Telemetry Disclosure
+
+We believe in complete transparency regarding network calls, telemetry, and user privacy.
+
+For a detailed technical breakdown of our anonymous app launch ping, zero-PII architecture, and ephemeral in-memory OAuth token handling, please see our dedicated [Privacy Policy](PRIVACY.md).
 
 ## Tasks
 
@@ -44,8 +51,8 @@ DataJackUI provides an interface for Steam manifest acquisition, native DLL hook
 > [!TIP]
 > For standard installation, use the standalone installer (`DataJackUI-win-Setup.exe`). Portable builds are also available for zero-installation deployment.
 
-* **Installer**: Download `DataJackUI-win-Setup.exe` from [Releases](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.13.0).
-* **Portable**: Download `DataJackUI-win-Portable.zip` from [Releases](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.13.0).
+* **Installer**: Download `DataJackUI-win-Setup.exe` from [Releases](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.13.1).
+* **Portable**: Download `DataJackUI-win-Portable.zip` from [Releases](https://github.com/NetrunnerGames/DataJackUI/releases/tag/v2.13.1).
 * **Steam CEF Plugin**: Download `plugin.zip` from the [Jack-in Repository](https://github.com/NetrunnerGames/Jack-in/releases/tag/v1.0) and extract it into your Steam client plugins directory.
 
 ## Building from Source

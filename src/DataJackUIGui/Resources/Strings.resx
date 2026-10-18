@@ -656,13 +656,22 @@ Cancel - keep downloading</value></data>
   <data name="Downloads_ClearHistory_Confirm" xml:space="preserve"><value>Remove all {0} entries from the download history? Downloaded files are not affected.</value></data>
   <data name="CloudSaves_Title" xml:space="preserve"><value>Cloud Saves</value></data>
   <data name="CloudSaves_Subtitle" xml:space="preserve"><value>Backup saves rejected by Steam and sync them seamlessly to OneDrive, Google Drive, or Rclone.</value></data>
-  <data name="CloudSaves_Scan" xml:space="preserve"><value>Scan Saves</value></data>
+  <data name="CloudSaves_Scan" xml:space="preserve"><value>Scan</value></data>
+  <data name="CloudSaves_ScanTooltip" xml:space="preserve"><value>Scan system for game saves</value></data>
   <data name="CloudSaves_BackupAll" xml:space="preserve"><value>Backup All</value></data>
-  <data name="CloudSaves_SyncCloud" xml:space="preserve"><value>Sync to Cloud</value></data>
-  <data name="CloudSaves_RestoreCloud" xml:space="preserve"><value>Restore from Cloud</value></data>
-  <data name="CloudSaves_Provider" xml:space="preserve"><value>Cloud Provider</value></data>
-  <data name="CloudSaves_ConfigureRclone" xml:space="preserve"><value>Configure Rclone</value></data>
-  <data name="CloudSaves_AutoSync" xml:space="preserve"><value>Auto-sync to cloud after backup</value></data>
+  <data name="CloudSaves_BackupAllTooltip" xml:space="preserve"><value>Create backup snapshots for all detected games</value></data>
+  <data name="CloudSaves_SyncCloud" xml:space="preserve"><value>Sync</value></data>
+  <data name="CloudSaves_SyncCloudTooltip" xml:space="preserve"><value>Sync backups to cloud storage</value></data>
+  <data name="CloudSaves_RestoreCloud" xml:space="preserve"><value>Restore</value></data>
+  <data name="CloudSaves_RestoreCloudTooltip" xml:space="preserve"><value>Restore backups from cloud storage</value></data>
+  <data name="CloudSaves_Provider" xml:space="preserve"><value>Provider</value></data>
+  <data name="CloudSaves_ConfigureRclone" xml:space="preserve"><value>Configure</value></data>
+  <data name="CloudSaves_AutoSync" xml:space="preserve"><value>Auto-sync</value></data>
+  <data name="CloudSaves_AutoSyncTooltip" xml:space="preserve"><value>Automatically sync backups to cloud whenever a backup is created</value></data>
+  <data name="CloudSaves_Connect" xml:space="preserve"><value>Connect</value></data>
+  <data name="CloudSaves_Disconnect" xml:space="preserve"><value>Disconnect</value></data>
+  <data name="CloudSaves_Connected" xml:space="preserve"><value>Connected</value></data>
+  <data name="CloudSaves_NotConnected" xml:space="preserve"><value>Not connected</value></data>
   <data name="CloudSaves_Snapshots" xml:space="preserve"><value>Snapshots</value></data>
   <data name="CloudSaves_Restore" xml:space="preserve"><value>Restore</value></data>
   <data name="CloudSaves_Delete" xml:space="preserve"><value>Delete</value></data>

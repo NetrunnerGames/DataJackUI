@@ -217,4 +217,102 @@ public class CloudSavesTests : IDisposable
         vm.RcloneRemote = "testremote:my_saves";
         Assert.Equal("testremote:my_saves", _settings.CloudSavesRcloneRemote);
     }
+
+    [Fact]
+    public void OAuth_GoogleDriveAndOneDrive_ConnectAndDisconnect_UpdatesSettingsAndState()
+    {
+        // Google Drive
+        Assert.False(_cloudSaves.IsGoogleDriveConnected);
+        Assert.Null(_cloudSaves.GetGoogleDriveAccount());
+
+        _settings.CloudSavesGDriveAccount = "gamer@gmail.com";
+
+        Assert.True(_cloudSaves.IsGoogleDriveConnected);
+        Assert.Equal("gamer@gmail.com", _cloudSaves.GetGoogleDriveAccount());
+
+        _cloudSaves.DisconnectGoogleDrive();
+        Assert.False(_cloudSaves.IsGoogleDriveConnected);
+        Assert.Null(_cloudSaves.GetGoogleDriveAccount());
+
+        // OneDrive
+        Assert.False(_cloudSaves.IsOneDriveConnected);
+        Assert.Null(_cloudSaves.GetOneDriveAccount());
+
+        _settings.CloudSavesOneDriveAccount = "gamer@outlook.com";
+
+        Assert.True(_cloudSaves.IsOneDriveConnected);
+        Assert.Equal("gamer@outlook.com", _cloudSaves.GetOneDriveAccount());
+
+        _cloudSaves.DisconnectOneDrive();
+        Assert.False(_cloudSaves.IsOneDriveConnected);
+        Assert.Null(_cloudSaves.GetOneDriveAccount());
+    }
+
+    [Fact]
+    public void CloudSavesViewModel_OAuthStateAndCommands_ReflectProperly()
+    {
+        _settings.CloudSavesGDriveAccount = "pilot@gmail.com";
+        _settings.CloudSavesOneDriveAccount = "pilot@outlook.com";
+
+        var vm = new CloudSavesViewModel(
+            _cloudSaves,
+            _settings,
+            new SteamAppInfoCache(new CacheService()),
+            new CoverCache(_settings),
+            new ToastService());
+
+        Assert.True(vm.IsGoogleDriveConnected);
+        Assert.Equal("pilot@gmail.com", vm.GoogleDriveAccount);
+        Assert.Contains("pilot@gmail.com", vm.GoogleDriveStatus);
+
+        Assert.True(vm.IsOneDriveConnected);
+        Assert.Equal("pilot@outlook.com", vm.OneDriveAccount);
+        Assert.Contains("pilot@outlook.com", vm.OneDriveStatus);
+
+        vm.DisconnectGoogleDriveCommand.Execute(null);
+        Assert.False(vm.IsGoogleDriveConnected);
+
+        vm.DisconnectOneDriveCommand.Execute(null);
+        Assert.False(vm.IsOneDriveConnected);
+    }
+
+    [Fact]
+    public void BaseBackupDir_FollowsCustomLocalBackupPath()
+    {
+        string defaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUI", "save_backups");
+        _settings.CloudSavesLocalPath = null;
+        Assert.Equal(defaultPath, _cloudSaves.BaseBackupDir);
+
+        string customPath = Path.Combine(_tempRoot, "MyCustomBackups");
+        _settings.CloudSavesLocalPath = customPath;
+        Assert.Equal(Path.GetFullPath(customPath), _cloudSaves.BaseBackupDir);
+
+        // Reset
+        _settings.CloudSavesLocalPath = null;
+        Assert.Equal(defaultPath, _cloudSaves.BaseBackupDir);
+    }
+
+    [Fact]
+    public void CloudGameItemViewModel_WithInitialCover_InitializesImmediately()
+    {
+        var target = new GameSaveTarget(
+            413150,
+            "Stardew Valley",
+            @"C:\Saves\Stardew",
+            SaveLocationType.AppDataRoaming,
+            3,
+            1024,
+            DateTime.UtcNow,
+            1,
+            DateTime.UtcNow);
+
+        string testCover = @"C:\Covers\413150.jpg";
+        var vm = new CloudGameItemViewModel(target, testCover);
+
+        Assert.Equal(413150, vm.AppId);
+        Assert.Equal("Stardew Valley", vm.GameName);
+        Assert.Equal(testCover, vm.CoverPath);
+        Assert.True(vm.HasBackups);
+        Assert.Equal("Roaming AppData", vm.LocationDisplay);
+    }
 }

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,7 +12,7 @@ public partial class CloudGameItemViewModel : ObservableObject
 {
     private readonly GameSaveTarget _target;
 
-    public CloudGameItemViewModel(GameSaveTarget target)
+    public CloudGameItemViewModel(GameSaveTarget target, string? initialCover = null)
     {
         _target = target;
         AppId = target.AppId;
@@ -23,6 +24,7 @@ public partial class CloudGameItemViewModel : ObservableObject
         LastModified = target.LastModified;
         SnapshotCount = target.SnapshotCount;
         LastBackupDate = target.LastBackupDate;
+        _coverPath = initialCover;
     }
 
     public long AppId { get; }
@@ -109,7 +111,11 @@ public partial class CloudSavesViewModel : ObservableObject
     public ObservableCollection<SaveBackupSnapshot> Snapshots { get; } = [];
 
     [ObservableProperty] private string _oneDriveStatus = "Checking…";
+    [ObservableProperty] private bool _isOneDriveConnected;
+    [ObservableProperty] private string? _oneDriveAccount;
     [ObservableProperty] private string _googleDriveStatus = "Checking…";
+    [ObservableProperty] private bool _isGoogleDriveConnected;
+    [ObservableProperty] private string? _googleDriveAccount;
     [ObservableProperty] private string _rcloneStatus = "Checking…";
     [ObservableProperty] private bool _isRcloneDetected;
 
@@ -146,8 +152,24 @@ public partial class CloudSavesViewModel : ObservableObject
     public string LocalBackupPath
     {
         get => _settings.CloudSavesLocalPath ?? "";
-        set { _settings.CloudSavesLocalPath = value; OnPropertyChanged(); }
+        set
+        {
+            string trimmed = (value ?? "").Trim();
+            string? normalized = string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+            if (_settings.CloudSavesLocalPath != normalized)
+            {
+                _settings.CloudSavesLocalPath = normalized;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasCustomLocalBackupPath));
+                OnPropertyChanged(nameof(EffectiveLocalBackupPath));
+                _ = ScanGamesAsync();
+            }
+        }
     }
+
+    public bool HasCustomLocalBackupPath => !string.IsNullOrWhiteSpace(_settings.CloudSavesLocalPath);
+
+    public string EffectiveLocalBackupPath => _cloudSaves.BaseBackupDir;
 
     public string RcloneExePath
     {
@@ -199,7 +221,7 @@ public partial class CloudSavesViewModel : ObservableObject
             _allGames.Clear();
             foreach (var t in rawTargets)
             {
-                var vm = new CloudGameItemViewModel(t);
+                var vm = new CloudGameItemViewModel(t, _covers.GetLocalPath(t.AppId));
                 _allGames.Add(vm);
             }
 
@@ -249,26 +271,55 @@ public partial class CloudSavesViewModel : ObservableObject
 
     private async Task ResolveAllCoversAndNamesAsync()
     {
-        foreach (var g in _allGames.ToList())
+        var games = _allGames.ToList();
+        var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = 6 };
+        try
         {
-            await ResolveGameDetailsAsync(g);
+            await Parallel.ForEachAsync(games, parallelOptions, async (g, ct) =>
+            {
+                await ResolveGameDetailsAsync(g);
+            });
         }
+        catch { }
     }
 
     private async Task ResolveGameDetailsAsync(CloudGameItemViewModel g)
     {
         try
         {
-            var info = _appInfo.GetCached(g.AppId) ?? await _appInfo.ResolveAsync(g.AppId);
-            if (info != null && !string.IsNullOrWhiteSpace(info.Name) && g.GameName == g.AppId.ToString())
-            {
-                g.GameName = info.Name;
-            }
-
+            // 1. Fast cover resolution (local path or Steam CDN guess)
             if (string.IsNullOrEmpty(g.CoverPath))
             {
-                string? cover = await _covers.EnsureAsync(g.AppId, info?.HeaderImage);
-                if (!string.IsNullOrEmpty(cover)) g.CoverPath = cover;
+                string? local = _covers.GetLocalPath(g.AppId);
+                if (local != null)
+                {
+                    g.CoverPath = local;
+                }
+                else
+                {
+                    string guess = SteamAppInfoCache.GuessHeaderImageUrl(g.AppId);
+                    local = await _covers.EnsureAsync(g.AppId, guess);
+                    if (!string.IsNullOrEmpty(local))
+                    {
+                        g.CoverPath = local;
+                    }
+                }
+            }
+
+            // 2. Resolve title if it's currently just numerical App ID
+            if (g.GameName == g.AppId.ToString())
+            {
+                var info = _appInfo.GetCached(g.AppId) ?? await _appInfo.ResolveAsync(g.AppId);
+                if (info != null && !string.IsNullOrWhiteSpace(info.Name))
+                {
+                    g.GameName = info.Name;
+                }
+
+                if (string.IsNullOrEmpty(g.CoverPath) && !string.IsNullOrEmpty(info?.HeaderImage))
+                {
+                    string? cover = await _covers.EnsureAsync(g.AppId, info.HeaderImage);
+                    if (!string.IsNullOrEmpty(cover)) g.CoverPath = cover;
+                }
             }
         }
         catch { }
@@ -557,11 +608,38 @@ public partial class CloudSavesViewModel : ObservableObject
         var dialog = new OpenFolderDialog
         {
             Title = "Select Destination Folder for Local Backups",
-            InitialDirectory = Directory.Exists(LocalBackupPath) ? LocalBackupPath : null
+            InitialDirectory = Directory.Exists(_cloudSaves.BaseBackupDir) ? _cloudSaves.BaseBackupDir : null
         };
-        if (dialog.ShowDialog() == true)
+        if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName))
         {
             LocalBackupPath = dialog.FolderName;
+            _toast.Show("Local Backups", $"Backup location updated: {dialog.FolderName}");
+        }
+    }
+
+    [RelayCommand]
+    public void ResetLocalBackupPath()
+    {
+        LocalBackupPath = "";
+        _toast.Show("Local Backups", "Reset backup directory to default (%APPDATA%\\DataJackUI\\save_backups).");
+    }
+
+    [RelayCommand]
+    public void OpenLocalBackupFolder()
+    {
+        string dir = _cloudSaves.BaseBackupDir;
+        try
+        {
+            Directory.CreateDirectory(dir);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = dir,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _toast.Show("Open Folder Error", ex.Message, error: true);
         }
     }
 
@@ -585,16 +663,114 @@ public partial class CloudSavesViewModel : ObservableObject
         SteamService.OpenUrl("https://rclone.org/downloads/");
     }
 
-    private void UpdateProviderDetection()
+    [RelayCommand]
+    public async Task ConnectGoogleDriveAsync()
     {
-        string? oneDrive = _cloudSaves.ResolveOneDriveFolder();
-        OneDriveStatus = oneDrive != null ? $"Ready ({oneDrive})" : "Not found";
+        if (IsBusy) return;
+        IsBusy = true;
+        StatusMessage = "Connecting to Google Drive… Please complete authorization in your browser.";
 
-        string? gdrive = _cloudSaves.ResolveGoogleDriveFolder();
-        GoogleDriveStatus = gdrive != null ? $"Ready ({gdrive})" : "Local folder not found (will use Rclone remote)";
+        try
+        {
+            var res = await _cloudSaves.ConnectGoogleDriveAsync(msg => StatusMessage = msg);
+            if (res.Success)
+            {
+                _toast.Show("Google Drive", $"Connected successfully as {res.Account ?? "Google User"}.");
+                UpdateProviderDetection();
+            }
+            else
+            {
+                _toast.Show("Google Drive", res.Message, error: true);
+            }
+            StatusMessage = res.Message;
+        }
+        catch (Exception ex)
+        {
+            _toast.Show("Google Drive Error", ex.Message, error: true);
+            StatusMessage = $"Google Drive auth error: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    public void DisconnectGoogleDrive()
+    {
+        _cloudSaves.DisconnectGoogleDrive();
+        UpdateProviderDetection();
+        _toast.Show("Google Drive", "Disconnected Google Drive account.");
+    }
+
+    [RelayCommand]
+    public async Task ConnectOneDriveAsync()
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        StatusMessage = "Connecting to OneDrive… Please complete authorization in your browser.";
+
+        try
+        {
+            var res = await _cloudSaves.ConnectOneDriveAsync(msg => StatusMessage = msg);
+            if (res.Success)
+            {
+                _toast.Show("OneDrive", $"Connected successfully as {res.Account ?? "Microsoft User"}.");
+                UpdateProviderDetection();
+            }
+            else
+            {
+                _toast.Show("OneDrive", res.Message, error: true);
+            }
+            StatusMessage = res.Message;
+        }
+        catch (Exception ex)
+        {
+            _toast.Show("OneDrive Error", ex.Message, error: true);
+            StatusMessage = $"OneDrive auth error: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    public void DisconnectOneDrive()
+    {
+        _cloudSaves.DisconnectOneDrive();
+        UpdateProviderDetection();
+        _toast.Show("OneDrive", "Disconnected OneDrive account.");
+    }
+
+    public void UpdateProviderDetection()
+    {
+        IsOneDriveConnected = _cloudSaves.IsOneDriveConnected;
+        OneDriveAccount = _cloudSaves.GetOneDriveAccount();
+        if (IsOneDriveConnected)
+        {
+            OneDriveStatus = !string.IsNullOrEmpty(OneDriveAccount) ? $"Connected ({OneDriveAccount})" : "Connected";
+        }
+        else
+        {
+            string? oneDrive = _cloudSaves.ResolveOneDriveFolder();
+            OneDriveStatus = oneDrive != null ? "Local folder detected" : "Not connected";
+        }
+
+        IsGoogleDriveConnected = _cloudSaves.IsGoogleDriveConnected;
+        GoogleDriveAccount = _cloudSaves.GetGoogleDriveAccount();
+        if (IsGoogleDriveConnected)
+        {
+            GoogleDriveStatus = !string.IsNullOrEmpty(GoogleDriveAccount) ? $"Connected ({GoogleDriveAccount})" : "Connected";
+        }
+        else
+        {
+            string? gdrive = _cloudSaves.ResolveGoogleDriveFolder();
+            GoogleDriveStatus = gdrive != null ? "Local folder detected" : "Not connected";
+        }
 
         string? rclone = _cloudSaves.FindRcloneExe();
         IsRcloneDetected = rclone != null;
-        RcloneStatus = rclone != null ? $"Ready ({rclone})" : "Not found (click to configure or download)";
+        RcloneStatus = rclone != null ? "Ready" : "Not found (click to configure)";
     }
 }
