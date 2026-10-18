@@ -15,7 +15,6 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     {
         _settings = settings;
         InitializeComponent();
-        WindowAcrylicHelper.Apply(this);
         DataContext = viewModel;
 
         // NavigationView resolves page instances (DownloadView/SettingsView) from DI.

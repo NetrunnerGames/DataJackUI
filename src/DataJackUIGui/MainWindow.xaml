@@ -19,10 +19,9 @@
     WindowBackdropType="Acrylic"
     WindowCornerPreference="Round"
     WindowStartupLocation="CenterScreen"
-    Background="Transparent"
     mc:Ignorable="d">
 
-    <Grid Background="#66090A0F">
+    <Grid Background="#D9090A0F">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />

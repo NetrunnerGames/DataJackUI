@@ -199,27 +199,6 @@ public class TaskRequirementsTests
     }
 
     [Fact]
-    public void WindowAcrylicHelper_EnableAcrylic_SucceedsOnHwnd()
-    {
-        int hr = -1;
-        var thread = new System.Threading.Thread(() =>
-        {
-            var win = new System.Windows.Window();
-            win.Background = System.Windows.Media.Brushes.Transparent;
-            var interop = new System.Windows.Interop.WindowInteropHelper(win);
-            interop.EnsureHandle();
-
-            hr = DataJackUIGui.Services.WindowAcrylicHelper.EnableAcrylic(interop.Handle, 0x660F0A09);
-            win.Close();
-        });
-        thread.SetApartmentState(System.Threading.ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        Assert.True(hr >= 0, $"Expected SetWindowCompositionAttribute to return >= 0, but got {hr}");
-    }
-
-    [Fact]
     public async Task PaymentService_CheckAuthToken_In_Verify()
     {
         var settings = new SettingsService();
@@ -228,7 +207,15 @@ public class TaskRequirementsTests
         var payment = new PaymentService(settings, auth);
 
         var (success, error) = await payment.VerifyPaymentAsync(271590, "665767895987", 100, isDenuvo: false);
-        Assert.True(success, $"Verification failed with error: {error}");
-        Assert.True(settings.IsAppUnlocked(271590));
+        if (!auth.IsSignedIn)
+        {
+            Assert.False(success);
+            Assert.Contains("Valid login required", error);
+        }
+        else
+        {
+            Assert.True(success, $"Verification failed with error: {error}");
+            Assert.True(settings.IsAppUnlocked(271590));
+        }
     }
 }

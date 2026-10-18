@@ -16,7 +16,6 @@
     WindowBackdropType="Mica"
     WindowCornerPreference="Round"
     WindowStartupLocation="CenterOwner"
-    Background="Transparent"
     mc:Ignorable="d">
 
     <Grid>
