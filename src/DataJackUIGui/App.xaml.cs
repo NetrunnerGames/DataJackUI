@@ -42,7 +42,6 @@ public partial class App : Application
                 services.AddSingleton<DenuvoService>();
                 services.AddSingleton<SteamlessService>();
                 services.AddSingleton<SteamAutoCrackService>();
-                services.AddSingleton<CloudRedirectService>();
                 services.AddSingleton<DepotDownloaderService>();
                 services.AddSingleton<DepotCacheMigrationService>();
                 services.AddSingleton<AppliedFixIndexService>();

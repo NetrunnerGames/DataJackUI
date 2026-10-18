@@ -84,17 +84,6 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         try
         {
             EnsureOpenSteamToolLuaPath(root);
-            if (SelectedMode == UnlockerMode.Ost)
-            {
-                SetOpenSteamToolCloudEnabled(root, true);
-                if (!File.Exists(Path.Combine(root, CloudRedirectDll)))
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        try { await DownloadCloudRedirectDllAsync(root, null, default); } catch { }
-                    });
-                }
-            }
         }
         catch { /* config tweak is best-effort */ }
     }
@@ -120,19 +109,6 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
             return new ModeState(mode, installed ? ModeStatus.UpToDate : ModeStatus.NotInstalled, active, null);
         }
         return new ModeState(mode, ModeStatus.Unknown, active, null);
-    }
-
-    /// <summary>Synchronous on-disk CloudRedirect state check (<1ms, no network I/O).</summary>
-    public CloudRedirectAddonState GetCloudRedirectLocalState()
-    {
-        string? root = steam.EffectivePath;
-        if (root is null || !steam.IsValid)
-            return new CloudRedirectAddonState(false, false, false, null);
-
-        string dll = Path.Combine(root, CloudRedirectDll);
-        bool installed = File.Exists(dll);
-        bool enabled = installed && ReadOpenSteamToolCloudEnabled(root);
-        return new CloudRedirectAddonState(installed, enabled, false, null);
     }
 
     /// <summary>Query GitHub + local files → this mode's status. Returns Unknown on any failure/offline.
@@ -307,14 +283,6 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
             try
             {
                 EnsureOpenSteamToolLuaPath(root);
-                SetOpenSteamToolCloudEnabled(root, true);
-                if (!File.Exists(Path.Combine(root, CloudRedirectDll)))
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        try { await DownloadCloudRedirectDllAsync(root, null, ct); } catch { }
-                    });
-                }
             }
             catch { }
 
@@ -562,8 +530,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         string tomlPath = Path.Combine(steamRoot, "opensteamtool.toml");
         if (!File.Exists(tomlPath))
         {
-            File.WriteAllText(tomlPath, $"[lua]\npaths = [\"{OstLuaPath}\"]\n\n[cloud]\nenabled = true\n");
-            SetDataJackJsonCloudEnabled(steamRoot, true);
+            File.WriteAllText(tomlPath, $"[lua]\npaths = [\"{OstLuaPath}\"]\n");
             return;
         }
 
@@ -631,253 +598,6 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
     {
         string t = line.TrimStart();
         return !t.StartsWith('#') && Regex.IsMatch(t, @"^\[[^\[].*\]");
-    }
-
-    // ── CloudRedirect add-on (a feature of the OpenSteamTool Nightly build) ──────────
-    // Not a mutually-exclusive mode: it drops cloud_redirect.dll into the Steam root and toggles
-    // [cloud] enabled in opensteamtool.toml (parallel to how BST install writes [lua] paths). Only
-    // meaningful when the Nightly BST mode is active.
-
-    private const string CloudRedirectDll = "cloud_redirect.dll";
-    private (GithubRelease release, DateTime fetchedAt)? _crReleaseCache;
-
-    private async Task<GithubRelease?> FetchCloudRedirectReleaseAsync(bool forceRefresh, CancellationToken ct)
-    {
-        if (!forceRefresh && _crReleaseCache is { } c && DateTime.UtcNow - c.fetchedAt < CacheTtl)
-            return c.release;
-
-        string url = $"https://api.github.com/repos/{AppConfig.CloudRedirectRepo}/releases/latest";
-        try
-        {
-            using var res = await gh.SendAsync(url, ct);
-            if (res is null || !res.IsSuccessStatusCode) return null;
-            var release = JsonSerializer.Deserialize<GithubRelease>(await res.Content.ReadAsStringAsync(ct), JsonOpts);
-            if (release is not null) _crReleaseCache = (release, DateTime.UtcNow);
-            return release;
-        }
-        catch { return null; }
-    }
-
-    /// <summary>Add-on state from disk (dll present + [cloud] enabled) plus, when <paramref name="checkUpdate"/>
-    /// and installed, whether a newer cloud_redirect.dll is published.</summary>
-    public async Task<CloudRedirectAddonState> GetCloudRedirectStateAsync(
-        bool checkUpdate, bool forceRefresh = false, CancellationToken ct = default)
-    {
-        string? root = steam.EffectivePath;
-        if (root is null || !steam.IsValid)
-            return new CloudRedirectAddonState(false, false, false, null);
-
-        string dll = Path.Combine(root, CloudRedirectDll);
-        bool installed = File.Exists(dll);
-        bool enabled = installed && ReadOpenSteamToolCloudEnabled(root);
-
-        bool updateAvailable = false;
-        string? latest = null;
-        if (checkUpdate && installed)
-        {
-            var release = await FetchCloudRedirectReleaseAsync(forceRefresh, ct);
-            if (release is not null)
-            {
-                latest = release.TagName;
-                string? wanted = AssetDigest(release, CloudRedirectDll);
-                if (wanted is not null && !AssetHash.OfFile(dll).Equals(wanted, StringComparison.OrdinalIgnoreCase))
-                    updateAvailable = true;
-            }
-        }
-        return new CloudRedirectAddonState(installed, enabled, updateAvailable, latest);
-    }
-
-    /// <summary>Enable: download cloud_redirect.dll if missing (verified), then set [cloud] enabled = true.
-    /// Takes effect on the next Steam launch.</summary>
-    public async Task<ModeInstallResult> EnableCloudRedirectAsync(IProgress<double?>? progress = null, CancellationToken ct = default)
-    {
-        string? root = steam.EffectivePath;
-        if (root is null || !steam.IsValid)
-            return ModeInstallResult.Fail(Resources.Strings.Err_SteamNotFound);
-
-        if (!File.Exists(Path.Combine(root, CloudRedirectDll)))
-        {
-            var dl = await DownloadCloudRedirectDllAsync(root, progress, ct);
-            if (!dl.Success) return dl;
-        }
-        try { SetOpenSteamToolCloudEnabled(root, true); }
-        catch (Exception ex) { return ModeInstallResult.Fail(ex.Message); }
-        return ModeInstallResult.Ok();
-    }
-
-    /// <summary>Disable: flip [cloud] enabled = false (keeps the dll on disk).</summary>
-    public ModeInstallResult DisableCloudRedirect()
-    {
-        string? root = steam.EffectivePath;
-        if (root is null || !steam.IsValid)
-            return ModeInstallResult.Fail(Resources.Strings.Err_SteamNotFound);
-        try { SetOpenSteamToolCloudEnabled(root, false); return ModeInstallResult.Ok(); }
-        catch (Exception ex) { return ModeInstallResult.Fail(ex.Message); }
-    }
-
-    /// <summary>Update: replace cloud_redirect.dll with the latest (verified). Fails with a "close Steam"
-    /// message if Steam holds the existing dll open.</summary>
-    public async Task<ModeInstallResult> UpdateCloudRedirectAsync(IProgress<double?>? progress = null, CancellationToken ct = default)
-    {
-        string? root = steam.EffectivePath;
-        if (root is null || !steam.IsValid)
-            return ModeInstallResult.Fail(Resources.Strings.Err_SteamNotFound);
-        return await DownloadCloudRedirectDllAsync(root, progress, ct);
-    }
-
-    private async Task<ModeInstallResult> DownloadCloudRedirectDllAsync(string root, IProgress<double?>? progress, CancellationToken ct)
-    {
-        var release = await FetchCloudRedirectReleaseAsync(forceRefresh: true, ct);
-        if (release is null) return ModeInstallResult.Fail(Resources.Strings.Err_GithubUnreachable);
-        var asset = FindAsset(release, CloudRedirectDll);
-        if (asset is null) return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_ReleaseMissingFile, CloudRedirectDll));
-
-        string staging = Path.Combine(Path.GetTempPath(), "DataJackUIGui", "cloud", Guid.NewGuid().ToString("N"));
-        try
-        {
-            Directory.CreateDirectory(staging);
-            string tmp = Path.Combine(staging, CloudRedirectDll);
-            await DownloadToFileAsync(asset.DownloadUrl, tmp, progress, ct);
-            if (AssetHash.ParseDigest(asset.Digest) is { } want && !AssetHash.OfFile(tmp).Equals(want, StringComparison.OrdinalIgnoreCase))
-                return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_VerifyFailedFile, CloudRedirectDll));
-
-            try
-            {
-                string dest = Path.Combine(root, CloudRedirectDll);
-                File.Copy(tmp, dest, overwrite: true);
-                StampNow(dest);
-            }
-            catch
-            {
-                // Steam has the loaded dll locked: surface a close-Steam message (same as mode install).
-                return ModeInstallResult.Fail(string.Format(Resources.Strings.Err_WriteFailedFile, CloudRedirectDll));
-            }
-            return ModeInstallResult.Ok();
-        }
-        catch (OperationCanceledException) { return ModeInstallResult.Fail(Resources.Strings.Err_Cancelled); }
-        catch (Exception ex) { return ModeInstallResult.Fail(ex.Message); }
-        finally { try { Directory.Delete(staging, recursive: true); } catch { /* best effort */ } }
-    }
-
-    /// <summary>Ensure opensteamtool.toml or datajack.json has an active [cloud] section with enabled = true|false.</summary>
-    private static void SetOpenSteamToolCloudEnabled(string steamRoot, bool enabled)
-    {
-        SetDataJackJsonCloudEnabled(steamRoot, enabled);
-
-        string tomlPath = Path.Combine(steamRoot, "opensteamtool.toml");
-        string val = enabled ? "true" : "false";
-
-        if (!File.Exists(tomlPath))
-        {
-            File.WriteAllText(tomlPath, $"[cloud]\nenabled = {val}\n");
-            return;
-        }
-
-        var lines = File.ReadAllLines(tomlPath).ToList();
-
-        int header = lines.FindIndex(l => IsActiveTableHeader(l, "cloud"));
-        if (header < 0)
-        {
-            if (lines.Count > 0 && lines[^1].Trim().Length > 0) lines.Add("");
-            lines.Add("[cloud]");
-            lines.Add($"enabled = {val}");
-            File.WriteAllLines(tomlPath, lines);
-            return;
-        }
-
-        int sectionEnd = lines.FindIndex(header + 1, IsActiveAnyTableHeader);
-        if (sectionEnd < 0) sectionEnd = lines.Count;
-
-        for (int i = header + 1; i < sectionEnd; i++)
-        {
-            string t = lines[i].TrimStart();
-            if (t.StartsWith('#')) continue;                       // commented → ignore
-            if (Regex.IsMatch(t, @"^enabled\s*="))
-            {
-                string indent = lines[i][..(lines[i].Length - lines[i].TrimStart().Length)];
-                lines[i] = $"{indent}enabled = {val}";
-                File.WriteAllLines(tomlPath, lines);
-                return;
-            }
-        }
-
-        // [cloud] exists but no active enabled key → insert one under the header.
-        lines.Insert(header + 1, $"enabled = {val}");
-        File.WriteAllLines(tomlPath, lines);
-    }
-
-    /// <summary>Read datajack.json or opensteamtool.toml's active [cloud] enabled value (false if absent).</summary>
-    private static bool ReadOpenSteamToolCloudEnabled(string steamRoot)
-    {
-        string tomlPath = Path.Combine(steamRoot, "opensteamtool.toml");
-        if (File.Exists(tomlPath))
-        {
-            var lines = File.ReadAllLines(tomlPath);
-            int header = Array.FindIndex(lines, l => IsActiveTableHeader(l, "cloud"));
-            if (header >= 0)
-            {
-                for (int i = header + 1; i < lines.Length; i++)
-                {
-                    if (IsActiveAnyTableHeader(lines[i])) break;            // next section → done
-                    string t = lines[i].TrimStart();
-                    if (t.StartsWith('#')) continue;                       // commented → ignore
-                    var m = Regex.Match(t, @"^enabled\s*=\s*(\w+)");
-                    if (m.Success) return m.Groups[1].Value.Equals("true", StringComparison.OrdinalIgnoreCase);
-                }
-            }
-        }
-
-        string jsonPath = Path.Combine(steamRoot, "datajack.json");
-        if (File.Exists(jsonPath))
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(File.ReadAllText(jsonPath));
-                if (doc.RootElement.TryGetProperty("cloud", out var cloudObj) &&
-                    cloudObj.TryGetProperty("enabled", out var enabledProp))
-                {
-                    return enabledProp.GetBoolean();
-                }
-            }
-            catch { }
-        }
-
-        return false;
-    }
-
-    private static void SetDataJackJsonCloudEnabled(string steamRoot, bool enabled)
-    {
-        try
-        {
-            string jsonPath = Path.Combine(steamRoot, "datajack.json");
-            Dictionary<string, object> dict = new();
-            if (File.Exists(jsonPath))
-            {
-                try
-                {
-                    var existing = JsonSerializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(jsonPath));
-                    if (existing is not null) dict = existing;
-                }
-                catch { }
-            }
-
-            Dictionary<string, object> cloudSection = new();
-            if (dict.TryGetValue("cloud", out var rawCloud) && rawCloud is JsonElement el && el.ValueKind == JsonValueKind.Object)
-            {
-                foreach (var prop in el.EnumerateObject())
-                    cloudSection[prop.Name] = prop.Value.ValueKind == JsonValueKind.True ? true :
-                                              prop.Value.ValueKind == JsonValueKind.False ? false :
-                                              prop.Value.ToString();
-            }
-
-            cloudSection["enabled"] = enabled;
-            if (!cloudSection.ContainsKey("library")) cloudSection["library"] = "cloud_redirect.dll";
-            dict["cloud"] = cloudSection;
-
-            string json = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(jsonPath, json);
-        }
-        catch { /* best effort */ }
     }
 
     private static void EnsureDataJackJsonLuaPath(string steamRoot)

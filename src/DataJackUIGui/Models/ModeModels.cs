@@ -88,15 +88,6 @@ public sealed record ModeState(
     bool IsActive,           // is this the currently-selected (active) mode
     string? LatestVersion);  // resolved release tag (for display)
 
-/// <summary>State of the CloudRedirect add-on (a feature of both the OST nightly and BST builds), derived
-/// from disk (cloud_redirect.dll presence + [cloud] enabled in opensteamtool.toml) and the latest
-/// CloudRedirect release.</summary>
-public sealed record CloudRedirectAddonState(
-    bool Installed,          // cloud_redirect.dll is present in the Steam root
-    bool Enabled,            // opensteamtool.toml has [cloud] enabled = true
-    bool UpdateAvailable,    // on-disk dll differs from the latest release asset
-    string? LatestVersion);  // latest CloudRedirect release tag (for display), null if unknown
-
 /// <summary>Outcome of installing/switching to a mode. Mirrors LuaInstaller.InstallResult.</summary>
 public sealed record ModeInstallResult(bool Success, string? Error, IReadOnlyList<string> Failed)
 {

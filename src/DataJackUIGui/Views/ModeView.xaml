@@ -14,7 +14,7 @@
     <Grid x:Name="Root">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
-            <!-- Fixed bottom dock (separator + CloudRedirect add-on + progress) -->
+            <!-- Fixed bottom dock (shared progress) -->
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
@@ -144,29 +144,6 @@
                                                         Text="{x:Static res:Strings.Mode_Experimental}" />
                                                 </StackPanel>
                                             </Border>
-                                            <!-- Nightly: purple "CloudRedirect Support" badge. -->
-                                            <Border
-                                                Margin="6,0,0,0"
-                                                Padding="7,2"
-                                                VerticalAlignment="Center"
-                                                Background="#207c3aed"
-                                                CornerRadius="4"
-                                                Visibility="{Binding SupportsCloudRedirect, Converter={StaticResource BoolToVis}}">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <ui:SymbolIcon
-                                                        VerticalAlignment="Center"
-                                                        FontSize="10"
-                                                        Foreground="#c4b5fd"
-                                                        Symbol="Cloud24" />
-                                                    <TextBlock
-                                                        Margin="4,0,0,0"
-                                                        VerticalAlignment="Center"
-                                                        FontSize="10.5"
-                                                        FontWeight="SemiBold"
-                                                        Foreground="#c4b5fd"
-                                                        Text="{x:Static res:Strings.Mode_CloudRedirectSupport}" />
-                                                </StackPanel>
-                                            </Border>
                                         </StackPanel>
                                         <TextBlock
                                             Margin="0,6,0,0"
@@ -203,100 +180,18 @@
             </StackPanel>
         </ScrollViewer>
 
-        <!-- Fixed bottom dock: separator + CloudRedirect add-on + shared progress. -->
-        <StackPanel Grid.Row="1" MaxWidth="760" Margin="8,0,16,16">
-
-                <!-- Divider between the scrolling mode cards and the docked add-on. -->
-                <Border Height="1" Margin="0,0,0,14" Background="#1FFFFFFF" />
-
-                <!-- CloudRedirect add-on: a feature of the Nightly BST build. Locked (dimmed, buttons
-                      disabled) unless BetterSteamTools Nightly is the active mode. -->
-                <Border
-                    Margin="0,0,0,0"
-                    Padding="18"
-                    Background="#0DFFFFFF"
-                    BorderBrush="#1FFFFFFF"
-                    BorderThickness="1"
-                    CornerRadius="10">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding CloudRedirectUnlocked}" Value="False">
-                                    <Setter Property="Opacity" Value="0.55" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <ui:SymbolIcon
-                                    VerticalAlignment="Center"
-                                    Foreground="#38bdf8"
-                                    Symbol="Cloud24" />
-                                <TextBlock
-                                    Margin="10,0,0,0"
-                                    VerticalAlignment="Center"
-                                    FontSize="15"
-                                    FontWeight="SemiBold"
-                                    Text="CloudRedirect" />
-                            </StackPanel>
-                            <TextBlock
-                                Margin="0,6,0,0"
-                                FontSize="12"
-                                Foreground="#7c8593"
-                                Text="{x:Static res:Strings.Mode_CloudRedirect_AddonDesc}"
-                                TextWrapping="Wrap" />
-                            <TextBlock
-                                Margin="0,6,0,0"
-                                FontSize="12.5"
-                                Foreground="#9ca3af"
-                                Text="{Binding CloudRedirectStatusText}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <ui:Button
-                                MinWidth="96"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Center"
-                                Command="{Binding ToggleCloudRedirectCommand}"
-                                Content="{Binding CloudRedirectToggleText}"
-                                IsEnabled="{Binding CanUseCloudRedirect}" />
-                            <ui:Button
-                                Margin="0,8,0,0"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Center"
-                                Command="{Binding UpdateCloudRedirectCommand}"
-                                Content="{x:Static res:Strings.Mode_Btn_Update}"
-                                Icon="{ui:SymbolIcon ArrowSync24}"
-                                IsEnabled="{Binding CanUseCloudRedirect}"
-                                Visibility="{Binding ShowCloudRedirectUpdate, Converter={StaticResource BoolToVis}}" />
-                            <ui:Button
-                                Margin="0,8,0,0"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Center"
-                                Command="{Binding ManageCloudRedirectCommand}"
-                                Content="{x:Static res:Strings.Mode_CloudRedirect_Manage}"
-                                Icon="{ui:SymbolIcon Cloud24}"
-                                IsEnabled="{Binding CanUseCloudRedirect}"
-                                Visibility="{Binding ShowCloudRedirectManage, Converter={StaticResource BoolToVis}}" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Shared progress while installing/switching -->
-                <ProgressBar
-                    Height="6"
-                    Margin="0,2,0,0"
-                    IsIndeterminate="{Binding IsProgressIndeterminate}"
-                    Maximum="100"
-                    Value="{Binding Progress}"
-                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
-
+        <!-- Fixed bottom dock: shared progress while installing/switching. -->
+        <StackPanel
+            Grid.Row="1"
+            MaxWidth="760"
+            Margin="8,0,16,16"
+            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+            <ProgressBar
+                Height="6"
+                Margin="0,2,0,0"
+                IsIndeterminate="{Binding IsProgressIndeterminate}"
+                Maximum="100"
+                Value="{Binding Progress}" />
         </StackPanel>
 
         <!-- Steam-shutdown confirmation overlay (covers the whole page, both rows) -->

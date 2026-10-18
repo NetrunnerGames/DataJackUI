@@ -474,75 +474,80 @@
                                                 </StackPanel>
                                             </StackPanel>
 
-                                            <!-- Action Buttons -->
-                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <!-- Backup Now -->
-                                                <ui:Button
-                                                    Margin="0,0,6,0"
-                                                    Padding="12,5"
-                                                    FontSize="12"
-                                                    Appearance="Primary"
-                                                    Command="{Binding DataContext.BackupGameCommand, ElementName=Root}"
-                                                    CommandParameter="{Binding}"
-                                                    Content="{x:Static res:Strings.CloudSaves_BackupNow}"
-                                                    ToolTip="Create backup snapshot for this game"
-                                                    Icon="{ui:SymbolIcon Save24}" />
+                                            <!-- Action Buttons (Stacked 2-line layout for compactness) -->
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="8,0,0,0">
+                                                <!-- Row 1: Save Operations (Backup Now + Folder + Edit) -->
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,5">
+                                                    <!-- Backup Now -->
+                                                    <ui:Button
+                                                        Margin="0,0,4,0"
+                                                        Padding="11,4"
+                                                        FontSize="11.5"
+                                                        Appearance="Primary"
+                                                        Command="{Binding DataContext.BackupGameCommand, ElementName=Root}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="{x:Static res:Strings.CloudSaves_BackupNow}"
+                                                        ToolTip="Create backup snapshot for this game"
+                                                        Icon="{ui:SymbolIcon Save24}" />
 
-                                                <!-- Open Save Folder -->
-                                                <ui:Button
-                                                    Margin="0,0,4,0"
-                                                    Padding="7,5"
-                                                    FontSize="11.5"
-                                                    Command="{Binding DataContext.OpenGameSaveFolderCommand, ElementName=Root}"
-                                                    CommandParameter="{Binding}"
-                                                    ToolTip="Open save folder in Explorer"
-                                                    Icon="{ui:SymbolIcon Folder24}" />
+                                                    <!-- Open Save Folder -->
+                                                    <ui:Button
+                                                        Margin="0,0,4,0"
+                                                        Padding="7,4"
+                                                        FontSize="11"
+                                                        Command="{Binding DataContext.OpenGameSaveFolderCommand, ElementName=Root}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip="Open save folder in Explorer"
+                                                        Icon="{ui:SymbolIcon Folder24}" />
 
-                                                <!-- Custom Save Folder -->
-                                                <ui:Button
-                                                    Margin="0,0,4,0"
-                                                    Padding="7,5"
-                                                    FontSize="11.5"
-                                                    Command="{Binding DataContext.BrowseGameCustomSaveLocationCommand, ElementName=Root}"
-                                                    CommandParameter="{Binding}"
-                                                    ToolTip="Change custom save location"
-                                                    Icon="{ui:SymbolIcon Edit24}" />
+                                                    <!-- Custom Save Folder -->
+                                                    <ui:Button
+                                                        Padding="7,4"
+                                                        FontSize="11"
+                                                        Command="{Binding DataContext.BrowseGameCustomSaveLocationCommand, ElementName=Root}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip="Change custom save location"
+                                                        Icon="{ui:SymbolIcon Edit24}" />
+                                                </StackPanel>
 
-                                                <!-- Open Snapshots Folder -->
-                                                <ui:Button
-                                                    Margin="0,0,6,0"
-                                                    Padding="7,5"
-                                                    FontSize="11.5"
-                                                    Command="{Binding DataContext.OpenGameSnapshotsFolderCommand, ElementName=Root}"
-                                                    CommandParameter="{Binding}"
-                                                    ToolTip="Open snapshots folder in Explorer"
-                                                    Icon="{ui:SymbolIcon FolderOpen24}" />
+                                                <!-- Row 2: Snapshot Operations (Snapshots expander + Snapshots Folder) -->
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                    <!-- Snapshots Expander Button -->
+                                                    <ui:Button
+                                                        Margin="0,0,4,0"
+                                                        Padding="9,4"
+                                                        FontSize="11"
+                                                        Command="{Binding DataContext.ToggleGameExpandedCommand, ElementName=Root}"
+                                                        CommandParameter="{Binding}">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <ui:SymbolIcon Symbol="History24" FontSize="13" Margin="0,0,5,0" VerticalAlignment="Center" />
+                                                            <TextBlock VerticalAlignment="Center" Text="Snapshots (" />
+                                                            <TextBlock VerticalAlignment="Center" Text="{Binding SnapshotCount, Mode=OneWay}" />
+                                                            <TextBlock VerticalAlignment="Center" Text=")" />
+                                                            <ui:SymbolIcon
+                                                                Symbol="ChevronUp24"
+                                                                FontSize="11"
+                                                                Margin="5,0,0,0"
+                                                                VerticalAlignment="Center"
+                                                                Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}" />
+                                                            <ui:SymbolIcon
+                                                                Symbol="ChevronDown24"
+                                                                FontSize="11"
+                                                                Margin="5,0,0,0"
+                                                                VerticalAlignment="Center"
+                                                                Visibility="{Binding IsExpanded, Converter={StaticResource InverseBoolToVis}}" />
+                                                        </StackPanel>
+                                                    </ui:Button>
 
-                                                <!-- Snapshots Expander Button -->
-                                                <ui:Button
-                                                    Padding="10,5"
-                                                    FontSize="11.5"
-                                                    Command="{Binding DataContext.ToggleGameExpandedCommand, ElementName=Root}"
-                                                    CommandParameter="{Binding}">
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                        <ui:SymbolIcon Symbol="History24" FontSize="14" Margin="0,0,5,0" VerticalAlignment="Center" />
-                                                        <TextBlock VerticalAlignment="Center" Text="Snapshots (" />
-                                                        <TextBlock VerticalAlignment="Center" Text="{Binding SnapshotCount, Mode=OneWay}" />
-                                                        <TextBlock VerticalAlignment="Center" Text=")" />
-                                                        <ui:SymbolIcon
-                                                            Symbol="ChevronUp24"
-                                                            FontSize="12"
-                                                            Margin="5,0,0,0"
-                                                            VerticalAlignment="Center"
-                                                            Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}" />
-                                                        <ui:SymbolIcon
-                                                            Symbol="ChevronDown24"
-                                                            FontSize="12"
-                                                            Margin="5,0,0,0"
-                                                            VerticalAlignment="Center"
-                                                            Visibility="{Binding IsExpanded, Converter={StaticResource InverseBoolToVis}}" />
-                                                    </StackPanel>
-                                                </ui:Button>
+                                                    <!-- Open Snapshots Folder -->
+                                                    <ui:Button
+                                                        Padding="7,4"
+                                                        FontSize="11"
+                                                        Command="{Binding DataContext.OpenGameSnapshotsFolderCommand, ElementName=Root}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip="Open snapshots folder in Explorer"
+                                                        Icon="{ui:SymbolIcon FolderOpen24}" />
+                                                </StackPanel>
                                             </StackPanel>
                                         </Grid>
 

@@ -1,4 +1,7 @@
+using System.Net.Http;
+using DataJackUIGui;
 using DataJackUIGui.Models;
+using DataJackUIGui.Services;
 using Xunit;
 
 namespace DataJackUIGui.Tests;
@@ -103,4 +106,38 @@ public class SourcePriorityTests
             .FirstOrDefault();
         Assert.Null(pick5);
     }
+
+    [Fact]
+    public async Task CheckSourcesAsync_Prioritizes_DepotBox_First()
+    {
+        var auth = new DataJackUIApiClientTests_AuthService();
+        await auth.InitializeAsync();
+        var settings = new SettingsService();
+        var cache = new CacheService();
+        var appList = new SteamAppListCache();
+        var appInfo = new SteamAppInfoCache(cache, appList);
+        var covers = new CoverCache();
+        var api = new DataJackUIApiClient(auth, appInfo, appList, covers, settings);
+
+        var sources = await api.CheckSourcesAsync("202970");
+
+        Assert.True(sources.ContainsKey("DepotBox"), "DepotBox must be present in sources");
+        Assert.Equal("available", sources["DepotBox"]);
+
+        var sortedSources = sources
+            .Where(kv => kv.Value == "available")
+            .OrderByDescending(kv => SourceMeta.GetPriority(kv.Key))
+            .Select(kv => kv.Key)
+            .ToList();
+
+        Assert.Equal("DepotBox", sortedSources[0]);
+        if (sortedSources.Contains("Ryuu"))
+        {
+            Assert.Equal("Ryuu", sortedSources[1]);
+        }
+    }
+}
+
+public class DataJackUIApiClientTests_AuthService : AuthService
+{
 }

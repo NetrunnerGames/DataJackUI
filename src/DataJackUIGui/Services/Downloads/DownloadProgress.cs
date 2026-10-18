@@ -8,7 +8,7 @@ namespace DataJackUIGui.Services.Downloads;
 /// This replaces the old <c>IProgress&lt;double?&gt;</c> contract for manifest/Denuvo downloads. The
 /// byte counts were always available inside the copy loop; they were folded into a fraction and thrown
 /// away, which made size/speed/ETA impossible to show. Out-of-scope downloads (everything routed through
-/// <see cref="GithubProxy"/>: updates, unlocker, plugin, Steamless, CloudRedirect) still use the old
+/// <see cref="GithubProxy"/>: updates, unlocker, plugin, Steamless) still use the old
 /// fraction shape.
 /// </remarks>
 public readonly record struct DownloadProgress(long BytesRead, long? TotalBytes)

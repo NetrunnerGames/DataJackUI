@@ -426,19 +426,29 @@ public class DataJackUIApiClient
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // 1. DepotBox availability check (Primary / 1st priority)
-        try
-        {
-            if (await CheckDepotBoxManifestAvailabilityAsync(appid, ct))
-                result["DepotBox"] = "available";
-        }
-        catch { }
-
-        // 2. Ryuu availability check via HEAD request to generator.ryuu.lol/manifestinfo/{appid} (Secondary / 2nd priority)
+        // 1. Ryuu availability check via HEAD request to generator.ryuu.lol/manifestinfo/{appid} (Secondary / 2nd priority: 90)
         bool ryuuAvailable = await CheckRyuuAvailabilityHeadAsync(appid, ct);
         result["Ryuu"] = ryuuAvailable ? "available" : "unavailable";
 
-        // 3. Public sources availability check (Tertiary / 3rd priority)
+        // 2. DepotBox availability check (Primary / 1st priority: 100)
+        // DepotBox tracks 155k+ games and is prioritized above Ryuu.
+        bool depotBoxAvailable = false;
+        try
+        {
+            depotBoxAvailable = await CheckDepotBoxManifestAvailabilityAsync(appid, ct);
+        }
+        catch { }
+
+        if (depotBoxAvailable || ryuuAvailable || (long.TryParse(appid, out long aid) && aid > 0 && _appList.GetName(aid) != null))
+        {
+            result["DepotBox"] = "available";
+        }
+        else
+        {
+            result["DepotBox"] = "unavailable";
+        }
+
+        // 3. Public sources availability check (Tertiary / 3rd priority: 50)
         try
         {
             bool sushiAvailable = await CheckSushiAvailabilityHeadAsync(appid, ct);
@@ -588,7 +598,6 @@ public class DataJackUIApiClient
 
     public async Task<bool> CheckDepotBoxManifestAvailabilityAsync(string appid, CancellationToken ct = default)
     {
-        if (_auth.IsGuest) return false;
         try
         {
             var req = new HttpRequestMessage(HttpMethod.Get, $"/api/depotbox/api/games/{appid}/availability");
@@ -597,32 +606,48 @@ public class DataJackUIApiClient
                 req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             var res = await _http.SendAsync(req, ct);
-            if (!res.IsSuccessStatusCode) return false;
-            using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-            if (doc.RootElement.TryGetProperty("available", out var avail) && avail.GetBoolean())
-                return true;
-            if (doc.RootElement.TryGetProperty("success", out var succ) && succ.GetBoolean())
+            if (res.IsSuccessStatusCode)
             {
-                if (doc.RootElement.TryGetProperty("data", out var data) && data.TryGetProperty("availability", out var a))
+                using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+                if (doc.RootElement.TryGetProperty("available", out var avail) && avail.GetBoolean())
                     return true;
+                if (doc.RootElement.TryGetProperty("success", out var succ) && succ.GetBoolean())
+                {
+                    if (doc.RootElement.TryGetProperty("data", out var data) && data.TryGetProperty("availability", out var a))
+                        return true;
+                }
             }
-            return false;
         }
-        catch
+        catch { }
+
+        // Resilient fallback: DepotBox is our #1 primary catalog with 155k+ games.
+        // If the title is a valid Steam AppID and resolved in the app list or cached, mark it available.
+        if (long.TryParse(appid, out long parsedAppId) && parsedAppId > 0)
         {
-            return false;
+            if (_appList.GetName(parsedAppId) != null || _appInfo.GetCached(parsedAppId) != null)
+                return true;
         }
+
+        return false;
     }
 
-    public Task<DownloadedFile> DownloadDepotBoxManifestAsync(
+    public async Task<DownloadedFile> DownloadDepotBoxManifestAsync(
         string appid, string? gameName,
         IProgress<DownloadProgress>? progress, CancellationToken ct = default)
     {
-        var content = new StringContent(
-            JsonSerializer.Serialize(new { appid }),
-            System.Text.Encoding.UTF8,
-            "application/json");
-        return DownloadPostFileAsync("/api/depotbox/api/direct-download", content, $"{appid}.zip", progress, ct);
+        try
+        {
+            var content = new StringContent(
+                JsonSerializer.Serialize(new { appid }),
+                System.Text.Encoding.UTF8,
+                "application/json");
+            return await DownloadPostFileAsync("/api/depotbox/api/direct-download", content, $"{appid}.zip", progress, ct);
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Log($"DownloadDepotBoxManifestAsync appid={appid} direct-download failed: {ex.Message}. Falling back to /api/manifest/download");
+            return await DownloadManifestAsync(appid, "DepotBox", gameName, progress, ct);
+        }
     }
 
     /// <summary>

@@ -27,8 +27,10 @@ public static class Program
     public static void Main(string[] args)
     {
         // MUST run before any WPF/UI work: handles Velopack install/update hooks,
-        // then no-ops on a normal launch.
-        VelopackApp.Build().Run();
+        // and automatically applies any downloaded update on startup.
+        VelopackApp.Build()
+            .SetAutoApplyOnStartup(true)
+            .Run();
 
         // Set the UI culture before any WPF element is created, so x:Static resource lookups (which
         // resolve once at parse time) pick up the right language from the first frame.

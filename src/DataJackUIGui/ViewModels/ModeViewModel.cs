@@ -42,9 +42,6 @@ public partial class ModeCardViewModel(UnlockerMode mode, string title, string d
 
     /// <summary>OST is upstream stable.</summary>
     public bool IsExperimental => false;
-
-    /// <summary>Both IceBreaker and OST carry native CloudRedirect support.</summary>
-    public bool SupportsCloudRedirect => Mode is UnlockerMode.IceBreaker or UnlockerMode.Ost;
 }
 
 /// <summary>
@@ -57,13 +54,11 @@ public partial class ModeViewModel : ObservableObject
     private readonly UnlockerService _unlocker;
     private readonly ToastService _toast;
     private readonly SteamService _steam;
-    private readonly CloudRedirectService _cloudRedirect;
 
     public ObservableCollection<ModeCardViewModel> Cards { get; } = [];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NotBusy))]
-    [NotifyPropertyChangedFor(nameof(CanUseCloudRedirect))]
     private bool _isBusy;
     public bool NotBusy => !IsBusy;
 
@@ -81,186 +76,11 @@ public partial class ModeViewModel : ObservableObject
     [ObservableProperty] private string _confirmTitle = "";
     private ModeCardViewModel? _pendingCard;
 
-    public ModeViewModel(UnlockerService unlocker, ToastService toast, SteamService steam,
-        CloudRedirectService cloudRedirect)
+    public ModeViewModel(UnlockerService unlocker, ToastService toast, SteamService steam)
     {
         _unlocker = unlocker;
         _toast = toast;
         _steam = steam;
-        _cloudRedirect = cloudRedirect;
-    }
-
-    /// <summary>CloudRedirect "Manage" (add-on panel): download (cache) the CloudRedirect GUI and launch it.</summary>
-    [RelayCommand]
-    private async Task ManageCloudRedirect()
-    {
-        if (IsBusy) return;
-        IsBusy = true;
-        IsProgressIndeterminate = true;
-        Progress = 0;
-        try
-        {
-            var prog = new Progress<double?>(p =>
-            {
-                IsProgressIndeterminate = p is null;
-                if (p is not null) Progress = p.Value * 100;
-            });
-
-            bool ok = await _cloudRedirect.LaunchAsync(prog);
-            if (!ok)
-                _toast.Show(Resources.Strings.Mode_CloudRedirect_Manage,
-                    Resources.Strings.Mode_CloudRedirect_LaunchFailed, error: true);
-        }
-        finally
-        {
-            IsBusy = false;
-            IsProgressIndeterminate = false;
-        }
-    }
-
-    // ── CloudRedirect add-on (bottom panel; usable when either OST or BST is active) ───
-    private const string CloudRedirectTitle = "CloudRedirect"; // product name, not localized
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowCloudRedirectManage))]
-    [NotifyPropertyChangedFor(nameof(ShowCloudRedirectUpdate))]
-    [NotifyPropertyChangedFor(nameof(CanUseCloudRedirect))]
-    private bool _cloudRedirectUnlocked;
-
-    /// <summary>Buttons on the add-on panel are usable only when unlocked (Nightly active) and idle.</summary>
-    public bool CanUseCloudRedirect => CloudRedirectUnlocked && !IsBusy;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CloudRedirectToggleText))]
-    [NotifyPropertyChangedFor(nameof(ShowCloudRedirectManage))]
-    private bool _cloudRedirectEnabled;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowCloudRedirectManage))]
-    private bool _cloudRedirectInstalled;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowCloudRedirectUpdate))]
-    private bool _cloudRedirectUpdateAvailable;
-
-    [ObservableProperty] private string _cloudRedirectStatusText = "";
-
-    public string CloudRedirectToggleText => CloudRedirectEnabled
-        ? Resources.Strings.Mode_CloudRedirect_Disable
-        : Resources.Strings.Mode_CloudRedirect_Enable;
-    public bool ShowCloudRedirectUpdate => CloudRedirectUnlocked && CloudRedirectUpdateAvailable;
-    public bool ShowCloudRedirectManage => CloudRedirectUnlocked && CloudRedirectInstalled && CloudRedirectEnabled;
-
-    /// <summary>Refresh the add-on panel state. Reads dll/toml from disk (cheap); checks GitHub for an
-    /// update only when unlocked (Nightly active), respecting forceRefresh.</summary>
-    /// <summary>Refresh the add-on panel state locally first, then check GitHub for updates.</summary>
-    private void RefreshCloudRedirectLocal()
-    {
-        CloudRedirectUnlocked = _unlocker.SelectedMode is UnlockerMode.Ost or UnlockerMode.IceBreaker;
-        var s = _unlocker.GetCloudRedirectLocalState();
-        CloudRedirectInstalled = s.Installed;
-        CloudRedirectEnabled = s.Enabled;
-        CloudRedirectUpdateAvailable = false;
-
-        CloudRedirectStatusText = !CloudRedirectUnlocked ? Resources.Strings.Mode_CloudRedirect_Locked
-            : !s.Installed ? Resources.Strings.Mode_CloudRedirect_Status_NotInstalled
-            : s.Enabled ? Resources.Strings.Mode_CloudRedirect_Status_Enabled
-            : Resources.Strings.Mode_CloudRedirect_Status_Disabled;
-    }
-
-    private async Task RefreshCloudRedirectAsync(bool forceRefresh)
-    {
-        bool unlocked = _unlocker.SelectedMode is UnlockerMode.Ost or UnlockerMode.IceBreaker;
-        if (unlocked && _unlocker.SelectedMode == UnlockerMode.Ost && _steam.EffectivePath is { } root)
-        {
-            if (!File.Exists(Path.Combine(root, "cloud_redirect.dll")))
-            {
-                try { await _unlocker.EnableCloudRedirectAsync(); } catch { }
-            }
-        }
-        var s = await _unlocker.GetCloudRedirectStateAsync(checkUpdate: unlocked, forceRefresh);
-        System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
-        {
-            CloudRedirectUnlocked = unlocked;
-            CloudRedirectInstalled = s.Installed;
-            CloudRedirectEnabled = s.Enabled;
-            CloudRedirectUpdateAvailable = s.UpdateAvailable;
-
-            CloudRedirectStatusText = !CloudRedirectUnlocked ? Resources.Strings.Mode_CloudRedirect_Locked
-                : !s.Installed ? Resources.Strings.Mode_CloudRedirect_Status_NotInstalled
-                : s.UpdateAvailable ? Resources.Strings.Mode_CloudRedirect_Status_UpdateAvailable
-                : s.Enabled ? Resources.Strings.Mode_CloudRedirect_Status_Enabled
-                : Resources.Strings.Mode_CloudRedirect_Status_Disabled;
-        });
-    }
-
-    /// <summary>Enable/disable the add-on (edits opensteamtool.toml; first enable also downloads the dll).
-    /// Lightweight, no Steam close; the change applies on the next Steam launch.</summary>
-    [RelayCommand]
-    private async Task ToggleCloudRedirect()
-    {
-        if (IsBusy || !CloudRedirectUnlocked) return;
-        bool enabling = !CloudRedirectEnabled;
-        IsBusy = true;
-        IsProgressIndeterminate = true;
-        Progress = 0;
-        try
-        {
-            var prog = new Progress<double?>(p =>
-            {
-                IsProgressIndeterminate = p is null;
-                if (p is not null) Progress = p.Value * 100;
-            });
-
-            var result = enabling
-                ? await _unlocker.EnableCloudRedirectAsync(prog)
-                : _unlocker.DisableCloudRedirect();
-
-            if (result.Success)
-                _toast.Show(CloudRedirectTitle, enabling
-                    ? Resources.Strings.Mode_CloudRedirect_Toast_Enabled
-                    : Resources.Strings.Mode_CloudRedirect_Toast_Disabled);
-            else
-                _toast.Show(CloudRedirectTitle, result.Error ?? "", error: true);
-
-            await LoadAsync();
-        }
-        finally
-        {
-            IsBusy = false;
-            IsProgressIndeterminate = false;
-        }
-    }
-
-    /// <summary>Replace cloud_redirect.dll with the latest. Reports "close Steam" if it's locked.</summary>
-    [RelayCommand]
-    private async Task UpdateCloudRedirect()
-    {
-        if (IsBusy || !CloudRedirectUnlocked) return;
-        IsBusy = true;
-        IsProgressIndeterminate = true;
-        Progress = 0;
-        try
-        {
-            var prog = new Progress<double?>(p =>
-            {
-                IsProgressIndeterminate = p is null;
-                if (p is not null) Progress = p.Value * 100;
-            });
-
-            var result = await _unlocker.UpdateCloudRedirectAsync(prog);
-            if (result.Success)
-                _toast.Show(CloudRedirectTitle, Resources.Strings.Mode_CloudRedirect_Toast_Updated);
-            else
-                _toast.Show(CloudRedirectTitle, result.Error ?? "", error: true);
-
-            await LoadAsync();
-        }
-        finally
-        {
-            IsBusy = false;
-            IsProgressIndeterminate = false;
-        }
     }
 
     /// <summary>True if a hidden mode should be shown: its reveal-file exists, or it's the active mode.</summary>
@@ -318,7 +138,6 @@ public partial class ModeViewModel : ObservableObject
             var localState = _unlocker.GetLocalState(card.Mode);
             Apply(card, localState);
         }
-        RefreshCloudRedirectLocal();
 
         // 2. Background update check
         _ = Task.Run(async () =>
@@ -331,7 +150,6 @@ public partial class ModeViewModel : ObservableObject
                     System.Windows.Application.Current?.Dispatcher?.Invoke(() => Apply(card, state));
                 }
             }
-            await RefreshCloudRedirectAsync(forceRefresh);
         });
     }
 
