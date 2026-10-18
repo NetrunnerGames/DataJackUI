@@ -12,19 +12,47 @@ Write-Host " Uploading Assets to GitHub Release $TagName via Git Credential" -Fo
 Write-Host "====================================================" -ForegroundColor Cyan
 
 # 1. Retrieve Git Credential Token for github.com
-$out = @("protocol=https", "host=github.com", "") | git credential fill
+$token = $env:GITHUB_TOKEN
 
-$token = ""
-foreach ($line in $out) {
-    $trimmed = $line.Trim()
-    if ($trimmed -match '^password=(.+)$') {
-        $token = $Matches[1].Trim()
-        break
+if (-not $token) {
+    $gcmCandidates = @(
+        "git-credential-manager",
+        "C:\Program Files\Git\mingw64\bin\git-credential-manager.exe",
+        "C:\Program Files (x86)\Git\mingw64\bin\git-credential-manager.exe"
+    )
+    foreach ($candidate in $gcmCandidates) {
+        try {
+            $psi = New-Object System.Diagnostics.ProcessStartInfo
+            $psi.FileName = $candidate
+            $psi.Arguments = "get"
+            $psi.RedirectStandardInput = $true
+            $psi.RedirectStandardOutput = $true
+            $psi.RedirectStandardError = $true
+            $psi.UseShellExecute = $false
+            $p = [System.Diagnostics.Process]::Start($psi)
+            $p.StandardInput.WriteLine("protocol=https")
+            $p.StandardInput.WriteLine("host=github.com")
+            $p.StandardInput.WriteLine("")
+            $p.StandardInput.Close()
+            $gcmOut = $p.StandardOutput.ReadToEnd()
+            $p.WaitForExit()
+            if ($gcmOut -match 'password=(.+)') {
+                $token = $Matches[1].Trim()
+                break
+            }
+        } catch { }
     }
 }
 
 if (-not $token) {
-    throw "Could not retrieve git credentials token for github.com from git credential manager."
+    try {
+        $ghOut = & gh auth token 2>$null
+        if ($ghOut) { $token = $ghOut.Trim() }
+    } catch { }
+}
+
+if (-not $token) {
+    throw "Could not retrieve git credentials token for github.com from git credential manager or environment."
 }
 
 $headers = @{
