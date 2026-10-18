@@ -42,15 +42,9 @@
             <local:FilterOptionDisplayConverter x:Key="FilterOptionDisplay" />
             <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
-            <!-- Global fix for WPF-UI button text and icons turning black when pressed in dark theme -->
-            <Style TargetType="{x:Type ui:Button}" BasedOn="{StaticResource {x:Type ui:Button}}">
-                <Setter Property="PressedForeground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-                <Style.Triggers>
-                    <Trigger Property="Appearance" Value="Primary">
-                        <Setter Property="PressedForeground" Value="#090a0f" />
-                    </Trigger>
-                </Style.Triggers>
-            </Style>
+            <!-- WPF-UI button pressed foreground brushes (prevents text/icons turning black when pressed in dark theme) -->
+            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#090a0f" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
