@@ -25,20 +25,20 @@ public partial class ModeCardViewModel(UnlockerMode mode, string title, string d
     [NotifyPropertyChangedFor(nameof(IsActionEnabled))]
     private bool _isBusy;
 
-    /// <summary>Always show the action button so disabled modes remain visible but greyed out.</summary>
+    /// <summary>Always show the action button so all modes remain visible.</summary>
     public bool ShowActionButton => true;
 
-    /// <summary>IceBreaker is currently disabled while under development.</summary>
-    public bool CanSelect => Mode != UnlockerMode.IceBreaker;
+    /// <summary>All modes are selectable.</summary>
+    public bool CanSelect => true;
 
     /// <summary>Action button is enabled only when selectable and view is idle.</summary>
     public bool IsActionEnabled => CanSelect && !IsBusy;
 
-    /// <summary>Visual opacity to grey out disabled cards.</summary>
-    public double CardOpacity => CanSelect ? 1.0 : 0.65;
+    /// <summary>Visual opacity for cards.</summary>
+    public double CardOpacity => 1.0;
 
-    /// <summary>OST is the recommended mode.</summary>
-    public bool IsRecommended => Mode == UnlockerMode.Ost;
+    /// <summary>IceBreaker is the recommended mode.</summary>
+    public bool IsRecommended => Mode == UnlockerMode.IceBreaker;
 
     /// <summary>OST is upstream stable.</summary>
     public bool IsExperimental => false;
@@ -174,14 +174,6 @@ public partial class ModeViewModel : ObservableObject
 
     private void Apply(ModeCardViewModel card, ModeState s)
     {
-        if (card.Mode == UnlockerMode.IceBreaker)
-        {
-            card.StatusText = "Disabled (Work in progress)";
-            card.ButtonText = "Disabled";
-            card.IsActive = false;
-            return;
-        }
-
         if (s.Status == ModeStatus.Unknown)
             card.StatusText = Resources.Strings.Mode_StatusUnavailable;
         else if (!s.IsActive)
@@ -211,7 +203,7 @@ public partial class ModeViewModel : ObservableObject
     [RelayCommand]
     private void Install(ModeCardViewModel card)
     {
-        if (IsBusy || card.Mode == UnlockerMode.IceBreaker) return;
+        if (IsBusy) return;
         _pendingCard = card;
         ConfirmTitle = card.IsActive
             ? string.Format(Resources.Strings.Mode_Confirm_Reinstall, card.Title)

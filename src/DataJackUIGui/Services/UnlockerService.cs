@@ -53,11 +53,11 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
 
     private ModeDefinition Def(UnlockerMode mode) => Modes.First(m => m.Mode == mode);
 
-    /// <summary>The currently-active mode (the last one installed/selected), or Ost by default.</summary>
+    /// <summary>The currently-active mode (the last one installed/selected), or IceBreaker by default.</summary>
     public UnlockerMode? SelectedMode =>
         Enum.TryParse(settings.SelectedMode, out UnlockerMode m)
-            ? (m == UnlockerMode.IceBreaker ? UnlockerMode.Ost : m)
-            : UnlockerMode.Ost;
+            ? m
+            : UnlockerMode.IceBreaker;
 
     /// <summary>Short display name of the active mode for status UI; null if none selected/detected yet.</summary>
     public string? SelectedModeDisplayName =>
@@ -258,9 +258,7 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
 
         if (mode == UnlockerMode.IceBreaker)
         {
-            // IceBreaker: disabled for now while under development
-            return ModeInstallResult.Fail("IceBreaker mode is temporarily disabled.");
-            // return await InstallIceBreakerFromReleaseAsync(root, def, progress, ct);
+            return await InstallIceBreakerFromReleaseAsync(root, def, progress, ct);
         }
 
         var (version, zipUrl, zipName, wantedZipDigest, manifest) = await ResolveReleaseAsync(def, ct);
@@ -436,12 +434,11 @@ public class UnlockerService(SteamService steam, SettingsService settings, Cache
         string? root = steam.EffectivePath;
         if (root is null || !steam.IsValid) return null;
 
-        // IceBreaker: disabled for now while under development
-        // if (File.Exists(Path.Combine(root, "version.dll")))
-        // {
-        //     settings.SelectedMode = UnlockerMode.IceBreaker.ToString();
-        //     return UnlockerMode.IceBreaker;
-        // }
+        if (File.Exists(Path.Combine(root, "version.dll")))
+        {
+            settings.SelectedMode = UnlockerMode.IceBreaker.ToString();
+            return UnlockerMode.IceBreaker;
+        }
 
         if (File.Exists(Path.Combine(root, "OpenSteamTool.dll")))
         {

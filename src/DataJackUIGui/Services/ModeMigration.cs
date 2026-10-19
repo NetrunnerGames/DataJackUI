@@ -43,11 +43,9 @@ public static class ModeMigration
     public static (string? Mode, bool ResetOnboarding) Migrate(string? stored)
     {
         if (string.IsNullOrWhiteSpace(stored)) return (null, false);   // fresh install; onboarding handles it
-        if (string.Equals(stored, nameof(UnlockerMode.IceBreaker), StringComparison.OrdinalIgnoreCase))
-            return (UnlockerMode.Ost.ToString(), false);
 
         if (Enum.TryParse<UnlockerMode>(stored, out var current))
-            return (current == UnlockerMode.IceBreaker ? UnlockerMode.Ost.ToString() : current.ToString(), false);
+            return (current.ToString(), false);
 
         return stored switch
         {
