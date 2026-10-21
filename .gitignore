@@ -54,6 +54,10 @@ build-release.ps1
 build_plugin_release.ps1
 deploy_workers.ps1
 run_local.ps1
+.wrangler/
+convert_antigravity_to_kilo.py
+antigravity_conversation_kilo.json
+skills_for_kilo_code.md
 
 # Temporary files and logs
 *.lnk

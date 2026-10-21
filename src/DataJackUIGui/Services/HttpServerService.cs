@@ -216,7 +216,8 @@ public class HttpServerService : IHostedService
         
         if (path == "/open/settings") return HandleOpenSettings();
         if (path == "/open-url") return await HandleOpenUrl(req);
-        if (path == "/restart-steam") return HandleRestartSteam();
+        if (path == "/restart-steam") return await HandleRestartSteam();
+        if (path == "/hot-reload") return await HandleHotReload();
         if (path == "/check-updates") return await HandleCheckUpdates();
         if (path == "/loaded-apps") return HandleDismissLoadedApps();
         
@@ -459,6 +460,20 @@ public class HttpServerService : IHostedService
                 File.Delete(path);
                 var disabled = Path.Combine(Path.GetDirectoryName(path)!, $"{appId}.lua.disabled");
                 if (File.Exists(disabled)) File.Delete(disabled);
+
+                var ipc = _services.GetService<IceBreakerIpcClient>();
+                if (ipc != null)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        if (await ipc.IsAvailableAsync())
+                        {
+                            await ipc.LockAppAsync((uint)appId);
+                            await ipc.ReloadManifestsAsync();
+                        }
+                    });
+                }
+
                 return (200, Json(new { success = true, deleted = new[] { path }, count = 1 }));
             }
             return (200, Json(new { success = true, deleted = Array.Empty<string>(), count = 0 }));
@@ -495,12 +510,40 @@ public class HttpServerService : IHostedService
         });
     }
 
-    private (int, string) HandleRestartSteam()
+    private async Task<(int, string)> HandleRestartSteam()
     {
+        var ipc = _services.GetService<IceBreakerIpcClient>();
+        var cef = _services.GetService<SteamCefClient>();
+        if (ipc != null && await ipc.IsAvailableAsync())
+        {
+            await ipc.ReloadManifestsAsync();
+            if (cef != null && await cef.IsCefDebuggingAvailableAsync())
+            {
+                await cef.ReloadSteamUiAsync();
+            }
+            return (200, Json(new { success = true, hotReloaded = true, error = (string?)null }));
+        }
+
         var ok = _steam.RestartSteam();
         return (200, Json(ok
             ? new { success = true, error = (string?)null }
             : new { success = false, error = (string?)"Failed to restart Steam" }));
+    }
+
+    private async Task<(int, string)> HandleHotReload()
+    {
+        var ipc = _services.GetService<IceBreakerIpcClient>();
+        var cef = _services.GetService<SteamCefClient>();
+        bool reloaded = false;
+        if (ipc != null && await ipc.IsAvailableAsync())
+        {
+            reloaded = await ipc.ReloadManifestsAsync();
+        }
+        if (cef != null && await cef.IsCefDebuggingAvailableAsync())
+        {
+            await cef.ReloadSteamUiAsync();
+        }
+        return (200, Json(new { success = true, hotReloaded = reloaded }));
     }
 
     private async Task<(int, string)> HandleOpenUrl(HttpListenerRequest req)

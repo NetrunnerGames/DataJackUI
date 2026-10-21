@@ -7,6 +7,10 @@ namespace DataJackUIGui.Tests;
 /// <summary>
 /// The 4-mode → 3-mode migration. Worth testing because every failure mode here is silent: a wrong
 /// mapping doesn't throw, it just puts the user on an unlocker they didn't choose.
+///
+/// Since v2.14.5 IceBreaker is once again a first-class mode (UnlockerMode.IceBreaker), so its stored
+/// value parses as current and the migration must leave it alone. Only the retired BST branding maps
+/// onto Ost.
 /// </summary>
 public class ModeMigrationTests
 {
@@ -16,8 +20,7 @@ public class ModeMigrationTests
     [InlineData("OpenSteamToolsNightly")]
     [InlineData("BetterSteamTools")]
     [InlineData("Bst")]
-    [InlineData("IceBreaker")]
-    public void BetterSteamToolsAndIceBreakerModes_BecomeOst_WithoutReonboarding(string stored)
+    public void BetterSteamToolsModes_BecomeOst_WithoutReonboarding(string stored)
     {
         var (mode, reset) = ModeMigration.Migrate(stored);
 
@@ -40,6 +43,7 @@ public class ModeMigrationTests
 
     [Theory]
     [InlineData(UnlockerMode.Ost)]
+    [InlineData(UnlockerMode.IceBreaker)]
     public void CurrentModes_AreUntouched(UnlockerMode mode)
     {
         var (result, reset) = ModeMigration.Migrate(mode.ToString());

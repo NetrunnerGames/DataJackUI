@@ -36,6 +36,8 @@ public partial class App : Application
                 services.AddSingleton<SettingsService>();
                 services.AddSingleton<CacheService>();
                 services.AddSingleton<SteamService>();
+                services.AddSingleton<IceBreakerIpcClient>();
+                services.AddSingleton<SteamCefClient>();
                 services.AddSingleton<SteamAppListCache>();
                 services.AddSingleton<SteamAppInfoCache>();
                 services.AddSingleton<CoverCache>();

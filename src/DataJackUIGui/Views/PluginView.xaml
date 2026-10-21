@@ -118,7 +118,7 @@
                             <Grid Grid.Row="2" Grid.Column="0" Margin="0,4" VerticalAlignment="Center">
                                 <ui:SymbolIcon FontSize="16" Foreground="#4ade80" Symbol="CheckmarkCircle24" Visibility="{Binding DllOk, Converter={StaticResource BoolToVis}}" />
                                 <ui:SymbolIcon FontSize="16" Foreground="#fbbf24" Symbol="Warning24" Visibility="{Binding DllOutOfDate, Converter={StaticResource BoolToVis}}" />
-                                <ui:SymbolIcon FontSize="16" Foreground="#7c8593" Symbol="DismissCircle24" Visibility="{Binding DllNotInstalled, Converter={StaticResource InverseBoolToVis}}" />
+                                <ui:SymbolIcon FontSize="16" Foreground="#7c8593" Symbol="DismissCircle24" Visibility="{Binding DllNotInstalled, Converter={StaticResource BoolToVis}}" />
                             </Grid>
                             <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,4,16,4" VerticalAlignment="Center" FontSize="12.5" Foreground="#7c8593" Text="{Binding LoaderRowTitle}" />
                             <TextBlock Grid.Row="2" Grid.Column="2" Margin="0,4" VerticalAlignment="Center" FontSize="12.5" Foreground="#e5e7eb" Text="{Binding DllStatus}" />

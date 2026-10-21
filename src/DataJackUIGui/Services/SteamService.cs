@@ -206,7 +206,12 @@ public class SteamService(SettingsService settings)
 
         try
         {
-            Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
+            var psi = new ProcessStartInfo(exe)
+            {
+                UseShellExecute = true,
+                Arguments = "-cef-enable-debugging"
+            };
+            Process.Start(psi);
             return true;
         }
         catch { return false; }
