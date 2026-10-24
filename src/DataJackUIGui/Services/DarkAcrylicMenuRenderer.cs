@@ -10,18 +10,17 @@ namespace DataJackUIGui.Services;
 /// <summary>
 /// Dark acrylic / Fluent style renderer for Windows Forms ContextMenuStrip,
 /// matching standard Windows 11 context menu geometry, acrylic backdrop, item height,
-/// margins, and clean typography.
+/// margins, border, and clean typography.
 /// </summary>
 public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
 {
-    // Windows 11 context menu dark palette
-    private static readonly Color BgColor = Color.FromArgb(242, 32, 32, 32);         // #202020 dark acrylic background
-    private static readonly Color ItemHoverBg = Color.FromArgb(245, 48, 48, 48);      // #303030 Windows 11 hover fill
-    private static readonly Color ItemHoverBorder = Color.FromArgb(40, 255, 255, 255); // subtle hover outline
-    private static readonly Color BorderColor = Color.FromArgb(180, 58, 58, 58);      // outer window border
-    private static readonly Color SeparatorColor = Color.FromArgb(140, 62, 62, 62);   // divider line
-    private static readonly Color TextColor = Color.FromArgb(245, 245, 248);          // crisp white text
-    private static readonly Color DisabledTextColor = Color.FromArgb(120, 120, 120);
+    // Exact Windows 11 context menu dark palette (sampled from native taskbar menu)
+    private static readonly Color BgColor = Color.FromArgb(242, 44, 44, 44);         // #2C2C2C native dark acrylic background
+    private static readonly Color ItemHoverBg = Color.FromArgb(255, 66, 66, 66);      // #424242 native Windows 11 hover fill
+    private static readonly Color BorderColor = Color.FromArgb(200, 56, 56, 56);      // subtle outer menu border
+    private static readonly Color SeparatorColor = Color.FromArgb(160, 64, 64, 64);   // divider line
+    private static readonly Color TextColor = Color.FromArgb(255, 255, 255);          // crisp white text
+    private static readonly Color DisabledTextColor = Color.FromArgb(130, 130, 130);
 
     public DarkAcrylicMenuRenderer() : base(new DarkColorTable())
     {
@@ -56,7 +55,7 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
     }
 
     /// <summary>
-    /// Enables native DWM dark mode, rounded corners, and acrylic blur-behind matching
+    /// Enables native DWM dark mode, rounded corners (8px), and acrylic blur-behind matching
     /// standard Windows 11 context menus.
     /// </summary>
     public static void EnableAcrylic(IntPtr hwnd)
@@ -77,12 +76,12 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
             int backdrop = 3;
             DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
 
-            // 4. Accent Policy for Windows 10 / 11 Acrylic blur behind with taskbar tint
+            // 4. Accent Policy for Windows 10 / 11 Acrylic blur behind
             var accent = new AccentPolicy
             {
                 AccentState = 4, // ACCENT_ENABLE_ACRYLICBLURBEHIND
                 AccentFlags = 2,
-                GradientColor = 0xD9202020,
+                GradientColor = 0xD92C2C2C,
                 AnimationId = 0
             };
             int accentSize = Marshal.SizeOf(accent);
@@ -134,17 +133,14 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
             return;
         }
 
-        // Windows 11 context menu item: 4px side margins, 2px top/bottom margins, 4px corner radius
-        var bounds = new Rectangle(4, 1, item.Width - 8, item.Height - 2);
+        // Native Windows 11 hover item: 6px margin from left and right edges, 1px top/bottom, 4px corner radius, solid #424242 fill (no cyan border)
+        var bounds = new Rectangle(6, 1, item.Width - 12, item.Height - 2);
         if (item.Selected && item.Enabled)
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var brush = new SolidBrush(ItemHoverBg);
             using var path = CreateRoundedRectangle(bounds, 4);
             e.Graphics.FillPath(brush, path);
-
-            using var pen = new Pen(ItemHoverBorder, 1);
-            e.Graphics.DrawPath(pen, path);
         }
     }
 
@@ -156,9 +152,9 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
         e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
         e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
-        // Vertically center the 16x16 icon in the item height
+        // Vertically center the 16x16 icon in the item height (native 32px row)
         int y = (e.Item.Height - e.Image.Height) / 2;
-        int x = 12; // 12px left padding matching Windows 11
+        int x = 14; // 14px left margin
         var destRect = new Rectangle(x, y, e.Image.Width, e.Image.Height);
 
         e.Graphics.DrawImage(e.Image, destRect);
@@ -169,10 +165,10 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
         e.TextColor = e.Item.Enabled ? TextColor : DisabledTextColor;
         e.Graphics.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
-        // Windows 11 context menu: text starts at 40px (12px margin + 16px icon + 12px gap)
+        // Native Windows 11 spacing: 14px margin + 16px icon + 12px gap = 42px text left
         var font = e.TextFont ?? e.Item.Font;
-        int textLeft = 40;
-        int textWidth = Math.Max(0, e.Item.Width - textLeft - 16);
+        int textLeft = 42;
+        int textWidth = Math.Max(0, e.Item.Width - textLeft - 14);
         int textTop = (e.Item.Height - font.Height) / 2;
 
         var rect = new Rectangle(textLeft, textTop, textWidth, font.Height + 2);
@@ -185,7 +181,7 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
     {
         int y = e.Item.Height / 2;
         using var pen = new Pen(SeparatorColor, 1);
-        e.Graphics.DrawLine(pen, 12, y, e.Item.Width - 12, y);
+        e.Graphics.DrawLine(pen, 14, y, e.Item.Width - 14, y);
     }
 
     protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
@@ -218,7 +214,7 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
     private sealed class DarkColorTable : ProfessionalColorTable
     {
         public override Color MenuBorder => BorderColor;
-        public override Color MenuItemBorder => ItemHoverBorder;
+        public override Color MenuItemBorder => Color.Transparent;
         public override Color MenuItemSelected => ItemHoverBg;
         public override Color ToolStripDropDownBackground => BgColor;
         public override Color ImageMarginGradientBegin => BgColor;

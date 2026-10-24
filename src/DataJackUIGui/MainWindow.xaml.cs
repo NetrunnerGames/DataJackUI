@@ -51,14 +51,14 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             ShowCheckMargin = false,
             ImageScalingSize = new System.Drawing.Size(16, 16),
             Font = new System.Drawing.Font("Segoe UI Variable Text", 9.25f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point),
-            Padding = new System.Windows.Forms.Padding(4, 5, 4, 5),
-            MinimumSize = new System.Drawing.Size(220, 0)
+            Padding = new System.Windows.Forms.Padding(0, 5, 0, 5),
+            MinimumSize = new System.Drawing.Size(228, 0)
         };
 
         menu.HandleCreated += (_, _) => DarkAcrylicMenuRenderer.EnableAcrylic(menu.Handle);
 
         const int iconSize = 16;
-        var itemPadding = new System.Windows.Forms.Padding(0, 4, 16, 4);
+        var itemPadding = new System.Windows.Forms.Padding(0, 6, 16, 6);
 
         System.Windows.Forms.ToolStripMenuItem CreateMenuItem(string text, string glyph, Action onClick)
         {
@@ -71,81 +71,81 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             return item;
         }
 
-        // Open DataJackUI (Home24: 0xF481)
+        // Open DataJackUI (Home: 0xE80F)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_Open,
-            "\uF481",
+            "\uE80F",
             () => Dispatcher.Invoke(RestoreFromTray)));
 
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
 
-        // Quick Navigation / QoL options (matching WPF-UI Fluent icons)
-        // Add Game / Store (Add24: 0xF10A)
+        // Quick Navigation / QoL options (using standard Segoe MDL2 Assets glyphs)
+        // Add Game / Store (Add: 0xE710)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_AddGame,
-            "\uF10A",
+            "\uE710",
             () => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToAdd(); })));
 
-        // Manage Library (Games24: 0xF451)
+        // Manage Library (Gamepad/Games: 0xE7FC)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_Manage,
-            "\uF451",
+            "\uE7FC",
             () => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToManage(); })));
 
-        // Presets & Depots (BranchFork24: 0xE1DF)
+        // Presets & Depots (BranchFork/Builds: 0xF003)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_Depots,
-            "\uE1DF",
+            "\uF003",
             () => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToBuilds(); })));
 
-        // Fixes & Tools (ShieldTask24: 0xEAD8)
+        // Fixes & Tools (Repair/Wrench: 0xE90F)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_Fixes,
-            "\uEAD8",
+            "\uE90F",
             () => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToFixes(); })));
 
-        // Steam Mode & Redirection (Options24: 0xF588)
+        // Steam Mode & Redirection (Sliders/Tune: 0xE7AC)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_Mode,
-            "\uF588",
+            "\uE7AC",
             () => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToMode(); })));
 
-        // Jack-in Plugin (PuzzlePiece24: 0xE9EA)
+        // Jack-in Plugin (Puzzle: 0xEA86)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_Plugin,
-            "\uE9EA",
+            "\uEA86",
             () => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToPlugin(); })));
 
-        // Downloads & Queue (ArrowDownload24: 0xF151)
+        // Downloads & Queue (Download arrow: 0xE896)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_Downloads,
-            "\uF151",
+            "\uE896",
             () => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToDownloads(); })));
 
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
 
         // Actions
-        // Restart Steam (ArrowClockwise24: 0xF13E)
+        // Restart Steam (Sync/ArrowClockwise: 0xE777)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_RestartSteam,
-            "\uF13E",
+            "\uE777",
             () => Dispatcher.Invoke(() =>
             {
                 if (DataContext is MainViewModel vm) vm.RestartSteamCommand.Execute(null);
             })));
 
-        // Settings (Settings24: 0xF6AA)
+        // Settings (Gear: 0xE713)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_Settings,
-            "\uF6AA",
+            "\uE713",
             () => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToSettings(); })));
 
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
 
-        // Exit (Power24: 0xF60F)
+        // Exit (Power: 0xE7E8)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_Exit,
-            "\uF60F",
+            "\uE7E8",
             () => Dispatcher.Invoke(ExitApp)));
 
         _trayIcon.ContextMenuStrip = menu;
