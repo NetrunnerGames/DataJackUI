@@ -75,7 +75,7 @@ public static class TrayIconGlyphs
         using (var accentBrush = new SolidBrush(Color.FromArgb(28, accent.R, accent.G, accent.B)))
         {
             float pad = size * 0.08f;
-            g.FillEllipse(accentBrush, pad, pad, size - pad * 2, size - pad * 2);
+            g.FillEllipse(accentBrush, pad, pad, size - (pad * 2), size - (pad * 2));
         }
 
         // 2. Duotone accent drop-shadow / secondary outline
