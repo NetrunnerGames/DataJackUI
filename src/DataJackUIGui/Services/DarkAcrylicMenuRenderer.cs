@@ -9,16 +9,17 @@ namespace DataJackUIGui.Services;
 
 /// <summary>
 /// Dark acrylic / Fluent style renderer for Windows Forms ContextMenuStrip,
-/// matching DataJackUI's dark cyberpunk / Netrunner cyan glass theme.
+/// matching modern Windows 11 / classic taskbar context menu proportions and
+/// DataJackUI's dark cyberpunk Netrunner cyan glass theme.
 /// </summary>
 public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
 {
     private static readonly Color BgColor = Color.FromArgb(242, 16, 17, 24);         // #101118 dark acrylic glass
-    private static readonly Color ItemHoverBg = Color.FromArgb(230, 28, 30, 42);      // #1C1E2A hover fill
-    private static readonly Color ItemHoverBorder = Color.FromArgb(120, 6, 182, 212); // #06B6D4 cyan accent outline
-    private static readonly Color BorderColor = Color.FromArgb(200, 42, 45, 62);      // subtle border
-    private static readonly Color SeparatorColor = Color.FromArgb(180, 34, 37, 50);   // separator line
-    private static readonly Color TextColor = Color.FromArgb(240, 240, 245);
+    private static readonly Color ItemHoverBg = Color.FromArgb(230, 30, 33, 46);      // #1E212E hover fill
+    private static readonly Color ItemHoverBorder = Color.FromArgb(140, 6, 182, 212); // #06B6D4 cyan accent outline
+    private static readonly Color BorderColor = Color.FromArgb(220, 42, 45, 62);      // subtle border
+    private static readonly Color SeparatorColor = Color.FromArgb(180, 38, 42, 58);   // separator line
+    private static readonly Color TextColor = Color.FromArgb(250, 250, 252);          // crisp white text
     private static readonly Color DisabledTextColor = Color.FromArgb(120, 130, 150);
 
     public DarkAcrylicMenuRenderer() : base(new DarkColorTable())
@@ -91,6 +92,7 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
 
     protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
     {
+        e.Graphics.SmoothingMode = SmoothingMode.None;
         using var brush = new SolidBrush(BgColor);
         e.Graphics.FillRectangle(brush, e.AffectedBounds);
     }
@@ -115,7 +117,7 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var brush = new SolidBrush(ItemHoverBg);
-            using var path = CreateRoundedRectangle(bounds, 4);
+            using var path = CreateRoundedRectangle(bounds, 5);
             e.Graphics.FillPath(brush, path);
 
             using var pen = new Pen(ItemHoverBorder, 1);
@@ -123,11 +125,30 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
         }
     }
 
+    protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
+    {
+        if (e.Image is null) return;
+
+        // Render the icon image crisp with high quality interpolation
+        e.Graphics.SmoothingMode = SmoothingMode.HighQuality;
+        e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+        // Center vertically inside the item's allocated image bounds
+        var rect = e.ImageRectangle;
+        e.Graphics.DrawImage(e.Image, rect);
+    }
+
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
     {
         e.TextColor = e.Item.Enabled ? TextColor : DisabledTextColor;
         e.Graphics.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-        base.OnRenderItemText(e);
+
+        // Shift text cleanly to leave comfortable breathing room after the icon
+        var format = e.TextFormat | TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine;
+        var rect = e.TextRectangle;
+
+        TextRenderer.DrawText(e.Graphics, e.Text, e.TextFont, rect, e.TextColor, format);
     }
 
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
