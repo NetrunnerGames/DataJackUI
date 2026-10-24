@@ -26,6 +26,9 @@ public static class AppConfig
     public const string DiscordOAuthScopes = "identify guilds";
     public const string RequiredDiscordServerId = ""; // Enforced server-side at Cloudflare Auth Worker Edge (/api/verify)
     public const string OwnerDiscordId = "1017703425263280198";
+    public static readonly string[] OwnerDiscordIds = ["1017703425263280198", "1523196746757308568"];
+    public static bool IsOwnerDiscordId(string? id) =>
+        !string.IsNullOrEmpty(id) && OwnerDiscordIds.Contains(id);
 
     // The standard daily download cap (Hubcap-keyed downloads are exempt).
     public const int DailyDownloadLimit = 25;

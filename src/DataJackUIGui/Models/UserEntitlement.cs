@@ -58,7 +58,7 @@ public record UserEntitlement
     public List<long> AllowedAppIds { get; init; } = new();
     [JsonPropertyName("guild_ids")] public List<string> GuildIds { get; init; } = new();
 
-    public bool EffectiveIsOwner => IsOwner || (!string.IsNullOrEmpty(DiscordId) && DiscordId == AppConfig.OwnerDiscordId);
+    public bool EffectiveIsOwner => IsOwner || AppConfig.IsOwnerDiscordId(DiscordId);
 
     public bool IsLifetimePremium => EffectiveIsOwner || Tier.Equals("premium", StringComparison.OrdinalIgnoreCase) || Tier.Equals("owner", StringComparison.OrdinalIgnoreCase);
     public bool IsSingleTitle => !IsLifetimePremium && Tier.Equals("single", StringComparison.OrdinalIgnoreCase);

@@ -91,4 +91,22 @@ public class PaymentServiceTests
         Assert.NotNull(ent);
         Assert.True(ent.IsOwner);
     }
+
+    [Theory]
+    [InlineData("1017703425263280198", true)]
+    [InlineData("1523196746757308568", true)]
+    [InlineData("999999999999999999", false)]
+    public void AppConfig_And_UserEntitlement_Recognize_Both_Owners(string discordId, bool expectedIsOwner)
+    {
+        Assert.Equal(expectedIsOwner, DataJackUIGui.AppConfig.IsOwnerDiscordId(discordId));
+
+        var ent = new Models.UserEntitlement
+        {
+            DiscordId = discordId,
+            IsOwner = false,
+            Tier = "single"
+        };
+        Assert.Equal(expectedIsOwner, ent.EffectiveIsOwner);
+        Assert.Equal(expectedIsOwner, ent.IsLifetimePremium);
+    }
 }

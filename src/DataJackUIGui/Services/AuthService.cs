@@ -35,8 +35,8 @@ public class AuthService
 
     /// <summary>True when logged in as the software creator/owner (enforced and returned by server API).</summary>
     public bool IsOwner => CurrentEntitlement.EffectiveIsOwner ||
-                           (!string.IsNullOrEmpty(DiscordId) && DiscordId == AppConfig.OwnerDiscordId) ||
-                           (!string.IsNullOrEmpty(UserId) && UserId == AppConfig.OwnerDiscordId);
+                           AppConfig.IsOwnerDiscordId(DiscordId) ||
+                           AppConfig.IsOwnerDiscordId(UserId);
 
     public bool IsBanned => CurrentEntitlement.IsBanned;
     public bool IsAppAllowed(long appid) => IsOwner || CurrentEntitlement.IsAppAllowed(appid);
