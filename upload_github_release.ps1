@@ -102,9 +102,9 @@ $assets = @(
 $nupkgs = Get-ChildItem "$releasesDir/*$($TagName.TrimStart('v'))*.nupkg" | Select-Object -ExpandProperty Name
 $assets += $nupkgs
 
-# Also include previous full nupkg if present so delta builds work across versions
-$prevFull = Get-ChildItem "$releasesDir/*-full.nupkg" | Select-Object -ExpandProperty Name
-$assets += $prevFull
+# Also include rolling window of full and delta nupkgs present in Releases so delta builds work across versions
+$rollingNupkgs = Get-ChildItem "$releasesDir/*.nupkg" | Select-Object -ExpandProperty Name
+$assets += $rollingNupkgs
 
 $assets = $assets | Select-Object -Unique
 
