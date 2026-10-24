@@ -91,16 +91,21 @@ public class UpdateService : IDisposable
             var info = await mgr.CheckForUpdatesAsync();
             if (info is null) return null;
 
+            bool hasDelta = info.DeltasToTarget != null && info.DeltasToTarget.Length > 0;
+            PluginLog.Log($"[UpdateService] Update available -> Target: v{info.TargetFullRelease.Version}. Mode: {(hasDelta ? $"Delta ({info.DeltasToTarget!.Length} diffs, ~{info.DeltasToTarget[0].Size / 1024} KB)" : "Full package fallback (no delta match)")}");
+
             // Downloads the delta package automatically (Velopack selects delta over full when available)
             await mgr.DownloadUpdatesAsync(info, progress != null ? progress.Report : null, ct);
             _stagedMgr = mgr;
             _staged = info;
 
+            PluginLog.Log($"[UpdateService] Successfully staged update v{info.TargetFullRelease.Version}.");
             UpdateReady?.Invoke();
             return info;
         }
-        catch
+        catch (Exception ex)
         {
+            PluginLog.Log($"[UpdateService] CheckAndAutoUpdateAsync error: {ex.Message}");
             return null;
         }
     }
