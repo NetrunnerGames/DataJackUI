@@ -77,10 +77,8 @@ if (-not (Test-Path $ReleasesDir)) {
     if ($existingFullNupkgs.Count -gt 1) {
         $existingFullNupkgs | Select-Object -Skip 1 | Remove-Item -Force
     }
-    Get-ChildItem "$ReleasesDir/*-delta.nupkg" -ErrorAction SilentlyContinue | Remove-Item -Force
-    # Clean up obsolete manifest metadata before re-packing
-    Remove-Item "$ReleasesDir/RELEASES" -ErrorAction SilentlyContinue
-    Remove-Item "$ReleasesDir/*.json" -ErrorAction SilentlyContinue
+    # Note: Retain previous full and delta packages and RELEASES manifest so Velopack vpk pack
+    # accurately links delta diffs against the existing base release in RELEASES and releases.win.json
 }
 
 # 1. Update plugin.json version property (if plugin source exists locally)
