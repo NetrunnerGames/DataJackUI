@@ -89,6 +89,15 @@ public static class Strings
     public static string Settings_MinimizeToTray => Get(nameof(Settings_MinimizeToTray));
     public static string Settings_MinimizeToTray_Hint => Get(nameof(Settings_MinimizeToTray_Hint));
     public static string Tray_Open => Get(nameof(Tray_Open));
+    public static string Tray_AddGame => Get(nameof(Tray_AddGame));
+    public static string Tray_Manage => Get(nameof(Tray_Manage));
+    public static string Tray_Depots => Get(nameof(Tray_Depots));
+    public static string Tray_Fixes => Get(nameof(Tray_Fixes));
+    public static string Tray_Mode => Get(nameof(Tray_Mode));
+    public static string Tray_Plugin => Get(nameof(Tray_Plugin));
+    public static string Tray_Downloads => Get(nameof(Tray_Downloads));
+    public static string Tray_RestartSteam => Get(nameof(Tray_RestartSteam));
+    public static string Tray_Settings => Get(nameof(Tray_Settings));
     public static string Tray_Exit => Get(nameof(Tray_Exit));
     public static string Settings_SteamNotFound => Get(nameof(Settings_SteamNotFound));
     public static string Settings_SteamSource_Custom => Get(nameof(Settings_SteamSource_Custom));

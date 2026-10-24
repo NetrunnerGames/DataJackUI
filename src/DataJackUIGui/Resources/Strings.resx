@@ -129,6 +129,15 @@
   <data name="Settings_MinimizeToTray" xml:space="preserve"><value>Minimize to System Tray</value></data>
   <data name="Settings_MinimizeToTray_Hint" xml:space="preserve"><value>When you close the window, keep DataJackUI running in the system tray instead of quitting. Double-click the tray icon to restore.</value></data>
   <data name="Tray_Open" xml:space="preserve"><value>Open DataJackUI</value></data>
+  <data name="Tray_AddGame" xml:space="preserve"><value>Add Game / Store</value></data>
+  <data name="Tray_Manage" xml:space="preserve"><value>Manage Library</value></data>
+  <data name="Tray_Depots" xml:space="preserve"><value>Presets &amp; Depots</value></data>
+  <data name="Tray_Fixes" xml:space="preserve"><value>Fixes &amp; Tools</value></data>
+  <data name="Tray_Mode" xml:space="preserve"><value>Steam Mode &amp; Redirection</value></data>
+  <data name="Tray_Plugin" xml:space="preserve"><value>Jack-in Plugin</value></data>
+  <data name="Tray_Downloads" xml:space="preserve"><value>Downloads &amp; Queue</value></data>
+  <data name="Tray_RestartSteam" xml:space="preserve"><value>Restart Steam</value></data>
+  <data name="Tray_Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="Tray_Exit" xml:space="preserve"><value>Exit</value></data>
   <data name="Settings_SteamNotFound" xml:space="preserve"><value>Steam not found</value></data>
   <data name="Settings_SteamSource_Custom" xml:space="preserve"><value>Custom location</value></data>

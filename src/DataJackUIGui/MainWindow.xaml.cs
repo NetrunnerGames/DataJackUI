@@ -44,10 +44,85 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
 
         _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
 
-        var menu = new System.Windows.Forms.ContextMenuStrip();
-        menu.Items.Add(DataJackUIGui.Resources.Strings.Tray_Open, null, (_, _) => RestoreFromTray());
+        var menu = new System.Windows.Forms.ContextMenuStrip
+        {
+            Renderer = new DarkAcrylicMenuRenderer(),
+            ShowImageMargin = true,
+            ShowCheckMargin = false
+        };
+
+        menu.HandleCreated += (_, _) => DarkAcrylicMenuRenderer.EnableAcrylic(menu.Handle);
+
+        var accentColor = System.Drawing.Color.FromArgb(6, 182, 212); // #06b6d4 cyan
+
+        // Open DataJackUI
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_Open,
+            TrayIconGlyphs.CreateIcon("\uE80F", accentColor),
+            (_, _) => Dispatcher.Invoke(RestoreFromTray)));
+
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-        menu.Items.Add(DataJackUIGui.Resources.Strings.Tray_Exit, null, (_, _) => ExitApp());
+
+        // Quick Navigation / QoL options
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_AddGame,
+            TrayIconGlyphs.CreateIcon("\uE710", accentColor),
+            (_, _) => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToAdd(); })));
+
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_Manage,
+            TrayIconGlyphs.CreateIcon("\uE7FC", accentColor),
+            (_, _) => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToManage(); })));
+
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_Depots,
+            TrayIconGlyphs.CreateIcon("\uF003", accentColor),
+            (_, _) => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToBuilds(); })));
+
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_Fixes,
+            TrayIconGlyphs.CreateIcon("\uEA1F", accentColor),
+            (_, _) => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToFixes(); })));
+
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_Mode,
+            TrayIconGlyphs.CreateIcon("\uE713", accentColor),
+            (_, _) => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToMode(); })));
+
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_Plugin,
+            TrayIconGlyphs.CreateIcon("\uEA86", accentColor),
+            (_, _) => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToPlugin(); })));
+
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_Downloads,
+            TrayIconGlyphs.CreateIcon("\uE896", accentColor),
+            (_, _) => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToDownloads(); })));
+
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+
+        // Actions
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_RestartSteam,
+            TrayIconGlyphs.CreateIcon("\uE777", accentColor),
+            (_, _) => Dispatcher.Invoke(() =>
+            {
+                if (DataContext is MainViewModel vm) vm.RestartSteamCommand.Execute(null);
+            })));
+
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_Settings,
+            TrayIconGlyphs.CreateIcon("\uE713", accentColor),
+            (_, _) => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToSettings(); })));
+
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+
+        // Exit
+        menu.Items.Add(new System.Windows.Forms.ToolStripMenuItem(
+            DataJackUIGui.Resources.Strings.Tray_Exit,
+            TrayIconGlyphs.CreateIcon("\uE7E8", accentColor),
+            (_, _) => Dispatcher.Invoke(ExitApp)));
+
         _trayIcon.ContextMenuStrip = menu;
     }
 

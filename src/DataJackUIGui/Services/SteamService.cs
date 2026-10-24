@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
 namespace DataJackUIGui.Services;
@@ -128,6 +129,58 @@ public class SteamService(SettingsService settings)
     /// </summary>
     public string? LegacyDepotCacheDir =>
         EffectivePath is { } p ? Path.Combine(p, "config", "depotcache") : null;
+
+    /// <summary>Full path to steamapps, or null if Steam isn't located.</summary>
+    public string? SteamAppsDir =>
+        EffectivePath is { } p ? Path.Combine(p, "steamapps") : null;
+
+    /// <summary>Resolves the primary 64-bit SteamID of the active user, or null if not found.</summary>
+    public string? GetPrimarySteamId64()
+    {
+        if (EffectivePath is not { } steamPath) return null;
+        string loginUsers = Path.Combine(steamPath, "config", "loginusers.vdf");
+        if (File.Exists(loginUsers))
+        {
+            try
+            {
+                string text = File.ReadAllText(loginUsers);
+                var matches = Regex.Matches(text, @"""(7656119\d+)""\s*\{([^}]+)\}", RegexOptions.Singleline);
+                string? firstId = null;
+                foreach (Match m in matches)
+                {
+                    string id = m.Groups[1].Value;
+                    string block = m.Groups[2].Value;
+                    if (firstId is null) firstId = id;
+                    if (block.Contains(@"""AutoLogin""") && (block.Contains(@"""1""") || block.Contains(@"1")))
+                        return id;
+                    if (block.Contains(@"""MostRecent""") && (block.Contains(@"""1""") || block.Contains(@"1")))
+                        return id;
+                }
+                if (firstId is not null) return firstId;
+            }
+            catch { }
+        }
+
+        // Fallback: userdata directory
+        string userdata = Path.Combine(steamPath, "userdata");
+        if (Directory.Exists(userdata))
+        {
+            try
+            {
+                foreach (var dir in Directory.EnumerateDirectories(userdata))
+                {
+                    string name = Path.GetFileName(dir);
+                    if (uint.TryParse(name, out uint accountId) && accountId > 0)
+                    {
+                        return (76561197960265728UL + accountId).ToString();
+                    }
+                }
+            }
+            catch { }
+        }
+
+        return null;
+    }
 
     /// <summary>Open a store/steam URL or file path with the shell (browser, Steam client, Explorer).</summary>
     public static void OpenUrl(string url) =>
