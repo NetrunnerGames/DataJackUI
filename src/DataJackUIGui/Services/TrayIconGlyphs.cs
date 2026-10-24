@@ -6,15 +6,15 @@ using System.Drawing.Text;
 namespace DataJackUIGui.Services;
 
 /// <summary>
-/// Helper to render crisp, pixel-perfect Fluent UI icons for Windows Forms context menu items.
-/// Uses standard Segoe MDL2 Assets glyph codepoints that are universally supported across Windows 10/11
-/// and render sharp vector geometry at 16x16 size without missing glyph boxes.
+/// Helper to render crisp, pixel-perfect Fluent vector icons for Windows Forms context menu items.
+/// Uses standard Segoe MDL2 Assets glyph codepoints rendered with high quality ClearType subpixel grid fitting
+/// at 20x20 canvas for crystal-clear legibility and sharpness on high-DPI displays.
 /// </summary>
 public static class TrayIconGlyphs
 {
     private static readonly FontFamily IconFamily = ResolveIconFontFamily();
 
-    // Windows 11 context menu crisp text/icon white (#FFFFFF)
+    // Pure crisp white text and vector iconography
     private static readonly Color DefaultForeground = Color.FromArgb(255, 255, 255);
 
     private static FontFamily ResolveIconFontFamily()
@@ -37,13 +37,12 @@ public static class TrayIconGlyphs
     }
 
     /// <summary>
-    /// Renders a native vector icon glyph matching Windows 11 context menu size and proportions.
-    /// Default size is 16x16.
+    /// Renders a native vector icon glyph at 20x20 pixels with high precision subpixel anti-aliasing.
     /// </summary>
     /// <param name="glyph">Unicode glyph string from Segoe MDL2 Assets.</param>
-    /// <param name="size">Canvas size in pixels (default 16x16).</param>
-    /// <param name="color">Foreground glyph color; defaults to crisp white.</param>
-    public static Bitmap CreateIcon(string glyph, int size = 16, Color? color = null)
+    /// <param name="size">Canvas size in pixels (default 20x20).</param>
+    /// <param name="color">Foreground glyph color; defaults to crisp pure white.</param>
+    public static Bitmap CreateIcon(string glyph, int size = 20, Color? color = null)
     {
         var fg = color ?? DefaultForeground;
 
@@ -55,8 +54,8 @@ public static class TrayIconGlyphs
         g.PixelOffsetMode = PixelOffsetMode.HighQuality;
         g.InterpolationMode = InterpolationMode.HighQualityBicubic;
 
-        // 13.5px font size for 16x16 icon box produces authentic Windows 11 glyph thickness
-        using var font = new Font(IconFamily, size * 0.84f, FontStyle.Regular, GraphicsUnit.Pixel);
+        // Calibrated 16.5px font size inside 20x20 box gives clean 1.5-2px line strokes without blurring
+        using var font = new Font(IconFamily, size * 0.825f, FontStyle.Regular, GraphicsUnit.Pixel);
 
         var sf = new StringFormat
         {

@@ -49,15 +49,15 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             Renderer = new DarkAcrylicMenuRenderer(),
             ShowImageMargin = true,
             ShowCheckMargin = false,
-            ImageScalingSize = new System.Drawing.Size(16, 16),
-            Font = new System.Drawing.Font("Segoe UI Variable Text", 9.25f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point),
-            Padding = new System.Windows.Forms.Padding(0, 5, 0, 5),
-            MinimumSize = new System.Drawing.Size(228, 0)
+            ImageScalingSize = new System.Drawing.Size(20, 20),
+            Font = new System.Drawing.Font("Segoe UI Variable Text", 9.5f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point),
+            Padding = new System.Windows.Forms.Padding(0, 6, 0, 6),
+            MinimumSize = new System.Drawing.Size(232, 0)
         };
 
         menu.HandleCreated += (_, _) => DarkAcrylicMenuRenderer.EnableAcrylic(menu.Handle);
 
-        const int iconSize = 16;
+        const int iconSize = 20;
         var itemPadding = new System.Windows.Forms.Padding(0, 6, 16, 6);
 
         System.Windows.Forms.ToolStripMenuItem CreateMenuItem(string text, string glyph, Action onClick)
