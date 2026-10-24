@@ -155,7 +155,7 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
         e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
         e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
-        // Vertically center the 20x20 icon in the item height
+        // Vertically center the 20x20 icon in the item row matching exact text baseline
         int y = (e.Item.Height - e.Image.Height) / 2;
         int x = 14; // 14px left margin
         var destRect = new Rectangle(x, y, e.Image.Width, e.Image.Height);
@@ -169,12 +169,12 @@ public sealed class DarkAcrylicMenuRenderer : ToolStripProfessionalRenderer
         e.Graphics.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
         // 14px margin + 20px icon + 12px gap = 46px text left
+        // Exact vertical baseline alignment: shift -2px to align font cap-height with icon optical center
         var font = e.TextFont ?? e.Item.Font;
         int textLeft = 46;
         int textWidth = Math.Max(0, e.Item.Width - textLeft - 14);
-        int textTop = (e.Item.Height - font.Height) / 2;
 
-        var rect = new Rectangle(textLeft, textTop, textWidth, font.Height + 2);
+        var rect = new Rectangle(textLeft, -2, textWidth, e.Item.Height);
         var format = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix;
 
         TextRenderer.DrawText(e.Graphics, e.Text, font, rect, e.TextColor, format);
