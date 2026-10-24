@@ -118,6 +118,27 @@ public class DataJackUIApiClient
         var localResults = localTask.Result;
         var storeResults = storeTask.Result;
 
+        var storeAppIds = storeResults.Select(s => s.AppId).ToHashSet();
+        foreach (var s in storeResults)
+        {
+            s.IsDelisted = false;
+            SteamDelistedHelper.MarkDelisted(s.AppId, false);
+        }
+
+        foreach (var l in localResults)
+        {
+            var cachedStatus = SteamDelistedHelper.CheckDelistedFast(l.AppId);
+            if (cachedStatus.HasValue)
+            {
+                l.IsDelisted = cachedStatus.Value;
+            }
+            else if (storeResults.Count > 0 && !storeAppIds.Contains(l.AppId))
+            {
+                // Delisted or store search omitted it; will be refined by card check
+                l.IsDelisted = false;
+            }
+        }
+
         var combined = localResults
             .Concat(storeResults)
             .DistinctBy(r => r.AppId)

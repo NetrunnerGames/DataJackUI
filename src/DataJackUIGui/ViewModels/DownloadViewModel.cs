@@ -88,10 +88,14 @@ public partial class AddGameCardVm : ObservableObject
 
     public string Cover => LocalCover ?? HeaderImage;
 
+    [ObservableProperty]
+    private bool _isDelisted;
+
     public AddGameCardVm(SteamSearchResult r)
     {
         AppId = r.AppId;
         Name = r.Name;
+        IsDelisted = r.IsDelisted;
     }
 
     public async Task EnsureCoverAsync(CoverCache covers)
@@ -617,6 +621,27 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 
             SetFiltered(cards);
             if (cards.Count == 0) RunOnUi(() => EmptyMessage = Resources.Strings.Fixes_Empty_None);
+
+            // Refine delisted status asynchronously for cards not already determined
+            _ = Task.Run(async () =>
+            {
+                foreach (var card in cards)
+                {
+                    if (cts.Token.IsCancellationRequested) break;
+                    var fast = SteamDelistedHelper.CheckDelistedFast(card.AppId);
+                    if (fast.HasValue)
+                    {
+                        if (card.IsDelisted != fast.Value)
+                            RunOnUi(() => card.IsDelisted = fast.Value);
+                    }
+                    else
+                    {
+                        bool delisted = await SteamDelistedHelper.IsDelistedAsync(card.AppId, cts.Token);
+                        if (delisted)
+                            RunOnUi(() => card.IsDelisted = true);
+                    }
+                }
+            }, cts.Token);
         }
         catch (OperationCanceledException) { }
         catch (ApiException ex) { RunOnUi(() => Error = ex.Message); SetFiltered([]); }

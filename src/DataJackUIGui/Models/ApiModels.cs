@@ -9,6 +9,7 @@ public class SteamSearchResult
     public long AppId { get; set; }
     public string Name { get; set; } = "";
     public string? Icon { get; set; }
+    public bool IsDelisted { get; set; }
 }
 
 // Steam's public store-search response (called directly by the app)
