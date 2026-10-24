@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Threading;
@@ -61,6 +61,11 @@ public static class Program
                 {
                     trayLocked = true;
                 }
+                else if (arg.Equals("--synthesize-patterns", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleSynthesizePatterns();
+                    return;
+                }
                 else if (arg.Equals("--force", StringComparison.OrdinalIgnoreCase) || arg.Equals("-f", StringComparison.OrdinalIgnoreCase))
                 {
                     force = true;
@@ -111,7 +116,7 @@ public static class Program
         {
             if (!isFirst)
             {
-                // Launched from a browser protocol link → write the URL to a temp file so the live
+                // Launched from a browser protocol link â†’ write the URL to a temp file so the live
                 // instance can pick it up, then signal it to surface and handle the URL.
                 if (protocolUrl is not null)
                     Services.ProtocolService.WritePending(protocolUrl);
@@ -193,7 +198,7 @@ public static class Program
         "en",
     ];
 
-    /// <summary>Resolve the UI language (saved setting → OS display language → English) and apply it to
+    /// <summary>Resolve the UI language (saved setting â†’ OS display language â†’ English) and apply it to
     /// the thread + WPF before any UI is built.</summary>
     private static void ApplyUiCulture()
     {
@@ -229,7 +234,7 @@ public static class Program
     }
 
     /// <summary>Map an OS culture to one of our supported tags. Tries the exact tag (e.g. "pt-BR"), then
-    /// our regional variants, then the two-letter neutral parent (e.g. "es-ES" → "es", "fr-FR" → "fr").
+    /// our regional variants, then the two-letter neutral parent (e.g. "es-ES" â†’ "es", "fr-FR" â†’ "fr").
     /// Falls back to "en". Internal-visible for tests.</summary>
     internal static string MatchOsLanguage(CultureInfo os)
     {
@@ -238,7 +243,7 @@ public static class Program
 
         string two = os.TwoLetterISOLanguageName; // "es", "fr", "pt", "zh", "nb"/"nn"...
 
-        // 2. Chinese: script (Hans/Hant) matters more than region. zh-CN/zh-SG → Hans, zh-TW/HK/MO → Hant.
+        // 2. Chinese: script (Hans/Hant) matters more than region. zh-CN/zh-SG â†’ Hans, zh-TW/HK/MO â†’ Hant.
         if (two == "zh")
         {
             string candidate = os.Name.IndexOf("Hant", StringComparison.OrdinalIgnoreCase) >= 0 ? "zh-Hant"
@@ -247,7 +252,7 @@ public static class Program
             if (IsSupported(candidate)) return candidate;
         }
 
-        // 3. Portuguese: we ship pt-BR + pt-PT but no neutral "pt". Default neutral/unknown → pt-PT (European).
+        // 3. Portuguese: we ship pt-BR + pt-PT but no neutral "pt". Default neutral/unknown â†’ pt-PT (European).
         if (two == "pt")
         {
             if (IsSupported("pt-PT")) return "pt-PT";
@@ -260,13 +265,13 @@ public static class Program
             if (IsSupported(candidate)) return candidate;
         }
 
-        // 5. Norwegian: Bokmål ("nb") and Nynorsk ("nn") both fall back to our "nb".
+        // 5. Norwegian: BokmÃ¥l ("nb") and Nynorsk ("nn") both fall back to our "nb".
         if (two is "nb" or "nn" or "no")
         {
             if (IsSupported("nb")) return "nb";
         }
 
-        // 6. Generic: try the two-letter neutral parent (es-ES→es, fr-FR→fr, de-DE→de, ja-JP→ja, ...).
+        // 6. Generic: try the two-letter neutral parent (es-ESâ†’es, fr-FRâ†’fr, de-DEâ†’de, ja-JPâ†’ja, ...).
         if (IsSupported(two)) return two;
 
         return "en";
@@ -298,7 +303,35 @@ public static class Program
                 return string.IsNullOrWhiteSpace(v) ? null : v;
             }
         }
-        catch { /* corrupt/missing → fall back to OS */ }
+        catch { /* corrupt/missing â†’ fall back to OS */ }
         return null;
+    }
+    private static void HandleSynthesizePatterns()
+    {
+        string steamClientDll = @"C:\Program Files (x86)\Steam\steamclient64.dll";
+        string otaJson = @"C:\Users\Flynn\Projects\OTA\icebreaker_patterns.json";
+
+        Console.WriteLine("[PatternSynthesizer] Inspecting: " + steamClientDll);
+        if (!File.Exists(steamClientDll))
+        {
+            Console.WriteLine("[PatternSynthesizer] Error: steamclient64.dll not found.");
+            return;
+        }
+
+        var results = Services.PatternSynthesizerService.SynthesizeAllPatterns(steamClientDll);
+        foreach (var kv in results)
+        {
+            Console.WriteLine("  * " + kv.Key + ":");
+            foreach (var pat in kv.Value)
+            {
+                Console.WriteLine("      \"" + pat + "\"");
+            }
+        }
+
+        if (File.Exists(otaJson))
+        {
+            bool ok = Services.PatternSynthesizerService.UpdateOtaRepository(otaJson, steamClientDll);
+            Console.WriteLine(ok ? ("[PatternSynthesizer] Successfully updated " + otaJson) : "[PatternSynthesizer] Failed to update OTA json.");
+        }
     }
 }
