@@ -48,13 +48,28 @@ public class SteamFeaturedItem
     [JsonPropertyName("type")] public int Type { get; set; } // 0 = game; non-zero are bundles/etc., so skip
 }
 
-public class PopularHeroGame
+public class PopularHeroGame : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
 {
     public long AppId { get; set; }
     public string Name { get; set; } = "";
     public int Rank { get; set; }
     public int PeakInGame { get; set; }
     public string HeroImage { get; set; } = "";
+
+    private string? _localHero;
+    public string? LocalHero
+    {
+        get => _localHero;
+        set
+        {
+            if (SetProperty(ref _localHero, value))
+            {
+                OnPropertyChanged(nameof(DisplayHeroImage));
+            }
+        }
+    }
+
+    public string DisplayHeroImage => !string.IsNullOrEmpty(LocalHero) ? LocalHero : HeroImage;
     public string FormattedPlayers => $"{PeakInGame:N0} playing";
 }
 

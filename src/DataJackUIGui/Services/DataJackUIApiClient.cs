@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -154,8 +155,36 @@ public class DataJackUIApiClient
     /// Fetches top most played games from ISteamChartsService/GetMostPlayedGames/v1
     /// and resolves library_hero imagery + game names for the Add page carousel.
     /// </summary>
+    private static readonly string PopularCacheFile =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui", "popular_games_cache.json");
+    private static readonly TimeSpan PopularCacheMaxAge = TimeSpan.FromHours(4);
+
     public async Task<List<PopularHeroGame>> GetPopularGamesAsync(CancellationToken ct = default)
     {
+        // 1. Try reading disk cache first if fresh
+        try
+        {
+            if (File.Exists(PopularCacheFile))
+            {
+                var fi = new FileInfo(PopularCacheFile);
+                if (DateTime.UtcNow - fi.LastWriteTimeUtc < PopularCacheMaxAge)
+                {
+                    string json = await File.ReadAllTextAsync(PopularCacheFile, ct);
+                    var cachedList = JsonSerializer.Deserialize<List<PopularHeroGame>>(json);
+                    if (cachedList is { Count: > 0 })
+                    {
+                        // Check if local hero files exist for instant loading
+                        foreach (var g in cachedList)
+                        {
+                            g.LocalHero = _covers.GetLocalHeroPath(g.AppId);
+                        }
+                        return cachedList;
+                    }
+                }
+            }
+        }
+        catch { /* continue to fresh fetch */ }
+
         try
         {
             var url = "https://api.steampowered.com/ISteamChartsService/GetMostPlayedGames/v1/";
@@ -163,7 +192,10 @@ public class DataJackUIApiClient
             req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
             using var resp = await _http.SendAsync(req, ct);
-            if (!resp.IsSuccessStatusCode) return [];
+            if (!resp.IsSuccessStatusCode)
+            {
+                return await LoadStalePopularCacheAsync(ct);
+            }
 
             using var stream = await resp.Content.ReadAsStreamAsync(ct);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
@@ -172,7 +204,7 @@ public class DataJackUIApiClient
                 !r.TryGetProperty("ranks", out var ranks) ||
                 ranks.ValueKind != JsonValueKind.Array)
             {
-                return [];
+                return await LoadStalePopularCacheAsync(ct);
             }
 
             var list = new List<PopularHeroGame>();
@@ -184,7 +216,7 @@ public class DataJackUIApiClient
                 int rank = rankItem.TryGetProperty("rank", out var rankProp) && rankProp.TryGetInt32(out var rVal) ? rVal : list.Count + 1;
                 int peak = rankItem.TryGetProperty("peak_in_game", out var peakProp) && peakProp.TryGetInt32(out var pVal) ? pVal : 0;
 
-                // Resolve name
+                // Resolve name (including popular apps like Wallpaper Engine)
                 string? name = _appList.GetName(aid);
                 if (string.IsNullOrWhiteSpace(name))
                 {
@@ -199,24 +231,51 @@ public class DataJackUIApiClient
                 // Primary wide hero image
                 string heroImg = $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{aid}/library_hero.jpg";
 
-                list.Add(new PopularHeroGame
+                var game = new PopularHeroGame
                 {
                     AppId = aid,
                     Name = name,
                     Rank = rank,
                     PeakInGame = peak,
-                    HeroImage = heroImg
-                });
+                    HeroImage = heroImg,
+                    LocalHero = _covers.GetLocalHeroPath(aid)
+                };
 
+                list.Add(game);
                 if (list.Count >= 10) break;
             }
+
+            // Save to disk cache
+            try
+            {
+                string dir = Path.GetDirectoryName(PopularCacheFile)!;
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                string json = JsonSerializer.Serialize(list);
+                await File.WriteAllTextAsync(PopularCacheFile, json, ct);
+            }
+            catch { /* best effort cache write */ }
 
             return list;
         }
         catch
         {
-            return [];
+            return await LoadStalePopularCacheAsync(ct);
         }
+    }
+
+    private static async Task<List<PopularHeroGame>> LoadStalePopularCacheAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (File.Exists(PopularCacheFile))
+            {
+                string json = await File.ReadAllTextAsync(PopularCacheFile, ct);
+                var cached = JsonSerializer.Deserialize<List<PopularHeroGame>>(json);
+                if (cached is { Count: > 0 }) return cached;
+            }
+        }
+        catch { }
+        return [];
     }
 
     public async Task<(List<SteamFeaturedItem> TopSellers, List<SteamFeaturedItem> NewReleases)> GetFeaturedAsync(

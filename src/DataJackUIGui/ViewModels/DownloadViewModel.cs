@@ -802,6 +802,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         foreach (var item in list)
         {
             PopularGames.Add(item);
+            _ = EnsureHeroCachedAsync(item);
         }
 
         OnPropertyChanged(nameof(HasPopularGames));
@@ -823,6 +824,24 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
             };
             _carouselTimer.Start();
         }
+    }
+
+    private async Task EnsureHeroCachedAsync(PopularHeroGame item)
+    {
+        if (!string.IsNullOrEmpty(item.LocalHero) && File.Exists(item.LocalHero)) return;
+        try
+        {
+            string? local = await _covers.EnsureHeroAsync(item.AppId, item.HeroImage);
+            if (!string.IsNullOrEmpty(local))
+            {
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher is not null && !dispatcher.CheckAccess())
+                    dispatcher.Invoke(() => item.LocalHero = local);
+                else
+                    item.LocalHero = local;
+            }
+        }
+        catch { }
     }
 
     /// <summary>Click a featured-strip card → load that game's details (same path as a search result).</summary>

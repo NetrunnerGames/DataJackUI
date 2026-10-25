@@ -13,6 +13,8 @@ public class CoverCache
 {
     private static readonly string CoversDir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui", "covers");
+    private static readonly string HeroesDir =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui", "heroes");
 
     // Reject only truncated/empty bodies. We don't gate on a size threshold: some legit covers are
     // tiny (e.g. Undertale 391540's header.jpg is ~5 KB. Mostly black, highly compressible), and a
@@ -50,6 +52,50 @@ public class CoverCache
             ServerCertificateCustomValidationCallback = (sender, cert, chain, sslErrors) => true
         };
         _http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
+    }
+
+    private static string HeroPathFor(long appid) => Path.Combine(HeroesDir, $"{appid}.jpg");
+
+    public string? GetLocalHeroPath(long appid)
+    {
+        string p = HeroPathFor(appid);
+        return File.Exists(p) ? p : null;
+    }
+
+    public Task<string?> EnsureHeroAsync(long appid, string? remoteUrl, CancellationToken ct = default)
+    {
+        string path = HeroPathFor(appid);
+        if (File.Exists(path)) return Task.FromResult<string?>(path);
+
+        return _inFlight.GetOrAdd(-appid, async _ =>
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(remoteUrl)) return null;
+                string sanitizedUrl = SteamCdnUrl.Sanitize(remoteUrl) ?? remoteUrl;
+                byte[] bytes = await _http.GetByteArrayAsync(sanitizedUrl, ct);
+                if (bytes.Length >= MinValidBytes && IsValidImage(bytes) && !IsHeaderCapsulePlaceholder(bytes))
+                {
+                    await _ioGate.WaitAsync(ct);
+                    try
+                    {
+                        Directory.CreateDirectory(HeroesDir);
+                        await File.WriteAllBytesAsync(path, bytes, ct);
+                        return path;
+                    }
+                    finally { _ioGate.Release(); }
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+            finally
+            {
+                _inFlight.TryRemove(-appid, out Task<string?>? _);
+            }
+        });
     }
 
     private static string PathFor(long appid) => Path.Combine(CoversDir, $"{appid}.jpg");

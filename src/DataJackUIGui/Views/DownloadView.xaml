@@ -181,12 +181,16 @@
                 BorderThickness="1"
                 Visibility="{Binding ShowPopularCarousel, Converter={StaticResource BoolToVis}}">
                 <Grid>
-                    <!-- Background Hero Image -->
-                    <Image
-                        Source="{Binding CurrentPopularGame.HeroImage}"
-                        Stretch="UniformToFill"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center" />
+                    <!-- Background Hero Image with CornerRadius via ImageBrush -->
+                    <Border CornerRadius="10">
+                        <Border.Background>
+                            <ImageBrush
+                                ImageSource="{Binding CurrentPopularGame.DisplayHeroImage, Converter={StaticResource ImagePathToSource}}"
+                                Stretch="UniformToFill"
+                                AlignmentX="Center"
+                                AlignmentY="Center" />
+                        </Border.Background>
+                    </Border>
 
                     <!-- Gradient overlays for readability and vignette -->
                     <Border CornerRadius="10">
@@ -273,11 +277,9 @@
                             Foreground="#ffffff"
                             Text="{Binding CurrentPopularGame.Name}"
                             TextTrimming="CharacterEllipsis"
-                            MaxWidth="650">
-                            <TextBlock.Effect>
-                                <DropShadowEffect BlurRadius="8" ShadowDepth="2" Direction="315" Opacity="0.8" Color="#000000" />
-                            </TextBlock.Effect>
-                        </TextBlock>
+                            MaxWidth="650"
+                            TextOptions.TextFormattingMode="Display"
+                            TextOptions.TextRenderingMode="ClearType" />
 
                         <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                             <!-- Fluent Flame/Fire icon for Popular -->
