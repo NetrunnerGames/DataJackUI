@@ -429,22 +429,31 @@
                     IsChecked="{Binding FastFetch, Mode=TwoWay}" />
             </Grid>
 
-            <!-- Jack-in button -->
-            <ui:Button
-                Margin="0,14,0,0"
-                HorizontalAlignment="Stretch"
-                Appearance="Primary"
-                Cursor="Hand"
-                Command="{Binding FetchCommand}"
-                Icon="{ui:SymbolIcon ArrowDownload24}"
-                Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
-                <ui:Button.Content>
-                    <Grid>
-                        <TextBlock Text="{x:Static res:Strings.Add_Fetch}" Visibility="{Binding IsChecking, Converter={StaticResource InverseBoolToVis}}" />
-                        <TextBlock Text="{x:Static res:Strings.Add_Checking}" Visibility="{Binding IsChecking, Converter={StaticResource BoolToVis}}" />
-                    </Grid>
-                </ui:Button.Content>
-            </ui:Button>
+            <!-- Jack-in button & progress -->
+            <StackPanel Margin="0,14,0,0" Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
+                <ui:Button
+                    HorizontalAlignment="Stretch"
+                    Appearance="Primary"
+                    Cursor="Hand"
+                    Command="{Binding FetchCommand}"
+                    Icon="{ui:SymbolIcon ArrowDownload24}">
+                    <ui:Button.Content>
+                        <Grid>
+                            <TextBlock Text="{x:Static res:Strings.Add_Fetch}" Visibility="{Binding IsChecking, Converter={StaticResource InverseBoolToVis}}" />
+                            <TextBlock Text="{x:Static res:Strings.Add_Checking}" Visibility="{Binding IsChecking, Converter={StaticResource BoolToVis}}" />
+                        </Grid>
+                    </ui:Button.Content>
+                </ui:Button>
+
+                <!-- Checking Progress Bar (matches Plugin/Mode tab progress styling) -->
+                <ProgressBar
+                    Height="6"
+                    Margin="0,14,0,0"
+                    IsIndeterminate="{Binding IsCheckingProgressIndeterminate}"
+                    Maximum="100"
+                    Value="{Binding CheckingProgress}"
+                    Visibility="{Binding IsChecking, Converter={StaticResource BoolToVis}}" />
+            </StackPanel>
 
             <!-- Error -->
             <TextBlock

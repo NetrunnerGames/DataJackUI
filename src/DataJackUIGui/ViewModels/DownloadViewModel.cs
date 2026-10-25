@@ -183,6 +183,15 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     private bool _isChecking;
 
     [ObservableProperty]
+    private double _checkingProgress;
+
+    [ObservableProperty]
+    private bool _isCheckingProgressIndeterminate = true;
+
+    [ObservableProperty]
+    private string? _checkingStatusLine;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSources))]
     [NotifyPropertyChangedFor(nameof(ShowFeatured))]
     private bool _sourcesLoaded;
@@ -744,6 +753,9 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         if (Details.IsDlc && await PromptSignInIfGuestAsync(Resources.Strings.Add_SignIn_Dlc)) return;
         ResetResults();
         IsChecking = true;
+        IsCheckingProgressIndeterminate = true;
+        CheckingProgress = 0;
+        CheckingStatusLine = Resources.Strings.Add_Checking;
         try
         {
             if (Details.IsDlc) await FetchDlcAsync();
@@ -751,7 +763,11 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         }
         catch (ApiException ex) { Error = ex.Message; }
         catch (Exception) { Error = Resources.Strings.Add_Err_Generic; }
-        finally { IsChecking = false; }
+        finally
+        {
+            IsChecking = false;
+            CheckingStatusLine = null;
+        }
     }
 
     private async Task FetchDlcAsync()
