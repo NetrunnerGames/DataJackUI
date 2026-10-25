@@ -142,7 +142,7 @@
 
     <Grid x:Name="Root">
     <ScrollViewer x:Name="MainScrollViewer" VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="640" Margin="8,16,8,24">
+        <StackPanel Margin="8,16,16,24">
 
             <TextBlock
                 FontSize="22"
@@ -277,7 +277,6 @@
                             Foreground="#ffffff"
                             Text="{Binding CurrentPopularGame.Name}"
                             TextTrimming="CharacterEllipsis"
-                            MaxWidth="650"
                             TextOptions.TextFormattingMode="Display"
                             TextOptions.TextRenderingMode="ClearType" />
 
