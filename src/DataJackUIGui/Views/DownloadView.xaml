@@ -142,7 +142,7 @@
 
     <Grid x:Name="Root">
     <ScrollViewer x:Name="MainScrollViewer" VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="8,16,16,24">
+        <StackPanel Margin="24,16,24,24">
 
             <TextBlock
                 FontSize="22"
