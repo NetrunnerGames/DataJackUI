@@ -33,13 +33,22 @@ public class GithubProxy
     /// downloader can reuse the same direct→mirror fallback.</summary>
     public static IEnumerable<string> Candidates(string url)
     {
-        yield return url; // direct first. Fastest when GitHub is reachable
-        if (!IsGithub(url)) yield break;
+        if (!IsGithub(url))
+        {
+            yield return url;
+            yield break;
+        }
+
+        // Primary: Cloudflare Edge Cache Proxy
         var mirrors = url.StartsWith("https://api.github.com/", StringComparison.OrdinalIgnoreCase)
             ? AppConfig.GithubApiMirrors
             : AppConfig.GithubDownloadMirrors;
+
         foreach (var mirror in mirrors)
             yield return mirror + url;
+
+        // Fallback: Direct GitHub connection
+        yield return url;
     }
 
     /// <summary>

@@ -93,7 +93,7 @@ public static class AppConfig
     /// Hosts releases.win.json, full packages, and delta diff packages.
     /// Uses static CDN distribution without requiring GitHub REST API calls or HTML scraping.
     /// </summary>
-    public const string VelopackReleaseFeedUrl = "https://github.com/NetrunnerGames/DataJackUI/releases/latest/download";
+    public const string VelopackReleaseFeedUrl = "https://proxy.netrunnergames.workers.dev/DataJackUI";
 
     /// <summary>
     /// Public GitHub repo hosting Velopack release assets.
@@ -126,10 +126,11 @@ public static class AppConfig
     //     API-only (its route 400s downloads) so it is deliberately NOT in this list.
     public static readonly string[] GithubApiMirrors =
     [
-        "https://auth.netrunnergames.workers.dev/api/gh/",
+        "https://proxy.netrunnergames.workers.dev/gh/",
     ];
     public static readonly string[] GithubDownloadMirrors =
     [
+        "https://proxy.netrunnergames.workers.dev/gh/",
         "https://ghproxy.net/",    // download-only (verified live 2026-07)
         "https://ghfast.top/",     // download-only
         "https://gh.ddlc.top/",    // download-only

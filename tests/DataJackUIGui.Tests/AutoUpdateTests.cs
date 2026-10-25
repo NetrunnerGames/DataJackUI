@@ -169,7 +169,7 @@ public class AutoUpdateTests
     [Fact]
     public void AppConfig_VelopackReleaseFeedUrl_PointsToDirectStaticReleaseAssets()
     {
-        Assert.Equal("https://github.com/NetrunnerGames/DataJackUI/releases/latest/download", AppConfig.VelopackReleaseFeedUrl);
+        Assert.Equal("https://proxy.netrunnergames.workers.dev/DataJackUI", AppConfig.VelopackReleaseFeedUrl);
         Assert.DoesNotContain("api.github.com", AppConfig.VelopackReleaseFeedUrl);
     }
 }

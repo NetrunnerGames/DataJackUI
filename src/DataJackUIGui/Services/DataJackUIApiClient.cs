@@ -494,7 +494,7 @@ public class DataJackUIApiClient
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(2.5));
 
-            var req = new HttpRequestMessage(HttpMethod.Head, $"https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/{appid}.zip");
+            var req = new HttpRequestMessage(HttpMethod.Head, $"https://proxy.netrunnergames.workers.dev/gh/https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/{appid}.zip");
             req.Headers.UserAgent.ParseAdd(AppConfig.DefaultUserAgent);
             using var res = await _http.SendAsync(req, timeoutCts.Token);
             return res.IsSuccessStatusCode;
@@ -706,7 +706,7 @@ public class DataJackUIApiClient
     public Task<DownloadedFile> DownloadPublicSushiManifestAsync(
         string appid, IProgress<DownloadProgress>? progress, CancellationToken ct = default)
     {
-        string url = $"https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/{appid}.zip";
+        string url = $"https://proxy.netrunnergames.workers.dev/gh/https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/{appid}.zip";
         return DownloadFromUrlAsync(url, $"{appid}.zip", progress, ct);
     }
 
