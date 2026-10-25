@@ -126,7 +126,7 @@ public partial class OnboardingViewModel : ObservableObject
             if (applyRecommended)
             {
                 _settings.FastFetch = true;
-                var result = await _unlocker.InstallAsync(UnlockerMode.Ost); // the Recommended mode
+                var result = await _unlocker.InstallAsync(UnlockerMode.IceBreaker); // the Recommended mode
                 if (!result.Success)
                     _toast.Show(Resources.Strings.Onboarding_Title, result.Error ?? "", error: true);
             }

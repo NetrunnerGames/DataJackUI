@@ -333,7 +333,7 @@ public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjec
 
             if (!IsInstalledLocally())
             {
-                var mode = unlocker.SelectedMode ?? UnlockerMode.Ost;
+                var mode = unlocker.SelectedMode ?? UnlockerMode.IceBreaker;
                 await unlocker.InstallAsync(mode, progress, ct);
             }
 

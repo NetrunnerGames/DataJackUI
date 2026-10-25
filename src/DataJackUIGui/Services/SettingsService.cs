@@ -107,7 +107,7 @@ public class SettingsService
     /// <summary>Selected unlocker backend ("Ost" | "Custom"), or "Ost" by default.</summary>
     public string? SelectedMode
     {
-        get => _settings.SelectedMode ?? "Ost";
+        get => _settings.SelectedMode ?? "IceBreaker";
         set { _settings.SelectedMode = string.IsNullOrWhiteSpace(value) ? null : value; Save(); }
     }
 
