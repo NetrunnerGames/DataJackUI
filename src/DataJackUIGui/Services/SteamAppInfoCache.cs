@@ -444,6 +444,7 @@ public class SteamAppInfoCache
                 HeaderImage = d.TryGetProperty("header_image", out var hi) ? hi.GetString() : null,
                 ReleaseDate = d.TryGetProperty("release_date", out var rd) && rd.TryGetProperty("date", out var dt) ? dt.GetString() : null,
                 DrmNotice = d.TryGetProperty("drm_notice", out var drm) ? drm.GetString() : null,
+                IsDelisted = SteamDelistedHelper.CheckDelistedFast(appid) ?? false,
             };
         }
         catch { return null; }

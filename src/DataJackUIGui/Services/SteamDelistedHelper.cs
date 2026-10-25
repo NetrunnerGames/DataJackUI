@@ -12,8 +12,90 @@ public static class SteamDelistedHelper
         "DataJackUIGui",
         "details");
 
+    private static readonly string DelistedCacheFile = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "DataJackUIGui",
+        "delisted_apps.json");
+
     private static readonly ConcurrentDictionary<long, bool> _memoryCache = new();
-    private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(6) };
+    private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private static bool _delistedListLoaded = false;
+    private static readonly object _syncLock = new();
+
+    /// <summary>
+    /// Loads known delisted AppIDs from local cache and syncs with steam-tracker in background.
+    /// </summary>
+    public static async Task EnsureDelistedListLoadedAsync()
+    {
+        if (_delistedListLoaded) return;
+
+        lock (_syncLock)
+        {
+            if (_delistedListLoaded) return;
+            _delistedListLoaded = true;
+        }
+
+        // 1. Load cached delisted AppIDs from disk if present
+        try
+        {
+            if (File.Exists(DelistedCacheFile))
+            {
+                var json = await File.ReadAllTextAsync(DelistedCacheFile);
+                var ids = JsonSerializer.Deserialize<HashSet<long>>(json);
+                if (ids is not null)
+                {
+                    foreach (var id in ids)
+                    {
+                        _memoryCache[id] = true;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        // 2. Fetch fresh list from steam-tracker in the background (cached for 7 days)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var fileInfo = new FileInfo(DelistedCacheFile);
+                if (fileInfo.Exists && (DateTime.UtcNow - fileInfo.LastWriteTimeUtc).TotalDays < 7)
+                {
+                    return; // Cache is fresh enough
+                }
+
+                using var req = new HttpRequestMessage(HttpMethod.Get, "https://steam-tracker.com/api?action=GetAppListV3");
+                req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+                using var resp = await _httpClient.SendAsync(req);
+                if (!resp.IsSuccessStatusCode) return;
+
+                using var stream = await resp.Content.ReadAsStreamAsync();
+                using var doc = await JsonDocument.ParseAsync(stream);
+
+                if (doc.RootElement.TryGetProperty("removed_apps", out var apps) && apps.ValueKind == JsonValueKind.Array)
+                {
+                    var idSet = new HashSet<long>();
+                    foreach (var item in apps.EnumerateArray())
+                    {
+                        if (item.TryGetProperty("appid", out var appidProp) && appidProp.TryGetInt64(out var aid))
+                        {
+                            idSet.Add(aid);
+                            _memoryCache[aid] = true;
+                        }
+                    }
+
+                    if (idSet.Count > 0)
+                    {
+                        var dir = Path.GetDirectoryName(DelistedCacheFile);
+                        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                        await File.WriteAllTextAsync(DelistedCacheFile, JsonSerializer.Serialize(idSet));
+                    }
+                }
+            }
+            catch { }
+        });
+    }
 
     /// <summary>
     /// Synchronously checks if a game is known to be delisted from RAM or cached details on disk.

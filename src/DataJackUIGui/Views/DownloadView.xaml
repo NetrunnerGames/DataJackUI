@@ -170,6 +170,208 @@
                 <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" Foreground="#9ca3af" Text="{x:Static res:Strings.Add_Searching}" />
             </StackPanel>
 
+            <!-- Popular Games Hero Carousel -->
+            <Border
+                Margin="0,18,0,4"
+                Height="210"
+                CornerRadius="10"
+                ClipToBounds="True"
+                Background="#111318"
+                BorderBrush="#1affffff"
+                BorderThickness="1"
+                Visibility="{Binding ShowPopularCarousel, Converter={StaticResource BoolToVis}}">
+                <Grid>
+                    <!-- Background Hero Image -->
+                    <Image
+                        Source="{Binding CurrentPopularGame.HeroImage}"
+                        Stretch="UniformToFill"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center" />
+
+                    <!-- Gradient overlays for readability and vignette -->
+                    <Border CornerRadius="10">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                                <GradientStop Color="#E60a0c10" Offset="0" />
+                                <GradientStop Color="#800a0c10" Offset="0.35" />
+                                <GradientStop Color="#20000000" Offset="0.7" />
+                                <GradientStop Color="#60000000" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                    <Border CornerRadius="10">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                <GradientStop Color="#990a0c10" Offset="0" />
+                                <GradientStop Color="#10000000" Offset="0.5" />
+                                <GradientStop Color="#40000000" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+
+                    <!-- Clickable Hitbox -->
+                    <Button
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Command="{Binding OpenPopularGameCommand}"
+                        CommandParameter="{Binding CurrentPopularGame}"
+                        ToolTip="{Binding CurrentPopularGame.Name}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" />
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <!-- Left / Right Navigation Chevrons -->
+                    <ui:Button
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Margin="12,0,0,0"
+                        Width="36"
+                        Height="36"
+                        Padding="0"
+                        Appearance="Secondary"
+                        Background="#801a1d24"
+                        BorderBrush="#33ffffff"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Cursor="Hand"
+                        Icon="{ui:SymbolIcon ChevronLeft24}"
+                        Command="{Binding PrevPopularCommand}"
+                        ToolTip="Previous" />
+
+                    <ui:Button
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="0,0,12,0"
+                        Width="36"
+                        Height="36"
+                        Padding="0"
+                        Appearance="Secondary"
+                        Background="#801a1d24"
+                        BorderBrush="#33ffffff"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Cursor="Hand"
+                        Icon="{ui:SymbolIcon ChevronRight24}"
+                        Command="{Binding NextPopularCommand}"
+                        ToolTip="Next" />
+
+                    <!-- Bottom-Left Game Info -->
+                    <StackPanel
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Bottom"
+                        Margin="24,0,0,20"
+                        IsHitTestVisible="False">
+                        <TextBlock
+                            FontSize="22"
+                            FontWeight="SemiBold"
+                            Foreground="#ffffff"
+                            Text="{Binding CurrentPopularGame.Name}"
+                            TextTrimming="CharacterEllipsis"
+                            MaxWidth="650">
+                            <TextBlock.Effect>
+                                <DropShadowEffect BlurRadius="8" ShadowDepth="2" Direction="315" Opacity="0.8" Color="#000000" />
+                            </TextBlock.Effect>
+                        </TextBlock>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                            <!-- Fluent Flame/Fire icon for Popular -->
+                            <ui:SymbolIcon
+                                Symbol="Fire20"
+                                Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                VerticalAlignment="Center" />
+
+                            <TextBlock
+                                Margin="6,0,0,0"
+                                FontSize="12.5"
+                                FontWeight="Medium"
+                                Foreground="#d1d5db"
+                                VerticalAlignment="Center"
+                                Text="{x:Static res:Strings.Add_PopularNow}" />
+
+                            <TextBlock
+                                Margin="8,0,8,0"
+                                FontSize="12"
+                                Foreground="#6b7280"
+                                VerticalAlignment="Center"
+                                Text="•" />
+
+                            <!-- Fluent People icon for active players -->
+                            <ui:SymbolIcon
+                                Symbol="People20"
+                                Foreground="#9ca3af"
+                                VerticalAlignment="Center" />
+
+                            <TextBlock
+                                Margin="6,0,0,0"
+                                FontSize="12"
+                                Foreground="#9ca3af"
+                                VerticalAlignment="Center"
+                                Text="{Binding CurrentPopularGame.FormattedPlayers}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Bottom Pagination Indicator (Pill Dots) -->
+                    <ItemsControl
+                        ItemsSource="{Binding PopularGames}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,0,14"
+                        IsHitTestVisible="True">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button
+                                    Margin="3,0"
+                                    Padding="0"
+                                    Height="6"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Command="{Binding DataContext.SelectPopularIndexCommand, ElementName=Root}"
+                                    CommandParameter="{Binding Rank}">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border
+                                                CornerRadius="3"
+                                                Height="6">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Width" Value="8" />
+                                                        <Setter Property="Background" Value="#55ffffff" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Value="True">
+                                                                <DataTrigger.Binding>
+                                                                    <MultiBinding Converter="{StaticResource EqualityMulti}">
+                                                                        <Binding Path="Rank" />
+                                                                        <Binding Path="DataContext.CurrentPopularGame.Rank" ElementName="Root" />
+                                                                    </MultiBinding>
+                                                                </DataTrigger.Binding>
+                                                                <Setter Property="Width" Value="24" />
+                                                                <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+            </Border>
+
             <!-- Search result game grid -->
             <ItemsControl
                 x:Name="CardScroller"
@@ -387,6 +589,22 @@
                                     Foreground="#a78bfa"
                                     Text="DLC" />
                             </Border>
+                            <Border
+                                Margin="8,0,0,0"
+                                Padding="6,1.5"
+                                VerticalAlignment="Center"
+                                Background="#CC18181B"
+                                BorderBrush="#80EF4444"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Visibility="{Binding IsDelistedGame, Converter={StaticResource BoolToVis}}">
+                                <TextBlock
+                                    FontFamily="Consolas"
+                                    FontSize="9.5"
+                                    FontWeight="Bold"
+                                    Foreground="#FCA5A5"
+                                    Text="DELISTED" />
+                            </Border>
                         </StackPanel>
                         <TextBlock
                             Margin="0,3,0,0"
@@ -439,8 +657,11 @@
                     Icon="{ui:SymbolIcon ArrowDownload24}">
                     <ui:Button.Content>
                         <Grid>
-                            <TextBlock Text="{x:Static res:Strings.Add_Fetch}" Visibility="{Binding IsChecking, Converter={StaticResource InverseBoolToVis}}" />
-                            <TextBlock Text="{x:Static res:Strings.Add_Checking}" Visibility="{Binding IsChecking, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Text="Delisted (Unavailable)" Visibility="{Binding IsDelistedGame, Converter={StaticResource BoolToVis}}" />
+                            <StackPanel Visibility="{Binding IsDelistedGame, Converter={StaticResource InverseBoolToVis}}">
+                                <TextBlock Text="{x:Static res:Strings.Add_Fetch}" Visibility="{Binding IsChecking, Converter={StaticResource InverseBoolToVis}}" />
+                                <TextBlock Text="{x:Static res:Strings.Add_Checking}" Visibility="{Binding IsChecking, Converter={StaticResource BoolToVis}}" />
+                            </StackPanel>
                         </Grid>
                     </ui:Button.Content>
                 </ui:Button>
@@ -1080,28 +1301,52 @@
                         Visibility="{Binding PaymentSuccessMessage, Converter={StaticResource NullToCollapsed}}" />
                 </StackPanel>
 
-                <!-- Actions -->
-                <Grid Grid.Row="4" Margin="0,16,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <!-- Actions & Demo -->
+                <StackPanel Grid.Row="4" Margin="0,16,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                    <ui:Button
-                        Grid.Column="0"
-                        HorizontalAlignment="Left"
-                        Cursor="Hand"
-                        Command="{Binding CancelPaymentCommand}"
-                        Content="{x:Static res:Strings.Mode_Cancel}" />
+                        <ui:Button
+                            Grid.Column="0"
+                            HorizontalAlignment="Left"
+                            Cursor="Hand"
+                            Command="{Binding CancelPaymentCommand}"
+                            Content="{x:Static res:Strings.Mode_Cancel}" />
 
+                        <ui:Button
+                            Grid.Column="1"
+                            Appearance="Primary"
+                            Cursor="Hand"
+                            Command="{Binding VerifyPaymentCommand}"
+                            Content="Verify &amp; Unlock"
+                            Icon="{ui:SymbolIcon Checkmark24}" />
+                    </Grid>
+
+                    <!-- OR Divider -->
+                    <Grid Margin="0,14,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Height="1" Background="#26FFFFFF" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Margin="10,0" FontSize="11" FontWeight="SemiBold" Foreground="#6b7280" Text="OR" VerticalAlignment="Center" />
+                        <Border Grid.Column="2" Height="1" Background="#26FFFFFF" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <!-- Play Demo Button -->
                     <ui:Button
-                        Grid.Column="1"
-                        Appearance="Primary"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Appearance="Secondary"
                         Cursor="Hand"
-                        Command="{Binding VerifyPaymentCommand}"
-                        Content="Verify &amp; Unlock"
-                        Icon="{ui:SymbolIcon Checkmark24}" />
-                </Grid>
+                        Command="{Binding PlayDemoCommand}"
+                        Content="Play DEMO (10 Min)"
+                        Icon="{ui:SymbolIcon Play24}" />
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

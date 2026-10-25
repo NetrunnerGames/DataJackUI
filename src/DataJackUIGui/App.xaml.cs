@@ -63,6 +63,7 @@ public partial class App : Application
                 services.AddTransient<DropInstallViewModel>(); // one per page (Home, Add)
                 services.AddSingleton<AuthService>();
                 services.AddSingleton<PaymentService>();
+                services.AddSingleton<DemoService>();
                 services.AddSingleton<DataJackUIApiClient>();
                 services.AddSingleton<HubcapService>();
                 services.AddSingleton<UpdateService>();

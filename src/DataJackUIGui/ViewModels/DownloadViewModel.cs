@@ -135,6 +135,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     private readonly ManifestJobFactory _jobs;
     private readonly CoverCache _covers;
     private readonly PaymentService _payment;
+    private readonly DemoService _demo;
     private readonly DenuvoService _denuvo;
     private CancellationTokenSource? _searchCts;
     private CancellationTokenSource? _detailsCts;
@@ -154,6 +155,21 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     // ── Featured strips (Steam top-sellers / new-releases), shown when the page is idle ──
     public ObservableCollection<FeaturedItem> TopSellers { get; } = [];
     public ObservableCollection<FeaturedItem> NewReleases { get; } = [];
+    public ObservableCollection<PopularHeroGame> PopularGames { get; } = [];
+    public bool HasPopularGames => PopularGames.Count > 0;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CurrentPopularGame))]
+    private int _currentPopularIndex = 0;
+
+    public PopularHeroGame? CurrentPopularGame =>
+        (PopularGames.Count > 0 && CurrentPopularIndex >= 0 && CurrentPopularIndex < PopularGames.Count)
+            ? PopularGames[CurrentPopularIndex]
+            : null;
+
+    public bool ShowPopularCarousel => HasPopularGames && string.IsNullOrWhiteSpace(SearchText) && !HasDetails && !IsSearching;
+
+    private System.Windows.Threading.DispatcherTimer? _carouselTimer;
 
     // Per-row visibility so an empty category collapses (raised in LoadFeaturedAsync).
     public bool HasTopSellers => TopSellers.Count > 0;
@@ -162,20 +178,26 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     public bool ShowFeatured => false;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowPopularCarousel))]
     private string _searchText = "";
-    [ObservableProperty] private bool _isSearching;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowPopularCarousel))]
+    private bool _isSearching;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasDetails))]
     [NotifyPropertyChangedFor(nameof(ShowFeatured))]
     [NotifyPropertyChangedFor(nameof(ShowResultsGrid))]
+    [NotifyPropertyChangedFor(nameof(ShowPopularCarousel))]
     [NotifyPropertyChangedFor(nameof(ShowPagerView))]
+    [NotifyPropertyChangedFor(nameof(IsDelistedGame))]
     [NotifyCanExecuteChangedFor(nameof(FetchCommand))]
     private GameDetails? _details;
 
     public bool HasDetails => Details is not null;
     public bool ShowResultsGrid => ShowItems && !HasDetails;
     public bool ShowPagerView => ShowPager && !HasDetails;
+    public bool IsDelistedGame => Details?.IsDelisted == true;
     public string GenresText => Details is null ? "" : string.Join(", ", Details.Genres);
 
     [ObservableProperty]
@@ -452,6 +474,27 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         }
     }
 
+    [RelayCommand]
+    private async Task PlayDemoAsync()
+    {
+        long appId = PaymentAppId;
+        string gameTitle = PaymentGameTitle;
+        _demo.RegisterDemo(appId, gameTitle);
+
+        PaymentSuccessMessage = "✓ Demo Mode Activated (10 Min)! Unlocking download...";
+        await Task.Delay(650);
+
+        IsPaymentRequired = false;
+        var action = _pendingAfterPaymentAction;
+        _pendingAfterPaymentAction = null;
+
+        if (action is not null)
+        {
+            await action();
+        }
+    }
+
+
     private async Task<bool> CheckIsDenuvoAsync(long appId)
     {
         // 0. If Denuvo was verified removed (e.g. from PCGamingWiki removal list), override stale notices
@@ -484,7 +527,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         SteamAppListCache appList, SteamAppInfoCache appInfo, SteamDepotInfo depotInfo,
         HardwareAppIdService hardware, DropInstallViewModel drop,
         DownloadQueue queue, ManifestJobFactory jobs, CoverCache covers,
-        PaymentService payment, DenuvoService denuvo)
+        PaymentService payment, DenuvoService denuvo, DemoService demo)
     {
         _api = api;
         _hubcap = hubcap;
@@ -501,9 +544,12 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         _covers = covers;
         _payment = payment;
         _denuvo = denuvo;
+        _demo = demo;
         _ = _denuvo.EnsureFreshAsync();
         _ = _appList.EnsureLoadedAsync();
         _ = _hardware.EnsureFreshAsync();
+        _ = SteamDelistedHelper.EnsureDelistedListLoadedAsync();
+        _ = LoadPopularGamesAsync();
         Drop = drop;
         _fastFetch = settings.FastFetch;
         InitPageSize(settings.AddPageSize);
@@ -697,11 +743,86 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         var cts = _detailsCts = new CancellationTokenSource();
         try
         {
-            Details = await _api.GetDetailsAsync(card.AppId.ToString(), cts.Token);
+            var d = await _api.GetDetailsAsync(card.AppId.ToString(), cts.Token);
+            if (d is not null && card.IsDelisted) d.IsDelisted = true;
+            Details = d;
             OnPropertyChanged(nameof(GenresText));
+            FetchCommand.NotifyCanExecuteChanged();
         }
         catch (OperationCanceledException) { }
         catch { Details = null; }
+    }
+
+    [RelayCommand]
+    public void NextPopular()
+    {
+        if (PopularGames.Count == 0) return;
+        CurrentPopularIndex = (CurrentPopularIndex + 1) % PopularGames.Count;
+    }
+
+    [RelayCommand]
+    public void PrevPopular()
+    {
+        if (PopularGames.Count == 0) return;
+        CurrentPopularIndex = (CurrentPopularIndex - 1 + PopularGames.Count) % PopularGames.Count;
+    }
+
+    [RelayCommand]
+    public void SelectPopularIndex(int index)
+    {
+        if (index >= 0 && index < PopularGames.Count)
+        {
+            CurrentPopularIndex = index;
+        }
+    }
+
+    [RelayCommand]
+    public async Task OpenPopularGameAsync(PopularHeroGame? game)
+    {
+        if (game is null) return;
+        ResetResults();
+
+        _detailsCts?.Cancel();
+        var cts = _detailsCts = new CancellationTokenSource();
+        try
+        {
+            var d = await _api.GetDetailsAsync(game.AppId.ToString(), cts.Token);
+            Details = d;
+            OnPropertyChanged(nameof(GenresText));
+            FetchCommand.NotifyCanExecuteChanged();
+        }
+        catch (OperationCanceledException) { }
+        catch { Details = null; }
+    }
+
+    public async Task LoadPopularGamesAsync()
+    {
+        if (PopularGames.Count > 0) return;
+        var list = await _api.GetPopularGamesAsync();
+        foreach (var item in list)
+        {
+            PopularGames.Add(item);
+        }
+
+        OnPropertyChanged(nameof(HasPopularGames));
+        OnPropertyChanged(nameof(CurrentPopularGame));
+        OnPropertyChanged(nameof(ShowPopularCarousel));
+
+        if (PopularGames.Count > 0 && _carouselTimer is null)
+        {
+            _carouselTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(6)
+            };
+            _carouselTimer.Tick += (s, e) =>
+            {
+                if (ShowPopularCarousel)
+                {
+                    NextPopular();
+                }
+            };
+            _carouselTimer.Start();
+        }
     }
 
     /// <summary>Click a featured-strip card → load that game's details (same path as a search result).</summary>
@@ -744,7 +865,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 
     // ── Fetch (sources or DLC info, depending on app type) ─────────
 
-    private bool CanFetch() => HasDetails && !IsChecking;
+    private bool CanFetch() => HasDetails && !IsChecking && !IsDelistedGame;
 
     [RelayCommand(CanExecute = nameof(CanFetch))]
     private async Task FetchAsync()

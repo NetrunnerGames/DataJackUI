@@ -48,6 +48,16 @@ public class SteamFeaturedItem
     [JsonPropertyName("type")] public int Type { get; set; } // 0 = game; non-zero are bundles/etc., so skip
 }
 
+public class PopularHeroGame
+{
+    public long AppId { get; set; }
+    public string Name { get; set; } = "";
+    public int Rank { get; set; }
+    public int PeakInGame { get; set; }
+    public string HeroImage { get; set; } = "";
+    public string FormattedPlayers => $"{PeakInGame:N0} playing";
+}
+
 public class GameDetails
 {
     [JsonPropertyName("name")] public string Name { get; set; } = "";
@@ -58,6 +68,7 @@ public class GameDetails
     [JsonPropertyName("headerImage")] public string? HeaderImage { get; set; }
     [JsonPropertyName("releaseDate")] public string? ReleaseDate { get; set; }
     [JsonPropertyName("drmNotice")] public string? DrmNotice { get; set; }
+    [JsonPropertyName("isDelisted")] public bool IsDelisted { get; set; }
 
     [JsonIgnore] public bool IsDlc => string.Equals(Type, "dlc", StringComparison.OrdinalIgnoreCase);
     [JsonIgnore] public bool HasDenuvo => !string.IsNullOrEmpty(DrmNotice) && DrmNotice.Contains("Denuvo", StringComparison.OrdinalIgnoreCase);

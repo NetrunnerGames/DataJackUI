@@ -325,6 +325,9 @@ public static class Strings
     public static string Add_BackToSearch => Get(nameof(Add_BackToSearch));
     public static string Add_Featured_TopSellers => Get(nameof(Add_Featured_TopSellers));
     public static string Add_Featured_NewReleases => Get(nameof(Add_Featured_NewReleases));
+    public static string Add_PopularGames => Get(nameof(Add_PopularGames));
+    public static string Add_PopularNow => Get(nameof(Add_PopularNow));
+    public static string Add_PlayingNow => Get(nameof(Add_PlayingNow));
     public static string Add_Released => Get(nameof(Add_Released));
     public static string Add_Fetch => Get(nameof(Add_Fetch));
     public static string Add_Checking => Get(nameof(Add_Checking));

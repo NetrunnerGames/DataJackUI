@@ -150,6 +150,75 @@ public class DataJackUIApiClient
 
     /// <summary>Steam's top sellers (from global charts) and new releases lists for the Add page strips.
     /// Public, no auth required. Uses Cloudflare CDN for images.</summary>
+    /// <summary>
+    /// Fetches top most played games from ISteamChartsService/GetMostPlayedGames/v1
+    /// and resolves library_hero imagery + game names for the Add page carousel.
+    /// </summary>
+    public async Task<List<PopularHeroGame>> GetPopularGamesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var url = "https://api.steampowered.com/ISteamChartsService/GetMostPlayedGames/v1/";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+            using var resp = await _http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode) return [];
+
+            using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+
+            if (!doc.RootElement.TryGetProperty("response", out var r) ||
+                !r.TryGetProperty("ranks", out var ranks) ||
+                ranks.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+
+            var list = new List<PopularHeroGame>();
+            foreach (var rankItem in ranks.EnumerateArray())
+            {
+                if (!rankItem.TryGetProperty("appid", out var appidProp) || !appidProp.TryGetInt64(out var aid) || aid <= 0)
+                    continue;
+
+                int rank = rankItem.TryGetProperty("rank", out var rankProp) && rankProp.TryGetInt32(out var rVal) ? rVal : list.Count + 1;
+                int peak = rankItem.TryGetProperty("peak_in_game", out var peakProp) && peakProp.TryGetInt32(out var pVal) ? pVal : 0;
+
+                // Resolve name
+                string? name = _appList.GetName(aid);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    var cached = _appInfo.GetCached(aid);
+                    name = cached?.Name;
+                }
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = $"App {aid}";
+                }
+
+                // Primary wide hero image
+                string heroImg = $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{aid}/library_hero.jpg";
+
+                list.Add(new PopularHeroGame
+                {
+                    AppId = aid,
+                    Name = name,
+                    Rank = rank,
+                    PeakInGame = peak,
+                    HeroImage = heroImg
+                });
+
+                if (list.Count >= 10) break;
+            }
+
+            return list;
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     public async Task<(List<SteamFeaturedItem> TopSellers, List<SteamFeaturedItem> NewReleases)> GetFeaturedAsync(
         CancellationToken ct = default)
     {
