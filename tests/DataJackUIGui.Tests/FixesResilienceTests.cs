@@ -246,5 +246,4 @@ public class FixesResilienceTests
         Assert.NotNull(result);
         Assert.NotEmpty(result.Games);
     }
-
 }

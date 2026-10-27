@@ -102,5 +102,4 @@ public class BrowseSectionsTests
         Assert.Contains("578080", card.HeaderImage);
         Assert.Equal(card.HeaderImage, card.Cover);
     }
-
 }
