@@ -2,7 +2,9 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using DataJackUIGui.Models;
 using DataJackUIGui.Services.Downloads;
 
@@ -18,6 +20,8 @@ public record DownloadedFile(string FilePath, string FileName);
 /// <summary>Typed client for the DataJackUI backend API, authenticated with a Supabase bearer token.</summary>
 public class DataJackUIApiClient
 {
+    static DataJackUIApiClient() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
     private readonly HttpClient _http;
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
@@ -171,7 +175,9 @@ public class DataJackUIApiClient
                 {
                     string json = await File.ReadAllTextAsync(PopularCacheFile, ct);
                     var cachedList = JsonSerializer.Deserialize<List<PopularHeroGame>>(json);
-                    if (cachedList is { Count: > 0 })
+                    if (cachedList is { Count: > 0 } &&
+                        !cachedList.Any(g => g.AppId == 578080) &&
+                        !cachedList.Any(g => (g.AppId is 1867240 or 3393110) && g.HeroImage.EndsWith("/library_hero.jpg") && !g.HeroImage.Contains("/" + g.AppId + "/")))
                     {
                         // Check if local hero files exist for instant loading
                         foreach (var g in cachedList)
@@ -207,29 +213,35 @@ public class DataJackUIApiClient
                 return await LoadStalePopularCacheAsync(ct);
             }
 
-            var list = new List<PopularHeroGame>();
+            var candidates = new List<(long AppId, int Rank, int Peak)>();
             foreach (var rankItem in ranks.EnumerateArray())
             {
                 if (!rankItem.TryGetProperty("appid", out var appidProp) || !appidProp.TryGetInt64(out var aid) || aid <= 0)
                     continue;
 
-                int rank = rankItem.TryGetProperty("rank", out var rankProp) && rankProp.TryGetInt32(out var rVal) ? rVal : list.Count + 1;
+                // Exclude PUBG: BATTLEGROUNDS (578080) as a free game that doesn't need unlockers
+                if (aid == 578080) continue;
+
+                int rank = rankItem.TryGetProperty("rank", out var rankProp) && rankProp.TryGetInt32(out var rVal) ? rVal : candidates.Count + 1;
                 int peak = rankItem.TryGetProperty("peak_in_game", out var peakProp) && peakProp.TryGetInt32(out var pVal) ? pVal : 0;
+                candidates.Add((aid, rank, peak));
+                if (candidates.Count >= 10) break;
+            }
 
-                // Resolve name (including popular apps like Wallpaper Engine)
-                string? name = _appList.GetName(aid);
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    var cached = _appInfo.GetCached(aid);
-                    name = cached?.Name;
-                }
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    name = $"App {aid}";
-                }
+            // Batch resolve exact library hero artwork (with content hashes) and titles via Valve's IStoreBrowseService
+            var storeAssets = await FetchStoreBrowseHeroAssetsAsync(candidates.Select(c => c.AppId), ct);
 
-                // Primary wide hero image
-                string heroImg = $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{aid}/library_hero.jpg";
+            var list = new List<PopularHeroGame>();
+            foreach (var (aid, rank, peak) in candidates)
+            {
+                storeAssets.TryGetValue(aid, out var meta);
+
+                string? name = meta.Name;
+                if (string.IsNullOrWhiteSpace(name)) name = _appList.GetName(aid);
+                if (string.IsNullOrWhiteSpace(name)) name = _appInfo.GetCached(aid)?.Name;
+                if (string.IsNullOrWhiteSpace(name)) name = $"App {aid}";
+
+                string heroImg = meta.HeroUrl ?? $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{aid}/library_hero.jpg";
 
                 var game = new PopularHeroGame
                 {
@@ -263,6 +275,99 @@ public class DataJackUIApiClient
         }
     }
 
+    private sealed record StoreBrowseItemMeta(
+        string? Name,
+        string? HeroUrl,
+        bool IsFree,
+        bool Visible,
+        int Success,
+        int Type);
+
+    private async Task<Dictionary<long, StoreBrowseItemMeta>> FetchStoreBrowseMetadataAsync(
+        IEnumerable<long> appids, CancellationToken ct)
+    {
+        var result = new Dictionary<long, StoreBrowseItemMeta>();
+        try
+        {
+            var idList = appids.Select(id => new { appid = id }).ToList();
+            if (idList.Count == 0) return result;
+
+            var payload = new
+            {
+                ids = idList,
+                context = new { language = "english", country_code = "US" },
+                data_request = new { include_assets = true, include_basic_info = true }
+            };
+
+            string jsonStr = JsonSerializer.Serialize(payload);
+            string url = "https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=" + Uri.EscapeDataString(jsonStr);
+
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+            using var resp = await _http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode) return result;
+
+            using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+
+            if (doc.RootElement.TryGetProperty("response", out var r) &&
+                r.TryGetProperty("store_items", out var storeItems) &&
+                storeItems.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in storeItems.EnumerateArray())
+                {
+                    if (!item.TryGetProperty("appid", out var aidProp) || !aidProp.TryGetInt64(out var aid))
+                        continue;
+
+                    string? name = item.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : null;
+                    bool isFree = item.TryGetProperty("is_free", out var ifProp) && ifProp.ValueKind == JsonValueKind.True;
+                    bool visible = !item.TryGetProperty("visible", out var vProp) || vProp.ValueKind != JsonValueKind.False;
+                    int success = item.TryGetProperty("success", out var sProp) && sProp.TryGetInt32(out var sVal) ? sVal : 1;
+                    int type = item.TryGetProperty("type", out var tProp) && tProp.TryGetInt32(out var tVal) ? tVal : 0;
+
+                    string? heroUrl = null;
+                    if (item.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Object)
+                    {
+                        string? heroRel = null;
+                        if (assets.TryGetProperty("library_hero", out var heroProp) && heroProp.GetString() is { Length: > 0 } h)
+                            heroRel = h;
+                        else if (assets.TryGetProperty("library_hero_2x", out var h2x) && h2x.GetString() is { Length: > 0 } h2)
+                            heroRel = h2;
+                        else if (assets.TryGetProperty("hero_capsule", out var hc) && hc.GetString() is { Length: > 0 } hcStr)
+                            heroRel = hcStr;
+                        else if (assets.TryGetProperty("main_capsule_2x", out var mc2) && mc2.GetString() is { Length: > 0 } mc2Str)
+                            heroRel = mc2Str;
+                        else if (assets.TryGetProperty("main_capsule", out var mc) && mc.GetString() is { Length: > 0 } mcStr)
+                            heroRel = mcStr;
+
+                        if (heroRel is not null)
+                        {
+                            string fmt = assets.TryGetProperty("asset_url_format", out var fmtProp) && fmtProp.GetString() is { Length: > 0 } fStr
+                                ? fStr
+                                : $"steam/apps/{aid}/${{FILENAME}}";
+
+                            string rel = fmt.Replace("${FILENAME}", heroRel).Split('?')[0];
+                            heroUrl = $"https://shared.akamai.steamstatic.com/store_item_assets/{rel}";
+                        }
+                    }
+
+                    result[aid] = new StoreBrowseItemMeta(name, heroUrl, isFree, visible, success, type);
+                }
+            }
+        }
+        catch { /* best effort */ }
+
+        return result;
+    }
+
+    private async Task<Dictionary<long, (string? Name, string? HeroUrl)>> FetchStoreBrowseHeroAssetsAsync(
+        IEnumerable<long> appids, CancellationToken ct)
+    {
+        var metaDict = await FetchStoreBrowseMetadataAsync(appids, ct);
+        return metaDict.ToDictionary(kvp => kvp.Key, kvp => (kvp.Value.Name, kvp.Value.HeroUrl));
+    }
+
     private static async Task<List<PopularHeroGame>> LoadStalePopularCacheAsync(CancellationToken ct)
     {
         try
@@ -271,7 +376,279 @@ public class DataJackUIApiClient
             {
                 string json = await File.ReadAllTextAsync(PopularCacheFile, ct);
                 var cached = JsonSerializer.Deserialize<List<PopularHeroGame>>(json);
-                if (cached is { Count: > 0 }) return cached;
+                if (cached is { Count: > 0 })
+                {
+                    cached.RemoveAll(g => g.AppId == 578080);
+                    return cached;
+                }
+            }
+        }
+        catch { }
+        return [];
+    }
+
+    private static readonly string WeeklyTopSellersCacheFile =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui", "weekly_top_sellers_paid_global_cache.json");
+    private static readonly string LatestMonthHitsCacheFile =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui", "latest_month_hits_paid_cache.json");
+    private static readonly TimeSpan BrowseCacheMaxAge = TimeSpan.FromHours(4);
+
+    public async Task<List<StoreBrowseItem>> GetWeeklyTopSellersAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            if (File.Exists(WeeklyTopSellersCacheFile))
+            {
+                var fi = new FileInfo(WeeklyTopSellersCacheFile);
+                if (DateTime.UtcNow - fi.LastWriteTimeUtc < BrowseCacheMaxAge)
+                {
+                    string json = await File.ReadAllTextAsync(WeeklyTopSellersCacheFile, ct);
+                    var cachedList = JsonSerializer.Deserialize<List<StoreBrowseItem>>(json);
+                    if (cachedList is { Count: > 0 })
+                    {
+                        return cachedList;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        try
+        {
+            var payload = new
+            {
+                context = new { country_code = "WW" },
+                data_request = new { include_assets = true, include_basic_info = true },
+                page_start = 0,
+                page_count = 35
+            };
+            string jsonPayload = JsonSerializer.Serialize(payload);
+            string url = "https://api.steampowered.com/IStoreTopSellersService/GetWeeklyTopSellers/v1/?input_json=" + Uri.EscapeDataString(jsonPayload);
+
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+            using var resp = await _http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                return await LoadStaleBrowseCacheAsync(WeeklyTopSellersCacheFile, ct);
+            }
+
+            using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+
+            if (!doc.RootElement.TryGetProperty("response", out var r) ||
+                !r.TryGetProperty("ranks", out var ranks) ||
+                ranks.ValueKind != JsonValueKind.Array)
+            {
+                return await LoadStaleBrowseCacheAsync(WeeklyTopSellersCacheFile, ct);
+            }
+
+            var list = new List<StoreBrowseItem>();
+            foreach (var rankItem in ranks.EnumerateArray())
+            {
+                if (!rankItem.TryGetProperty("appid", out var appidProp) || !appidProp.TryGetInt64(out var aid) || aid <= 0)
+                    continue;
+
+                // Skip hardware (e.g. Steam Deck 1675200)
+                if (aid == 1675200) continue;
+
+                bool isFree = false;
+                bool isVisible = true;
+                int itemType = 0;
+                string? name = null;
+
+                if (rankItem.TryGetProperty("item", out var itemProp))
+                {
+                    if (itemProp.TryGetProperty("is_free", out var fProp) && fProp.ValueKind == JsonValueKind.True)
+                        isFree = true;
+                    if (itemProp.TryGetProperty("visible", out var vProp) && vProp.ValueKind == JsonValueKind.False)
+                        isVisible = false;
+                    if (itemProp.TryGetProperty("type", out var tProp) && tProp.TryGetInt32(out var tVal))
+                        itemType = tVal;
+                    if (itemProp.TryGetProperty("name", out var nameProp))
+                        name = nameProp.GetString();
+                }
+
+                // Strictly filter out free-to-play games
+                if (isFree) continue;
+
+                // Skip delisted or hidden items, and non-game items (hardware, etc.)
+                if (!isVisible || itemType != 0) continue;
+                if (SteamDelistedHelper.CheckDelistedFast(aid) == true) continue;
+
+                if (string.IsNullOrWhiteSpace(name)) name = _appList.GetName(aid);
+                if (string.IsNullOrWhiteSpace(name)) name = _appInfo.GetCached(aid)?.Name;
+                if (string.IsNullOrWhiteSpace(name)) name = $"App {aid}";
+
+                string coverUrl = $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{aid}/header.jpg";
+
+                list.Add(new StoreBrowseItem
+                {
+                    AppId = aid,
+                    Name = name,
+                    CoverUrl = coverUrl
+                });
+
+                if (list.Count >= 10) break;
+            }
+
+            try
+            {
+                string dir = Path.GetDirectoryName(WeeklyTopSellersCacheFile)!;
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                string json = JsonSerializer.Serialize(list);
+                await File.WriteAllTextAsync(WeeklyTopSellersCacheFile, json, ct);
+            }
+            catch { }
+
+            return list;
+        }
+        catch
+        {
+            return await LoadStaleBrowseCacheAsync(WeeklyTopSellersCacheFile, ct);
+        }
+    }
+
+    public async Task<List<StoreBrowseItem>> GetLatestMonthHitsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            if (File.Exists(LatestMonthHitsCacheFile))
+            {
+                var fi = new FileInfo(LatestMonthHitsCacheFile);
+                if (DateTime.UtcNow - fi.LastWriteTimeUtc < BrowseCacheMaxAge)
+                {
+                    string json = await File.ReadAllTextAsync(LatestMonthHitsCacheFile, ct);
+                    var cachedList = JsonSerializer.Deserialize<List<StoreBrowseItem>>(json);
+                    if (cachedList is { Count: > 0 })
+                    {
+                        return cachedList;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        try
+        {
+            var now = DateTime.UtcNow;
+            var currentMonthDate = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            long rtime = new DateTimeOffset(currentMonthDate).ToUnixTimeSeconds();
+
+            var appIds = await FetchMonthTopAppReleasesAppIdsAsync(rtime, ct);
+            if (appIds.Count == 0)
+            {
+                var prevDate = currentMonthDate.AddMonths(-1);
+                if (prevDate.Year == now.Year)
+                {
+                    long prevRtime = new DateTimeOffset(prevDate).ToUnixTimeSeconds();
+                    appIds = await FetchMonthTopAppReleasesAppIdsAsync(prevRtime, ct);
+                }
+            }
+
+            if (appIds.Count == 0)
+            {
+                return await LoadStaleBrowseCacheAsync(LatestMonthHitsCacheFile, ct);
+            }
+
+            // Fetch metadata for candidates (up to 35) to filter out free and delisted games
+            var candidateIds = appIds.Take(35).ToList();
+            var storeMeta = await FetchStoreBrowseMetadataAsync(candidateIds, ct);
+
+            var list = new List<StoreBrowseItem>();
+            foreach (var aid in candidateIds)
+            {
+                if (aid == 1675200) continue;
+                if (SteamDelistedHelper.CheckDelistedFast(aid) == true) continue;
+
+                if (storeMeta.TryGetValue(aid, out var meta))
+                {
+                    // Filter out free-to-play games
+                    if (meta.IsFree) continue;
+
+                    // Filter out delisted or hidden or non-game items
+                    if (!meta.Visible || meta.Success != 1 || meta.Type != 0) continue;
+                }
+
+                string? name = meta?.Name;
+                if (string.IsNullOrWhiteSpace(name)) name = _appList.GetName(aid);
+                if (string.IsNullOrWhiteSpace(name)) name = _appInfo.GetCached(aid)?.Name;
+                if (string.IsNullOrWhiteSpace(name)) name = $"App {aid}";
+
+                string coverUrl = $"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{aid}/header.jpg";
+
+                list.Add(new StoreBrowseItem
+                {
+                    AppId = aid,
+                    Name = name,
+                    CoverUrl = coverUrl
+                });
+
+                if (list.Count >= 10) break;
+            }
+
+            try
+            {
+                string dir = Path.GetDirectoryName(LatestMonthHitsCacheFile)!;
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                string json = JsonSerializer.Serialize(list);
+                await File.WriteAllTextAsync(LatestMonthHitsCacheFile, json, ct);
+            }
+            catch { }
+
+            return list;
+        }
+        catch
+        {
+            return await LoadStaleBrowseCacheAsync(LatestMonthHitsCacheFile, ct);
+        }
+    }
+
+    private async Task<List<long>> FetchMonthTopAppReleasesAppIdsAsync(long rtimeMonth, CancellationToken ct)
+    {
+        var result = new List<long>();
+        try
+        {
+            string url = $"https://api.steampowered.com/ISteamChartsService/GetMonthTopAppReleases/v1/?rtime_month={rtimeMonth}";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+            using var resp = await _http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode) return result;
+
+            using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+
+            if (doc.RootElement.TryGetProperty("response", out var r) &&
+                r.TryGetProperty("top_combined_app_and_dlc_releases", out var releases) &&
+                releases.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in releases.EnumerateArray())
+                {
+                    if (item.TryGetProperty("appid", out var aidProp) && aidProp.TryGetInt64(out var aid) && aid > 0)
+                    {
+                        result.Add(aid);
+                    }
+                }
+            }
+        }
+        catch { }
+        return result;
+    }
+
+    private static async Task<List<StoreBrowseItem>> LoadStaleBrowseCacheAsync(string cacheFile, CancellationToken ct)
+    {
+        try
+        {
+            if (File.Exists(cacheFile))
+            {
+                string json = await File.ReadAllTextAsync(cacheFile, ct);
+                var cached = JsonSerializer.Deserialize<List<StoreBrowseItem>>(json);
+                if (cached is { Count: > 0 })
+                {
+                    return cached;
+                }
             }
         }
         catch { }
@@ -1204,6 +1581,112 @@ public class DataJackUIApiClient
         return null;
     }
 
+    /// <summary>
+    /// Checks whether a game has "Online Fix" and/or "Bypass" fixes available.
+    /// Queries /api/game-fixes (proxied via worker with DepotBox API key) and checks the online-fix scraper.
+    /// </summary>
+    public async Task<(bool HasBypass, bool HasOnlineFix)> CheckGameFixBadgesAsync(
+        string appid, string? gameName = null, CancellationToken ct = default)
+    {
+        bool hasBypass = false;
+        bool hasOnline = false;
+
+        if (string.IsNullOrWhiteSpace(appid)) return (false, false);
+
+        var endpoints = new[]
+        {
+            $"{AppConfig.ApiBaseUrl}/api/game-fixes?tag=bypass,online&q={Uri.EscapeDataString(appid)}",
+            $"{AppConfig.ApiBaseUrl}/api/depotbox/api/game-fixes?tag=bypass,online&q={Uri.EscapeDataString(appid)}"
+        };
+
+        foreach (var endpoint in endpoints)
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+                if (_auth.IsSignedIn)
+                {
+                    try
+                    {
+                        string? token = await _auth.GetValidAccessTokenAsync();
+                        if (!string.IsNullOrEmpty(token))
+                            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                    }
+                    catch { }
+                }
+
+                using var res = await _http.SendAsync(req, ct);
+                if (res.IsSuccessStatusCode)
+                {
+                    string json = await res.Content.ReadAsStringAsync(ct);
+                    using var doc = JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+
+                    void CheckElementTags(JsonElement elem)
+                    {
+                        if (elem.TryGetProperty("tags", out var tagsProp))
+                        {
+                            if (tagsProp.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var t in tagsProp.EnumerateArray())
+                                {
+                                    string? id = null;
+                                    if (t.ValueKind == JsonValueKind.String) id = t.GetString();
+                                    else if (t.ValueKind == JsonValueKind.Object)
+                                    {
+                                        if (t.TryGetProperty("id", out var idProp)) id = idProp.GetString();
+                                        else if (t.TryGetProperty("slug", out var sProp)) id = sProp.GetString();
+                                        else if (t.TryGetProperty("name", out var nProp)) id = nProp.GetString();
+                                    }
+                                    if (string.Equals(id, "bypass", StringComparison.OrdinalIgnoreCase)) hasBypass = true;
+                                    if (string.Equals(id, "online", StringComparison.OrdinalIgnoreCase) ||
+                                        string.Equals(id, "onlinefix", StringComparison.OrdinalIgnoreCase)) hasOnline = true;
+                                }
+                            }
+                            else if (tagsProp.ValueKind == JsonValueKind.String)
+                            {
+                                string str = tagsProp.GetString() ?? "";
+                                if (str.Contains("bypass", StringComparison.OrdinalIgnoreCase)) hasBypass = true;
+                                if (str.Contains("online", StringComparison.OrdinalIgnoreCase)) hasOnline = true;
+                            }
+                        }
+                    }
+
+                    if (root.ValueKind == JsonValueKind.Object)
+                    {
+                        CheckElementTags(root);
+                        if (root.TryGetProperty("fixes", out var fixesProp) && fixesProp.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var f in fixesProp.EnumerateArray())
+                            {
+                                CheckElementTags(f);
+                            }
+                        }
+                        if (root.TryGetProperty("games", out var gamesProp) && gamesProp.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var g in gamesProp.EnumerateArray())
+                            {
+                                CheckElementTags(g);
+                            }
+                        }
+                    }
+                    else if (root.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var item in root.EnumerateArray())
+                        {
+                            CheckElementTags(item);
+                        }
+                    }
+
+                    if (hasBypass || hasOnline) break;
+                }
+            }
+            catch { }
+        }
+
+        return (hasBypass, hasOnline);
+    }
+
     /// <summary>Downloads a fix archive from DepotBox /api/game-fixes/download or a manifest zip.</summary>
     public async Task<DownloadedFile> DownloadDenuvoAsync(
         string fixId, string slot, string fallbackName,
@@ -1216,6 +1699,10 @@ public class DataJackUIApiClient
             string manifestUrl = $"{AppConfig.ApiBaseUrl}/api/manifest/download?appid={Uri.EscapeDataString(effectiveAppId)}";
             return await DownloadFileAsync(manifestUrl, $"{effectiveAppId}.zip", progress, ct);
         }
+
+        // Scraped online-fix.me fixes: direct hoster download, no depotbox/worker involvement.
+        if (fixId.Contains("_ofme_", StringComparison.Ordinal))
+            return await DownloadOnlineFixAsync(parsedAppId, fallbackName, progress, ct);
 
         string proxyUrl = $"{AppConfig.ApiBaseUrl}/api/depotbox/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}&appid={parsedAppId}";
         try
@@ -1239,6 +1726,185 @@ public class DataJackUIApiClient
         // Direct fallback endpoint if worker is unreachable
         string directUrl = $"https://depotbox.org/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
         return await DownloadFromUrlAsync(directUrl, fallbackName, progress, ct);
+    }
+
+    // ── Online-fix.me scraping (fixes tagged "online") ───────────────
+
+    private const string OnlineFixReferer = "https://online-fix.me/";
+    private const string OnlineFixUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+    private readonly object _ofLock = new();
+    private readonly Dictionary<long, OnlineFixScrapeResult?> _ofCache = new();
+
+    public sealed record OnlineFixScrapeResult(
+        string SearchName, string Title, string ArticleUrl, string VersionStr, string? DirectFixUrl, string? FixFileName);
+
+    /// <summary>
+    /// Finds the game's article on online-fix.me and scrapes its game version + direct fix download link.
+    /// Result is cached per appid for the session (including negative results).
+    /// </summary>
+    public async Task<OnlineFixScrapeResult?> ScrapeOnlineFixForGameAsync(long appId, string gameName, CancellationToken ct = default)
+    {
+        if (appId <= 0) return null;
+        lock (_ofLock) { if (_ofCache.TryGetValue(appId, out var hit)) return hit; }
+
+        OnlineFixScrapeResult? result = null;
+        try
+        {
+            string name = string.IsNullOrWhiteSpace(gameName) ? $"App {appId}" : gameName;
+            string? articleUrl = await SearchOnlineFixArticleAsync(name, ct);
+            if (articleUrl is not null)
+                result = await ScrapeOnlineFixArticleAsync(articleUrl, name, ct);
+        }
+        catch { }
+
+        lock (_ofLock) _ofCache[appId] = result;
+        return result;
+    }
+
+    private async Task<string?> SearchOnlineFixArticleAsync(string gameName, CancellationToken ct)
+    {
+        string url = $"https://online-fix.me/index.php?do=search&subaction=search&story={Uri.EscapeDataString(gameName)}";
+        string html = await GetOnlineFixHtmlAsync(url, ct);
+        if (html.Length == 0) return null;
+
+        var match = Regex.Match(html, "href=\"(?:https?://online-fix\\.me)?(/games/[^\"]+\\.html)\"", RegexOptions.IgnoreCase);
+        return match.Success ? $"https://online-fix.me{match.Groups[1].Value}" : null;
+    }
+
+    private async Task<OnlineFixScrapeResult?> ScrapeOnlineFixArticleAsync(string articleUrl, string searchName, CancellationToken ct)
+    {
+        string html = await GetOnlineFixHtmlAsync(articleUrl, ct);
+        if (html.Length == 0) return null;
+
+        // "Игра через: Steam" is usable; "Microsoft Store" games need GDK fixes — never list those.
+        var platformMatch = Regex.Match(html, "Игра через:\\s*(?:<[^>]+>\\s*)*([А-Яа-яЁёA-Za-z ]+)", RegexOptions.IgnoreCase);
+        if (platformMatch.Success)
+        {
+            string platform = platformMatch.Groups[1].Value.Trim();
+            if (platform.Contains("Microsoft", StringComparison.OrdinalIgnoreCase) ||
+                platform.Contains("Store", StringComparison.OrdinalIgnoreCase))
+                return null;
+        }
+
+        string title = "";
+        var titleMatch = Regex.Match(html, "<h1[^>]*>(?:\\s*<[^>]+>)*([^<]+)", RegexOptions.IgnoreCase);
+        if (titleMatch.Success) title = titleMatch.Groups[1].Value.Trim();
+
+        string versionStr = "";
+        var m = Regex.Match(html, "<b>\\s*(?:Game version|Версия игры|Версия):\\s*([^<]+)</b>", RegexOptions.IgnoreCase);
+        if (!m.Success) m = Regex.Match(html, "<b>\\s*(Build[^<]+)</b>", RegexOptions.IgnoreCase);
+        if (!m.Success) m = Regex.Match(html, "Версия игры:\\s*([0-9a-zA-Z\\._\\-]+)", RegexOptions.IgnoreCase);
+        if (m.Success)
+        {
+            string raw = m.Groups[1].Value.Trim();
+            versionStr = Regex.IsMatch(raw, "^(?:Game version|Версия игры|Версия):", RegexOptions.IgnoreCase)
+                ? Regex.Replace(raw, "^(?:Версия игры|Версия):", "Game version:", RegexOptions.IgnoreCase).Trim()
+                : $"Game version: {raw}";
+        }
+
+        string? direct = null, fileName = null;
+        var hosterMatch = Regex.Match(html, "href=\"(https://hosters\\.online-fix\\.me:2053/[^\"]+)\"", RegexOptions.IgnoreCase);
+        if (hosterMatch.Success)
+        {
+            string hosterUrl = hosterMatch.Groups[1].Value.Replace("&amp;", "&");
+            string hosterHtml = await GetOnlineFixHtmlAsync(hosterUrl, ct);
+            hosterHtml = hosterHtml.Replace("&quot;", "\"").Replace("&amp;", "&");
+
+            // The fix archive may only be mirrored on one of the hosts: collect candidates from every
+            // data-links block, drop GDK (Microsoft Store) helper files, then pick by priority.
+            var candidates = new List<(string FileName, string DirectLink)>();
+            foreach (Match lm in Regex.Matches(hosterHtml, "data-links=['\"](\\[\\{[\\s\\S]*?\\}\\])['\"]", RegexOptions.IgnoreCase))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(lm.Groups[1].Value);
+                    foreach (var item in doc.RootElement.EnumerateArray())
+                    {
+                        string? fn = item.TryGetProperty("file_name", out var f) && f.ValueKind == JsonValueKind.String ? f.GetString() : null;
+                        string? dl = item.TryGetProperty("direct_link", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;
+                        if (string.IsNullOrEmpty(fn) || string.IsNullOrEmpty(dl)) continue;
+                        if (fn.ToLowerInvariant().Contains("gdkhelper")) continue; // MS Store fix — needs the whole game, not usable on Steam
+                        candidates.Add((fn, dl));
+                    }
+                }
+                catch { }
+            }
+
+            // Prefer an explicit fix/repair archive, then the OFME release parts, then anything.
+            string? chosen = candidates.FirstOrDefault(c => c.FileName.ToLowerInvariant().Contains("fix_repair")).FileName
+                ?? candidates.FirstOrDefault(c => { string l = c.FileName.ToLowerInvariant(); return l.Contains("fix") && !l.Contains("ofme"); }).FileName
+                ?? candidates.FirstOrDefault(c => c.FileName.ToLowerInvariant().Contains("ofme")).FileName
+                ?? candidates.FirstOrDefault().FileName;
+
+            if (chosen is not null)
+            {
+                fileName = chosen;
+                string dl = candidates.First(c => c.FileName == chosen).DirectLink;
+                direct = dl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                    ? dl
+                    : $"https://hosters.online-fix.me:2053/{dl.TrimStart('/')}";
+            }
+        }
+
+        if (string.IsNullOrEmpty(title))
+        {
+            title = Uri.UnescapeDataString(articleUrl.Split('/').LastOrDefault() ?? "Online Fix");
+            title = Regex.Replace(title, "^\\d+-", "").Replace(".html", "").Replace('-', ' ').Trim();
+        }
+
+        return new OnlineFixScrapeResult(searchName, title, articleUrl, versionStr, direct, fileName);
+    }
+
+    private async Task<string> GetOnlineFixHtmlAsync(string url, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.UserAgent.ParseAdd(OnlineFixUserAgent);
+            req.Headers.Referrer = new Uri(OnlineFixReferer);
+            using var res = await _http.SendAsync(req, ct);
+            if (!res.IsSuccessStatusCode) return "";
+            byte[] bytes = await res.Content.ReadAsByteArrayAsync(ct);
+            try { return Encoding.GetEncoding(1251).GetString(bytes); }
+            catch { return Encoding.UTF8.GetString(bytes); }
+        }
+        catch { return ""; }
+    }
+
+    /// <summary>Downloads the scraped online-fix.me direct link (with the UA/Referer the hoster requires).</summary>
+    private async Task<DownloadedFile> DownloadOnlineFixAsync(
+        long appId, string fallbackName, IProgress<DownloadProgress>? progress, CancellationToken ct)
+    {
+        OnlineFixScrapeResult? scrape;
+        lock (_ofLock) _ofCache.TryGetValue(appId, out scrape);
+
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            string searchName = scrape?.SearchName ?? $"App {appId}";
+            scrape ??= await ScrapeOnlineFixForGameAsync(appId, searchName, ct);
+            if (scrape?.DirectFixUrl is not { } url)
+                throw new InvalidOperationException($"No online-fix.me fix link found for '{searchName}'");
+
+            string fileName = string.IsNullOrWhiteSpace(scrape.FixFileName) ? fallbackName : scrape.FixFileName!;
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.UserAgent.ParseAdd(OnlineFixUserAgent);
+                req.Headers.Referrer = new Uri(OnlineFixReferer);
+                using var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+                if (res.IsSuccessStatusCode)
+                    return await HttpFileDownloader.SaveResponseAsync(res, fileName, progress, ct);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { }
+
+            // Link likely expired: drop the cache and re-scrape once.
+            lock (_ofLock) _ofCache.Remove(appId);
+            scrape = null;
+        }
+
+        throw new InvalidOperationException("Online-fix.me download failed");
     }
 
     // ── Plumbing ────────────────────────────────────────────────────

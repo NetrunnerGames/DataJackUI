@@ -153,9 +153,9 @@ public partial class FixGameCardVm : ObservableObject
             string? local = appid > 0 ? covers.GetLocalPath(appid) : null;
             if (local is null)
             {
-                string rawUrl = !string.IsNullOrWhiteSpace(HeaderImage)
-                    ? HeaderImage!
-                    : (appid > 0 ? SteamAppInfoCache.GuessHeaderImageUrl(appid) : "");
+                string rawUrl = appid > 0
+                    ? $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg"
+                    : (!string.IsNullOrWhiteSpace(HeaderImage) ? HeaderImage! : "");
 
                 if (!string.IsNullOrWhiteSpace(rawUrl))
                 {
@@ -589,15 +589,34 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         IsLoadingFixes = true;
         try
         {
-            var data = await api.GetDenuvoFixesAsync(game.AppId);
-            if (data is null || data.Fixes.Count == 0)
-            {
-                data = DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
-            }
-            else if (data.Name.StartsWith("App ", StringComparison.OrdinalIgnoreCase) && !game.HasPlaceholderName)
+            var data = await api.GetDenuvoFixesAsync(game.AppId) ?? DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
+            if (data.Name.StartsWith("App ", StringComparison.OrdinalIgnoreCase) && !game.HasPlaceholderName)
             {
                 data.Name = game.Name;
             }
+
+            // Depotbox "online"-tagged fixes are replaced by ones scraped live from online-fix.me.
+            data.Fixes.RemoveAll(f => f.Tags.Any(t => string.Equals(t.Id, "online", StringComparison.OrdinalIgnoreCase)));
+            try
+            {
+                if (long.TryParse(game.AppId, out long ofId) && !string.IsNullOrWhiteSpace(game.Name))
+                {
+                    var of = await api.ScrapeOnlineFixForGameAsync(ofId, game.Name);
+                    if (of?.DirectFixUrl is not null)
+                    {
+                        data.Fixes.Add(new DenuvoFix
+                        {
+                            Id = $"{ofId}_ofme_0",
+                            Title = of.Title,
+                            Description = of.VersionStr,
+                            FixFilename = of.FixFileName,
+                            Tags = [new DenuvoTag { Id = "online", Name = "Online Fix", Slug = "online" }]
+                        });
+                    }
+                }
+            }
+            catch { }
+
             await ProcessGameDataAsync(game, data);
         }
         catch

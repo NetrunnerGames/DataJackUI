@@ -73,6 +73,13 @@ public class PopularHeroGame : CommunityToolkit.Mvvm.ComponentModel.ObservableOb
     public string FormattedPlayers => $"{PeakInGame:N0} playing";
 }
 
+public class StoreBrowseItem
+{
+    public long AppId { get; set; }
+    public string Name { get; set; } = "";
+    public string? CoverUrl { get; set; }
+}
+
 public class GameDetails
 {
     [JsonPropertyName("name")] public string Name { get; set; } = "";

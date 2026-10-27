@@ -138,6 +138,51 @@
                 </Button.Template>
             </Button>
         </DataTemplate>
+        <!-- Shared card template for browse sections (Weekly Top Sellers & Latest Month Hits), styled like Home Recently Added -->
+        <DataTemplate x:Key="BrowseGameCardTemplate">
+            <Button
+                Margin="0,0,12,12"
+                Padding="0"
+                Command="{Binding DataContext.SelectResultCommand, ElementName=Root}"
+                CommandParameter="{Binding}"
+                Cursor="Hand"
+                ToolTip="{Binding Name}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border
+                            x:Name="Card"
+                            Width="170"
+                            Background="#0DFFFFFF"
+                            BorderBrush="#14FFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="10">
+                            <StackPanel>
+                                <Border
+                                    Height="80"
+                                    Background="#11FFFFFF"
+                                    ClipToBounds="True"
+                                    CornerRadius="10,10,0,0">
+                                    <Image Source="{Binding Cover, Converter={StaticResource ImagePathToSource}}" Stretch="UniformToFill" />
+                                </Border>
+                                <TextBlock
+                                    Margin="10,8,10,10"
+                                    FontSize="12.5"
+                                    FontWeight="SemiBold"
+                                    Foreground="#e5e7eb"
+                                    Text="{Binding Name}"
+                                    TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Card" Property="Background" Value="#18FFFFFF" />
+                                <Setter TargetName="Card" Property="BorderBrush" Value="#33FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid x:Name="Root">
@@ -373,6 +418,58 @@
                 </Grid>
             </Border>
 
+            <!-- Weekly Top Sellers -->
+            <StackPanel Margin="0,20,0,0" Visibility="{Binding ShowWeeklyTopSellers, Converter={StaticResource BoolToVis}}">
+                <TextBlock
+                    FontSize="15"
+                    FontWeight="SemiBold"
+                    Foreground="#e5e7eb"
+                    Text="{x:Static res:Strings.Add_WeeklyTopSellers}" />
+                <ScrollViewer
+                    x:Name="WeeklyTopSellersScroller"
+                    Margin="0,12,0,0"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Disabled"
+                    PreviewMouseWheel="FeaturedStrip_PreviewMouseWheel"
+                    Focusable="False">
+                    <ItemsControl
+                        ItemsSource="{Binding WeeklyTopSellers}"
+                        ItemTemplate="{StaticResource BrowseGameCardTemplate}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+
+            <!-- Latest Month Hits -->
+            <StackPanel Margin="0,14,0,0" Visibility="{Binding ShowLatestMonthHits, Converter={StaticResource BoolToVis}}">
+                <TextBlock
+                    FontSize="15"
+                    FontWeight="SemiBold"
+                    Foreground="#e5e7eb"
+                    Text="{x:Static res:Strings.Add_LatestMonthHits}" />
+                <ScrollViewer
+                    x:Name="LatestMonthHitsScroller"
+                    Margin="0,12,0,0"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Disabled"
+                    PreviewMouseWheel="FeaturedStrip_PreviewMouseWheel"
+                    Focusable="False">
+                    <ItemsControl
+                        ItemsSource="{Binding LatestMonthHits}"
+                        ItemTemplate="{StaticResource BrowseGameCardTemplate}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+
             <!-- Search result game grid -->
             <ItemsControl
                 x:Name="CardScroller"
@@ -562,13 +659,54 @@
                 CornerRadius="8"
                 Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
                 <StackPanel>
-                    <Border
-                        Height="280"
-                        CornerRadius="8,8,0,0">
-                        <Border.Background>
-                            <ImageBrush ImageSource="{Binding Details.HeaderImage, Converter={StaticResource ImagePathToSource}}" Stretch="UniformToFill" />
-                        </Border.Background>
-                    </Border>
+                    <Grid Height="280">
+                        <Border
+                            CornerRadius="8,8,0,0">
+                            <Border.Background>
+                                <ImageBrush ImageSource="{Binding Details.HeaderImage, Converter={StaticResource ImagePathToSource}}" Stretch="UniformToFill" />
+                            </Border.Background>
+                        </Border>
+
+                        <!-- Fix badges on top-right edge of banner ("Online Fix", "Bypass") -->
+                        <StackPanel
+                            Margin="0,14,14,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Orientation="Horizontal">
+                            <!-- Online Fix badge -->
+                            <Border
+                                Margin="0,0,8,0"
+                                Padding="10,4.5"
+                                Background="#E6064E3B"
+                                BorderBrush="#9934D399"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                ToolTip="{x:Static res:Strings.OnlineFix_Title}"
+                                Visibility="{Binding HasOnlineFix, Converter={StaticResource BoolToVis}}">
+                                <TextBlock
+                                    FontSize="11.5"
+                                    FontWeight="SemiBold"
+                                    Foreground="#6EE7B7"
+                                    Text="Online Fix" />
+                            </Border>
+
+                            <!-- Bypass badge -->
+                            <Border
+                                Padding="10,4.5"
+                                Background="#E62E1065"
+                                BorderBrush="#99A78BFA"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                ToolTip="Bypass Fix"
+                                Visibility="{Binding HasBypassFix, Converter={StaticResource BoolToVis}}">
+                                <TextBlock
+                                    FontSize="11.5"
+                                    FontWeight="SemiBold"
+                                    Foreground="#C4B5FD"
+                                    Text="Bypass" />
+                            </Border>
+                        </StackPanel>
+                    </Grid>
                     <StackPanel Margin="12,8,12,10">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock
@@ -1064,16 +1202,7 @@
                     TextWrapping="Wrap" />
             </StackPanel>
 
-            <!-- Already have files? Drag them in -->
-            <StackPanel Visibility="{Binding HasDetails, Converter={StaticResource InverseBoolToVis}}">
-                <TextBlock
-                    Margin="0,24,0,0"
-                    FontSize="13"
-                    FontWeight="SemiBold"
-                    Foreground="#d1d5db"
-                    Text="{x:Static res:Strings.Add_AlreadyHaveFiles}" />
-                <views:DropZone Margin="0,8,0,0" DataContext="{Binding Drop}" />
-            </StackPanel>
+
         </StackPanel>
     </ScrollViewer>
 
@@ -1352,7 +1481,6 @@
         </Border>
     </Grid>
 
-    <!-- Drag-and-drop overwrite confirm (the DropZone's own flow), page-spanning. -->
-    <views:ConfirmOverlay DataContext="{Binding Drop}" />
+
     </Grid>
 </UserControl>

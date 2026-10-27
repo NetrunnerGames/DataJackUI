@@ -70,6 +70,7 @@
   <data name="Nav_RestartSteam" xml:space="preserve"><value>Restart Steam</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="Nav_SignInDiscord" xml:space="preserve"><value>Sign in with Discord</value></data>
+  <data name="Nav_SignInGoogle" xml:space="preserve"><value>Sign in with Google</value></data>
   <data name="Nav_WaitingForBrowser" xml:space="preserve"><value>Waiting for browser…</value></data>
   <data name="Nav_Footer_Guest" xml:space="preserve"><value>Browsing as Guest</value></data>
   <data name="Nav_Footer_LoggedIn" xml:space="preserve"><value>Logged In</value></data>
@@ -153,7 +154,7 @@
 
   <!-- ── Home ── -->
   <data name="Home_Welcome" xml:space="preserve"><value>Welcome to DataJackUI</value></data>
-  <data name="Home_LuasOnBoard" xml:space="preserve"><value>Luas on board</value></data>
+  <data name="Home_LuasOnBoard" xml:space="preserve"><value>Games on board</value></data>
   <data name="Home_LastAdded" xml:space="preserve"><value>LAST ADDED</value></data>
   <data name="Home_PluginStatus" xml:space="preserve"><value>Plugin Status</value></data>
   <data name="Home_RecentlyAdded" xml:space="preserve"><value>Recently added</value></data>
@@ -400,6 +401,8 @@ This deletes the .lua files from Steam\config\stplug-in.</value></data>
   <data name="Add_Generating" xml:space="preserve"><value>Generating…</value></data>
   <data name="Add_DlcHint" xml:space="preserve"><value>Put the .lua into steam\config\stplug-in, and make sure the base game is added too. Counts toward your daily limit (25/day).</value></data>
   <data name="Add_AlreadyHaveFiles" xml:space="preserve"><value>Already have the files?</value></data>
+  <data name="Add_WeeklyTopSellers" xml:space="preserve"><value>Weekly Top Sellers</value></data>
+  <data name="Add_LatestMonthHits" xml:space="preserve"><value>Latest Month Hits</value></data>
   <!-- Add / Download C# strings -->
   <data name="Add_SignIn_Dlc" xml:space="preserve"><value>Sign in with Discord to view DLC unlocks.</value></data>
   <data name="Add_SignIn_Download" xml:space="preserve"><value>Sign in with Discord to download.</value></data>

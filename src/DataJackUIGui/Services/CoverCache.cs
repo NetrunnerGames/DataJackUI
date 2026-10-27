@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace DataJackUIGui.Services;
 
@@ -71,20 +72,49 @@ public class CoverCache
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(remoteUrl)) return null;
-                string sanitizedUrl = SteamCdnUrl.Sanitize(remoteUrl) ?? remoteUrl;
-                byte[] bytes = await _http.GetByteArrayAsync(sanitizedUrl, ct);
-                if (bytes.Length >= MinValidBytes && IsValidImage(bytes) && !IsHeaderCapsulePlaceholder(bytes))
+                if (!string.IsNullOrWhiteSpace(remoteUrl))
                 {
-                    await _ioGate.WaitAsync(ct);
+                    string sanitizedUrl = SteamCdnUrl.Sanitize(remoteUrl) ?? remoteUrl;
                     try
                     {
-                        Directory.CreateDirectory(HeroesDir);
-                        await File.WriteAllBytesAsync(path, bytes, ct);
-                        return path;
+                        byte[] bytes = await _http.GetByteArrayAsync(sanitizedUrl, ct);
+                        if (bytes.Length >= MinValidBytes && IsValidImage(bytes) && !IsHeaderCapsulePlaceholder(bytes))
+                        {
+                            await _ioGate.WaitAsync(ct);
+                            try
+                            {
+                                Directory.CreateDirectory(HeroesDir);
+                                await File.WriteAllBytesAsync(path, bytes, ct);
+                                return path;
+                            }
+                            finally { _ioGate.Release(); }
+                        }
                     }
-                    finally { _ioGate.Release(); }
+                    catch { /* try fallback */ }
                 }
+
+                // If remoteUrl failed or 404'd, resolve exact hero asset via Valve's IStoreBrowseService/GetItems
+                string? fallbackHeroUrl = await ResolveStoreBrowseHeroUrlAsync(appid, ct);
+                if (!string.IsNullOrWhiteSpace(fallbackHeroUrl))
+                {
+                    try
+                    {
+                        byte[] bytes = await _http.GetByteArrayAsync(fallbackHeroUrl, ct);
+                        if (bytes.Length >= MinValidBytes && IsValidImage(bytes) && !IsHeaderCapsulePlaceholder(bytes))
+                        {
+                            await _ioGate.WaitAsync(ct);
+                            try
+                            {
+                                Directory.CreateDirectory(HeroesDir);
+                                await File.WriteAllBytesAsync(path, bytes, ct);
+                                return path;
+                            }
+                            finally { _ioGate.Release(); }
+                        }
+                    }
+                    catch { /* best effort */ }
+                }
+
                 return null;
             }
             catch
@@ -96,6 +126,66 @@ public class CoverCache
                 _inFlight.TryRemove(-appid, out Task<string?>? _);
             }
         });
+    }
+
+    private async Task<string?> ResolveStoreBrowseHeroUrlAsync(long appid, CancellationToken ct)
+    {
+        try
+        {
+            var payload = new
+            {
+                ids = new[] { new { appid } },
+                context = new { language = "english", country_code = "US" },
+                data_request = new { include_assets = true }
+            };
+
+            string jsonStr = JsonSerializer.Serialize(payload);
+            string url = "https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=" + Uri.EscapeDataString(jsonStr);
+
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+            using var resp = await _http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+
+            using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+
+            if (doc.RootElement.TryGetProperty("response", out var r) &&
+                r.TryGetProperty("store_items", out var items) &&
+                items.ValueKind == JsonValueKind.Array &&
+                items.GetArrayLength() > 0)
+            {
+                var item = items[0];
+                if (item.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Object)
+                {
+                    string? heroRel = null;
+                    if (assets.TryGetProperty("library_hero", out var heroProp) && heroProp.GetString() is { Length: > 0 } h)
+                        heroRel = h;
+                    else if (assets.TryGetProperty("library_hero_2x", out var h2x) && h2x.GetString() is { Length: > 0 } h2)
+                        heroRel = h2;
+                    else if (assets.TryGetProperty("hero_capsule", out var hc) && hc.GetString() is { Length: > 0 } hcStr)
+                        heroRel = hcStr;
+                    else if (assets.TryGetProperty("main_capsule_2x", out var mc2) && mc2.GetString() is { Length: > 0 } mc2Str)
+                        heroRel = mc2Str;
+                    else if (assets.TryGetProperty("main_capsule", out var mc) && mc.GetString() is { Length: > 0 } mcStr)
+                        heroRel = mcStr;
+
+                    if (heroRel is not null)
+                    {
+                        string fmt = assets.TryGetProperty("asset_url_format", out var fmtProp) && fmtProp.GetString() is { Length: > 0 } fStr
+                            ? fStr
+                            : $"steam/apps/{appid}/${{FILENAME}}";
+
+                        string rel = fmt.Replace("${FILENAME}", heroRel).Split('?')[0];
+                        return $"https://shared.akamai.steamstatic.com/store_item_assets/{rel}";
+                    }
+                }
+            }
+        }
+        catch { /* best effort */ }
+
+        return null;
     }
 
     private static string PathFor(long appid) => Path.Combine(CoversDir, $"{appid}.jpg");
@@ -176,7 +266,29 @@ public class CoverCache
                         finally { _ioGate.Release(); }
                     }
                 }
-                catch { /* Steam CDN failed, try SteamGridDB fallback */ }
+                catch { /* Steam CDN failed, try capsule fallback */ }
+            }
+
+            // Steam header.jpg 404'd (or was the grey placeholder): try the 616x353 capsule next.
+            if (appid > 0)
+            {
+                string capsuleUrl = $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/capsule_616x353.jpg";
+                try
+                {
+                    byte[] capsule = await _http.GetByteArrayAsync(capsuleUrl, ct);
+                    if (capsule.Length >= MinValidBytes && IsValidImage(capsule) && !IsHeaderCapsulePlaceholder(capsule))
+                    {
+                        await _ioGate.WaitAsync(ct);
+                        try
+                        {
+                            Directory.CreateDirectory(CoversDir);
+                            await File.WriteAllBytesAsync(path, capsule, ct);
+                            return path;
+                        }
+                        finally { _ioGate.Release(); }
+                    }
+                }
+                catch { /* capsule failed, try SteamGridDB fallback */ }
             }
 
             // Fallback to SteamGridDB via Cloudflare worker proxy

@@ -98,6 +98,13 @@ public partial class AddGameCardVm : ObservableObject
         IsDelisted = r.IsDelisted;
     }
 
+    public AddGameCardVm(long appId, string name, bool isDelisted = false)
+    {
+        AppId = appId;
+        Name = name;
+        IsDelisted = isDelisted;
+    }
+
     public async Task EnsureCoverAsync(CoverCache covers)
     {
         if (LocalCover is not null) return;
@@ -158,6 +165,15 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     public ObservableCollection<PopularHeroGame> PopularGames { get; } = [];
     public bool HasPopularGames => PopularGames.Count > 0;
 
+    public ObservableCollection<AddGameCardVm> WeeklyTopSellers { get; } = [];
+    public ObservableCollection<AddGameCardVm> LatestMonthHits { get; } = [];
+
+    public bool HasWeeklyTopSellers => WeeklyTopSellers.Count > 0;
+    public bool HasLatestMonthHits => LatestMonthHits.Count > 0;
+
+    public bool ShowWeeklyTopSellers => HasWeeklyTopSellers && string.IsNullOrWhiteSpace(SearchText) && !HasDetails && !IsSearching;
+    public bool ShowLatestMonthHits => HasLatestMonthHits && string.IsNullOrWhiteSpace(SearchText) && !HasDetails && !IsSearching;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CurrentPopularGame))]
     private int _currentPopularIndex = 0;
@@ -179,9 +195,13 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowPopularCarousel))]
+    [NotifyPropertyChangedFor(nameof(ShowWeeklyTopSellers))]
+    [NotifyPropertyChangedFor(nameof(ShowLatestMonthHits))]
     private string _searchText = "";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowPopularCarousel))]
+    [NotifyPropertyChangedFor(nameof(ShowWeeklyTopSellers))]
+    [NotifyPropertyChangedFor(nameof(ShowLatestMonthHits))]
     private bool _isSearching;
 
     [ObservableProperty]
@@ -189,10 +209,52 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     [NotifyPropertyChangedFor(nameof(ShowFeatured))]
     [NotifyPropertyChangedFor(nameof(ShowResultsGrid))]
     [NotifyPropertyChangedFor(nameof(ShowPopularCarousel))]
+    [NotifyPropertyChangedFor(nameof(ShowWeeklyTopSellers))]
+    [NotifyPropertyChangedFor(nameof(ShowLatestMonthHits))]
     [NotifyPropertyChangedFor(nameof(ShowPagerView))]
     [NotifyPropertyChangedFor(nameof(IsDelistedGame))]
     [NotifyCanExecuteChangedFor(nameof(FetchCommand))]
     private GameDetails? _details;
+
+    [ObservableProperty]
+    private bool _hasBypassFix;
+
+    [ObservableProperty]
+    private bool _hasOnlineFix;
+
+    private CancellationTokenSource? _fixesBadgeCts;
+
+    partial void OnDetailsChanged(GameDetails? value)
+    {
+        _fixesBadgeCts?.Cancel();
+        _fixesBadgeCts = null;
+        HasBypassFix = false;
+        HasOnlineFix = false;
+
+        if (value is null) return;
+
+        var cts = _fixesBadgeCts = new CancellationTokenSource();
+        var token = cts.Token;
+        string appid = value.AppId.ToString();
+        string? name = value.Name;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var (hasBypass, hasOnline) = await _api.CheckGameFixBadgesAsync(appid, name, token);
+                if (!token.IsCancellationRequested)
+                {
+                    RunOnUi(() =>
+                    {
+                        HasBypassFix = hasBypass;
+                        HasOnlineFix = hasOnline;
+                    });
+                }
+            }
+            catch { }
+        }, token);
+    }
 
     public bool HasDetails => Details is not null;
     public bool ShowResultsGrid => ShowItems && !HasDetails;
@@ -549,7 +611,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         _ = _appList.EnsureLoadedAsync();
         _ = _hardware.EnsureFreshAsync();
         _ = SteamDelistedHelper.EnsureDelistedListLoadedAsync();
-        _ = LoadPopularGamesAsync();
+        _ = LoadBrowseSectionsAsync();
         Drop = drop;
         _fastFetch = settings.FastFetch;
         InitPageSize(settings.AddPageSize);
@@ -795,6 +857,49 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         catch { Details = null; }
     }
 
+    public async Task LoadBrowseSectionsAsync()
+    {
+        await Task.WhenAll(
+            LoadPopularGamesAsync(),
+            LoadWeeklyTopSellersAsync(),
+            LoadLatestMonthHitsAsync()
+        );
+    }
+
+    public async Task LoadWeeklyTopSellersAsync()
+    {
+        if (WeeklyTopSellers.Count > 0) return;
+        var list = await _api.GetWeeklyTopSellersAsync();
+        foreach (var item in list)
+        {
+            if (_hardware.IsBlacklisted(item.AppId)) continue;
+            if (SteamDelistedHelper.CheckDelistedFast(item.AppId) == true) continue;
+            var card = new AddGameCardVm(item.AppId, item.Name);
+            _ = card.EnsureCoverAsync(_covers);
+            WeeklyTopSellers.Add(card);
+            if (WeeklyTopSellers.Count >= 10) break;
+        }
+        OnPropertyChanged(nameof(HasWeeklyTopSellers));
+        OnPropertyChanged(nameof(ShowWeeklyTopSellers));
+    }
+
+    public async Task LoadLatestMonthHitsAsync()
+    {
+        if (LatestMonthHits.Count > 0) return;
+        var list = await _api.GetLatestMonthHitsAsync();
+        foreach (var item in list)
+        {
+            if (_hardware.IsBlacklisted(item.AppId)) continue;
+            if (SteamDelistedHelper.CheckDelistedFast(item.AppId) == true) continue;
+            var card = new AddGameCardVm(item.AppId, item.Name);
+            _ = card.EnsureCoverAsync(_covers);
+            LatestMonthHits.Add(card);
+            if (LatestMonthHits.Count >= 10) break;
+        }
+        OnPropertyChanged(nameof(HasLatestMonthHits));
+        OnPropertyChanged(nameof(ShowLatestMonthHits));
+    }
+
     public async Task LoadPopularGamesAsync()
     {
         if (PopularGames.Count > 0) return;
@@ -930,32 +1035,26 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 
         await AddHubcapSourceAsync(statuses, Details.AppId.ToString());
 
+        Sources.Clear();
         foreach (var (name, status) in statuses.OrderByDescending(kv => SourceMeta.GetPriority(kv.Key)))
             Sources.Add(new SourceRowViewModel(this, name, status));
 
         await ApplyHubcapStateAsync();
 
-        if (FastFetch)
-        {
-            var best = Sources
-                .Where(s => s.CanDownload && !_triedFastFetchSources.Contains(s.Name))
-                .OrderByDescending(s => SourceMeta.GetPriority(s.Name))
-                .FirstOrDefault();
+        var best = Sources
+            .Where(s => s.CanDownload && !_triedFastFetchSources.Contains(s.Name))
+            .OrderByDescending(s => SourceMeta.GetPriority(s.Name))
+            .FirstOrDefault();
 
-            if (best is null)
-            {
-                Error = Resources.Strings.Add_FastFetch_NoSource;
-                return;
-            }
-            _triedFastFetchSources.Add(best.Name);
-            _fastFetchSource = best.DisplayName;
-            await DownloadFromSourceAsync(best);
-        }
-        else
+        if (best is null)
         {
-            SourcesLoaded = true;
-            await RefreshStandardUsageAsync();
+            Error = Resources.Strings.Add_FastFetch_NoSource;
+            return;
         }
+
+        _triedFastFetchSources.Add(best.Name);
+        _fastFetchSource = best.DisplayName;
+        await DownloadFromSourceAsync(best);
     }
 
     /// <summary>The Hubcap source name as the website/source-meta keys it.</summary>
@@ -1150,7 +1249,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 
         bool isFailure = (result is null && item.Status == DownloadStatus.Failed) || (result is not null && !result.Ok);
 
-        if (isFailure && item.Status != DownloadStatus.Cancelled && FastFetch)
+        if (isFailure && item.Status != DownloadStatus.Cancelled)
         {
             var nextSource = Sources
                 .Where(s => s.CanDownload && !_triedFastFetchSources.Contains(s.Name))

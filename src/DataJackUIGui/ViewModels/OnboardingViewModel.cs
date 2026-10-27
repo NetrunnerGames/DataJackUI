@@ -52,6 +52,8 @@ public partial class OnboardingViewModel : ObservableObject
     public bool IsGuest => !IsSignedIn;
 
     [ObservableProperty] private bool _isSigningIn;
+    [ObservableProperty] private string _waitingMessage = "Waiting for authorization...";
+    private CancellationTokenSource? _signInCts;
 
     // The two yes/no choices: both default to "yes".
     [ObservableProperty] private bool _applyRecommended = true;
@@ -75,12 +77,38 @@ public partial class OnboardingViewModel : ObservableObject
     private void SetInstallPlugin(bool value) => InstallPlugin = value;
 
     [RelayCommand]
+    public void CancelSignIn()
+    {
+        _signInCts?.Cancel();
+        IsSigningIn = false;
+    }
+
+    [RelayCommand]
     private async Task SignIn()
     {
         if (IsSigningIn) return;
         IsSigningIn = true;
         StatusLine = null;
-        try { await _auth.SignInAsync(); }
+        WaitingMessage = "Waiting for Discord...";
+        _signInCts?.Cancel();
+        _signInCts = new CancellationTokenSource();
+        try { await _auth.SignInAsync(_signInCts.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { StatusLine = ex.Message; }
+        finally { IsSigningIn = false; }
+    }
+
+    [RelayCommand]
+    private async Task SignInGoogle()
+    {
+        if (IsSigningIn) return;
+        IsSigningIn = true;
+        StatusLine = null;
+        WaitingMessage = "Waiting for Google...";
+        _signInCts?.Cancel();
+        _signInCts = new CancellationTokenSource();
+        try { await _auth.SignInWithGoogleAsync(_signInCts.Token); }
+        catch (OperationCanceledException) { }
         catch (Exception ex) { StatusLine = ex.Message; }
         finally { IsSigningIn = false; }
     }
@@ -95,7 +123,7 @@ public partial class OnboardingViewModel : ObservableObject
 
         if (!IsSignedIn)
         {
-            StatusLine = "You must sign in with Discord to continue.";
+            StatusLine = "You must sign in to continue.";
             return;
         }
 

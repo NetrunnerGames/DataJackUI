@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataJackUIGui.Services;
@@ -96,6 +97,18 @@ public partial class HomeViewModel : ObservableObject
     [RelayCommand] private void OpenManage() => NavigateToManage?.Invoke();
     [RelayCommand] private void OpenSettings() => NavigateToSettings?.Invoke();
     [RelayCommand] private void OpenMode() => NavigateToMode?.Invoke();
+
+    public const string SupportDiscordUrl = "https://discord.gg/SadzcAwdjW";
+
+    [RelayCommand]
+    private void OpenSupportDiscord()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(SupportDiscordUrl) { UseShellExecute = true });
+        }
+        catch { }
+    }
 
     /// <summary>Inline install of the store-page plugin from the Home tile (mirrors PluginViewModel.Install):
     /// confirm the Steam restart, install, toast the outcome, then refresh the tile.</summary>
@@ -207,7 +220,7 @@ public partial class HomeViewModel : ObservableObject
 
         GameCount = tiles.Count;
 
-        var recent = tiles.Take(4).ToList();
+        var recent = tiles;
         Recent = new ObservableCollection<LuaTileViewModel>(recent);
         foreach (var t in recent) _ = t.EnsureResolvedAsync(_appInfo, _covers); // warm covers
     }

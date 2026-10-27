@@ -7,6 +7,7 @@ using Xunit;
 
 namespace DataJackUIGui.Tests;
 
+[Collection("AuthFile")]
 public class AuthStorageTests : IDisposable
 {
     private readonly string _tempFile;

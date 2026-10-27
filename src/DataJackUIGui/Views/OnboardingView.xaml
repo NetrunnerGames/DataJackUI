@@ -49,14 +49,65 @@
                         Foreground="#9ca3af"
                         Text="{x:Static res:Strings.Onboarding_SignIn_Blurb}"
                         TextWrapping="Wrap" />
-                    <ui:Button
-                        Margin="0,10,0,0"
-                        HorizontalAlignment="Left"
-                        Appearance="Primary"
-                        Command="{Binding SignInCommand}"
-                        Content="{x:Static res:Strings.Nav_SignInDiscord}"
-                        Icon="{ui:SymbolIcon Person24}"
-                        Visibility="{Binding IsSigningIn, Converter={StaticResource InverseBoolToVis}}" />
+                    <!-- Action buttons (Discord & Google alongside) -->
+                    <StackPanel
+                        Margin="0,12,0,0"
+                        Orientation="Horizontal"
+                        Visibility="{Binding IsSigningIn, Converter={StaticResource InverseBoolToVis}}">
+                        <!-- Sign in with Discord -->
+                        <ui:Button
+                            Appearance="Primary"
+                            Background="#5865F2"
+                            BorderBrush="#4752C4"
+                            Foreground="White"
+                            Padding="14,7"
+                            Cursor="Hand"
+                            Command="{Binding SignInCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="16" Height="16" Margin="0,0,8,0">
+                                    <Path
+                                        Data="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037c-1.687.29-3.33.8-4.885 1.515a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.793 8.18 1.793 12.061 0a.075.075 0 0 1 .079.009c.12.098.245.195.372.288a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"
+                                        Fill="White"
+                                        Stretch="Uniform" />
+                                </Viewbox>
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontWeight="SemiBold"
+                                    FontSize="13"
+                                    Foreground="White"
+                                    Text="{x:Static res:Strings.Nav_SignInDiscord}" />
+                            </StackPanel>
+                        </ui:Button>
+
+                        <!-- Sign in with Google -->
+                        <ui:Button
+                            Margin="10,0,0,0"
+                            Appearance="Transparent"
+                            Background="Transparent"
+                            BorderBrush="#33FFFFFF"
+                            BorderThickness="1"
+                            Foreground="White"
+                            Padding="14,7"
+                            Cursor="Hand"
+                            Command="{Binding SignInGoogleCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="16" Height="16" Margin="0,0,8,0">
+                                    <Grid Width="24" Height="24">
+                                        <Path Fill="#4285F4" Data="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z" />
+                                        <Path Fill="#34A853" Data="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.12C3.26 21.43 7.31 24 12 24z" />
+                                        <Path Fill="#FBBC05" Data="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.59H1.24C.45 8.16 0 9.94 0 12s.45 3.84 1.24 5.41l4.04-3.12z" />
+                                        <Path Fill="#EA4335" Data="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.57 1.24 6.59l4.04 3.12c.95-2.83 3.6-4.96 6.72-4.96z" />
+                                    </Grid>
+                                </Viewbox>
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontWeight="SemiBold"
+                                    FontSize="13"
+                                    Foreground="White"
+                                    Text="{x:Static res:Strings.Nav_SignInGoogle}" />
+                            </StackPanel>
+                        </ui:Button>
+                    </StackPanel>
                     <!-- Signing-in spinner -->
                     <StackPanel
                         Margin="0,10,0,0"
@@ -68,7 +119,7 @@
                             VerticalAlignment="Center"
                             FontSize="12"
                             Foreground="#9ca3af"
-                            Text="Waiting for Discord..." />
+                            Text="{Binding WaitingMessage}" />
                     </StackPanel>
                     <!-- Sign-in error -->
                     <TextBlock

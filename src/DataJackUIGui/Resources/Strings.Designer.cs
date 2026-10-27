@@ -30,6 +30,7 @@ public static class Strings
     public static string Nav_RestartSteam => Get(nameof(Nav_RestartSteam));
     public static string Nav_Settings => Get(nameof(Nav_Settings));
     public static string Nav_SignInDiscord => Get(nameof(Nav_SignInDiscord));
+    public static string Nav_SignInGoogle => Get(nameof(Nav_SignInGoogle));
     public static string Nav_WaitingForBrowser => Get(nameof(Nav_WaitingForBrowser));
     public static string Nav_Footer_Guest => Get(nameof(Nav_Footer_Guest));
     public static string Nav_Footer_LoggedIn => Get(nameof(Nav_Footer_LoggedIn));
@@ -348,6 +349,8 @@ public static class Strings
     public static string Add_Generating => Get(nameof(Add_Generating));
     public static string Add_DlcHint => Get(nameof(Add_DlcHint));
     public static string Add_AlreadyHaveFiles => Get(nameof(Add_AlreadyHaveFiles));
+    public static string Add_WeeklyTopSellers => Get(nameof(Add_WeeklyTopSellers));
+    public static string Add_LatestMonthHits => Get(nameof(Add_LatestMonthHits));
     public static string Add_SignIn_Dlc => Get(nameof(Add_SignIn_Dlc));
     public static string Add_SignIn_Download => Get(nameof(Add_SignIn_Download));
     public static string Add_Err_BaseGame => Get(nameof(Add_Err_BaseGame));

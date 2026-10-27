@@ -136,6 +136,10 @@ public class AuthService
         if (!IsSignedIn || string.IsNullOrEmpty(_accessToken))
             return false;
 
+        // If signed in with Google, there is no Discord guild requirement
+        if (string.IsNullOrEmpty(DiscordId))
+            return true;
+
         try
         {
             var verifyReq = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.DiscordAuthWorkerUrl.Replace("/api/login", "")}/api/verify")
@@ -223,6 +227,8 @@ public class AuthService
         }
     }
 
+    public const string GoogleClientId = "781682855217-v068fks3g2a945d8bvd9sff5e135ek60.apps.googleusercontent.com";
+
     // ── Interactive sign-in ─────────────────────────────────────────
 
     /// <summary>
@@ -235,6 +241,159 @@ public class AuthService
 
         // 2. Exchange code with Worker for session
         await ExchangeCodeForSessionAsync(code, ct);
+    }
+
+    /// <summary>
+    /// Interactive sign-in with Google OAuth 2.0 PKCE flow in default browser.
+    /// </summary>
+    public async Task SignInWithGoogleAsync(CancellationToken ct = default)
+    {
+        int port = GetRandomPort();
+        string redirectUri = $"http://127.0.0.1:{port}/oauth2callback/";
+        string verifier = CreateCodeVerifier();
+        string challenge = CreateCodeChallenge(verifier);
+
+        using var listener = new HttpListener();
+        listener.Prefixes.Add(redirectUri);
+        try
+        {
+            listener.Start();
+        }
+        catch (Exception ex)
+        {
+            throw new AuthException($"Could not start local listener for Google auth: {ex.Message}");
+        }
+
+        string authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" +
+            $"client_id={Uri.EscapeDataString(GoogleClientId)}&" +
+            $"redirect_uri={Uri.EscapeDataString(redirectUri)}&" +
+            "response_type=code&" +
+            "scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile%20openid&" +
+            $"code_challenge={challenge}&code_challenge_method=S256&" +
+            "access_type=offline&prompt=select_account";
+
+        SteamService.OpenUrl(authUrl);
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromMinutes(3));
+
+        string authCode;
+        try
+        {
+            while (true)
+            {
+                var context = await listener.GetContextAsync().WaitAsync(timeoutCts.Token);
+                string? code = HttpUtility.ParseQueryString(context.Request.Url?.Query ?? "").Get("code");
+                string? error = HttpUtility.ParseQueryString(context.Request.Url?.Query ?? "").Get("error");
+
+                if (code is null && error is null)
+                {
+                    context.Response.StatusCode = 404;
+                    context.Response.Close();
+                    continue;
+                }
+
+                bool ok = code is not null;
+                byte[] page = Encoding.UTF8.GetBytes(ResultPage(ok, error));
+                context.Response.ContentType = "text/html; charset=utf-8";
+                context.Response.ContentLength64 = page.Length;
+                await context.Response.OutputStream.WriteAsync(page, timeoutCts.Token);
+                context.Response.Close();
+
+                if (!ok) throw new AuthException(error ?? "Google authorization was cancelled.");
+                authCode = code!;
+                break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw new AuthException("Google authorization timed out.");
+        }
+        finally
+        {
+            try { listener.Stop(); } catch { }
+        }
+
+        // Exchange code for tokens
+        var tokenReq = new HttpRequestMessage(HttpMethod.Post, "https://oauth2.googleapis.com/token")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["client_id"] = GoogleClientId,
+                ["code"] = authCode,
+                ["code_verifier"] = verifier,
+                ["grant_type"] = "authorization_code",
+                ["redirect_uri"] = redirectUri
+            })
+        };
+
+        var tokenRes = await _http.SendAsync(tokenReq, ct);
+        string tokenJson = await tokenRes.Content.ReadAsStringAsync(ct);
+        if (!tokenRes.IsSuccessStatusCode)
+            throw new AuthException($"Google token exchange failed: {tokenJson}");
+
+        using var doc = JsonDocument.Parse(tokenJson);
+        var root = doc.RootElement;
+        string accessToken = root.TryGetProperty("access_token", out var atProp) ? atProp.GetString() ?? "" : "";
+        string refreshToken = root.TryGetProperty("refresh_token", out var rtProp) ? rtProp.GetString() ?? "" : accessToken;
+        int expiresIn = root.TryGetProperty("expires_in", out var expProp) && expProp.TryGetInt32(out int exp) ? exp : 3600;
+
+        if (string.IsNullOrEmpty(accessToken))
+            throw new AuthException("Invalid token response from Google.");
+
+        // Fetch user profile
+        string? userEmail = null;
+        string? userName = null;
+        string? userPicture = null;
+        string? userId = null;
+
+        try
+        {
+            var userReq = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
+            userReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            var userRes = await _http.SendAsync(userReq, ct);
+            if (userRes.IsSuccessStatusCode)
+            {
+                string userBody = await userRes.Content.ReadAsStringAsync(ct);
+                using var userDoc = JsonDocument.Parse(userBody);
+                var uRoot = userDoc.RootElement;
+                if (uRoot.TryGetProperty("id", out var idProp)) userId = idProp.GetString();
+                if (uRoot.TryGetProperty("email", out var emailProp)) userEmail = emailProp.GetString();
+                if (uRoot.TryGetProperty("name", out var nameProp)) userName = nameProp.GetString();
+                if (uRoot.TryGetProperty("picture", out var picProp)) userPicture = picProp.GetString();
+            }
+        }
+        catch { }
+
+        _accessToken = accessToken;
+        _refreshToken = !string.IsNullOrEmpty(refreshToken) ? refreshToken : accessToken;
+        _expiresAt = DateTimeOffset.UtcNow.AddSeconds(expiresIn);
+        DisplayName = userName ?? userEmail ?? "Google User";
+        Username = userName ?? (userEmail?.Contains('@') == true ? userEmail.Split('@')[0] : userEmail) ?? "Google User";
+        UserId = userId ?? userEmail ?? Guid.NewGuid().ToString("N");
+        Email = userEmail;
+        AvatarUrl = userPicture;
+        DiscordId = null;
+
+        CurrentEntitlement = new UserEntitlement
+        {
+            DiscordId = "",
+            Tier = "single",
+            IsOwner = false,
+            IsBanned = false
+        };
+
+        SaveStored(new StoredAuth
+        {
+            RefreshToken = _refreshToken,
+            AccessToken = _accessToken,
+            ExpiresAt = _expiresAt,
+            Username = Username,
+            UserId = UserId,
+            AvatarUrl = AvatarUrl,
+        });
+
+        NotifyAuthStateChanged();
     }
 
     /// <summary>
@@ -483,6 +642,52 @@ public class AuthService
 
     private async Task RefreshAsync()
     {
+        if (string.IsNullOrEmpty(DiscordId) && !string.IsNullOrEmpty(_refreshToken))
+        {
+            try
+            {
+                var googleRefreshReq = new HttpRequestMessage(HttpMethod.Post, "https://oauth2.googleapis.com/token")
+                {
+                    Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                    {
+                        ["client_id"] = GoogleClientId,
+                        ["refresh_token"] = _refreshToken,
+                        ["grant_type"] = "refresh_token"
+                    })
+                };
+                var googleRefreshRes = await _http.SendAsync(googleRefreshReq);
+                if (googleRefreshRes.IsSuccessStatusCode)
+                {
+                    string gBody = await googleRefreshRes.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(gBody);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("access_token", out var atProp))
+                    {
+                        _accessToken = atProp.GetString();
+                        int exp = root.TryGetProperty("expires_in", out var expProp) && expProp.TryGetInt32(out int e) ? e : 3600;
+                        _expiresAt = DateTimeOffset.UtcNow.AddSeconds(exp);
+                        if (root.TryGetProperty("refresh_token", out var rtProp) && !string.IsNullOrEmpty(rtProp.GetString()))
+                            _refreshToken = rtProp.GetString();
+
+                        SaveStored(new StoredAuth
+                        {
+                            RefreshToken = _refreshToken!,
+                            AccessToken = _accessToken!,
+                            ExpiresAt = _expiresAt,
+                            Username = Username,
+                            UserId = UserId,
+                            AvatarUrl = AvatarUrl,
+                        });
+                        return;
+                    }
+                }
+            }
+            catch
+            {
+                // Fall through to standard refresh or let Supabase flow handle
+            }
+        }
+
         var req = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.SupabaseUrl}/auth/v1/token?grant_type=refresh_token")
         {
             Content = new StringContent(
@@ -748,6 +953,21 @@ public class AuthService
     {
         byte[] bytes = RandomNumberGenerator.GetBytes(48);
         return Base64Url(bytes);
+    }
+
+    private static string CreateCodeChallenge(string verifier)
+    {
+        byte[] hash = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
+        return Base64Url(hash);
+    }
+
+    private static int GetRandomPort()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
     }
 
     private static string Base64Url(byte[] bytes) =>
