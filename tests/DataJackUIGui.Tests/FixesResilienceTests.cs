@@ -152,4 +152,99 @@ public class FixesResilienceTests
         Assert.Equal("GUNDAM ROGUE ORBIT", vm.Name);
         Assert.False(vm.HasPlaceholderName);
     }
+
+    [Fact]
+    public void ParseDenuvoFixes_ParsesDepotBoxGamesResponseStructure()
+    {
+        string json = """
+        {
+          "success": true,
+          "count": 1,
+          "games": [
+            {
+              "appid": "2239550",
+              "name": "Watch Dogs®: Legion",
+              "headerImage": "https://fastly.steamstatic.com/header.jpg",
+              "fixes": [
+                {
+                  "id": "76b985bd98bcdbd2",
+                  "downloadName": "Watch_Dogs_Legion_bypass.zip",
+                  "filename": "Watch_Dogs_Legion_bypass.zip",
+                  "size": "285.6 MB",
+                  "tags": ["bypass"]
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var response = DataJackUIApiClient.ParseDenuvoFixes(json, "2239550");
+        Assert.NotNull(response);
+        Assert.Equal("2239550", response.AppId);
+        Assert.Equal("Watch Dogs®: Legion", response.Name);
+        Assert.Single(response.Fixes);
+        Assert.Equal("76b985bd98bcdbd2", response.Fixes[0].Id);
+        Assert.Equal("Watch_Dogs_Legion_bypass.zip", response.Fixes[0].FixFilename);
+        Assert.Equal("285.6 MB", response.Fixes[0].SizeStr);
+        Assert.Contains(response.Fixes[0].Tags, t => t.Id == "bypass");
+    }
+
+    [Fact]
+    public void ParseDenuvoFixes_ParsesOnlineFixPayload_RetainingFixAndDownloadUrl()
+    {
+        string json = """
+        {
+          "appid": "of_18268",
+          "name": "Assassins Creed III",
+          "header_image": "https://online-fix.me/uploads/posts/2026-10/2630959492_poster.jpg",
+          "fixes": [
+            {
+              "id": "of_18268_online",
+              "title": "Assassins Creed III Online Fix",
+              "description": "Online fix (Game version: 1.06)",
+              "has_manifest": false,
+              "has_fix": true,
+              "fix_filename": "Assassins Creed III_OnlineFix.rar",
+              "download_url": "https://hosters.online-fix.me:2053/Assassins%20Creed%20III",
+              "tags": [
+                {
+                  "id": "online",
+                  "name": "Online Fix",
+                  "slug": "online"
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var response = DataJackUIApiClient.ParseDenuvoFixes(json, "of_18268");
+        Assert.NotNull(response);
+        Assert.Equal("of_18268", response.AppId);
+        Assert.Equal("Assassins Creed III", response.Name);
+        Assert.Single(response.Fixes);
+        Assert.Equal("of_18268_online", response.Fixes[0].Id);
+        Assert.True(response.Fixes[0].HasFix);
+        Assert.Equal("https://hosters.online-fix.me:2053/Assassins%20Creed%20III", response.Fixes[0].DownloadUrl);
+        Assert.Contains(response.Fixes[0].Tags, t => t.Id == "online");
+    }
+
+    [Fact]
+    public async Task GetDenuvoListingsAsync_DoesNotHang()
+    {
+        var settings = new SettingsService();
+        var auth = new AuthService();
+        var appList = new SteamAppListCache();
+        var cache = new CacheService();
+        var appInfo = new SteamAppInfoCache(cache, appList);
+        var covers = new CoverCache();
+        var api = new DataJackUIApiClient(auth, appInfo, appList, covers, settings);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var result = await api.GetDenuvoListingsAsync(cts.Token);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Games);
+    }
+
 }

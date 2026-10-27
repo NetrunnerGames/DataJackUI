@@ -319,6 +319,7 @@ public static class Strings
     public static string Fixes_MyGames_NotInstalled => Get(nameof(Fixes_MyGames_NotInstalled));
 
     // ── Add / Download ──
+    public static string Add_BypassNotice => Get(nameof(Add_BypassNotice));
     public static string Add_Title => Get(nameof(Add_Title));
     public static string Add_Subtitle => Get(nameof(Add_Subtitle));
     public static string Add_SearchPlaceholder => Get(nameof(Add_SearchPlaceholder));

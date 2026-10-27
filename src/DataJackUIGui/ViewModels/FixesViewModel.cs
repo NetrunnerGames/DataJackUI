@@ -569,19 +569,37 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         ClearCursor();
         SelectedGame = game;
         _ = game.EnsureCoverAsync(covers, appInfo, appList);
-        if (game.HasPlaceholderName && long.TryParse(game.AppId, out long appid))
+
+        // Resolve real Steam App ID if AppId is non-numeric (e.g. of_18268)
+        long realAppId = 0;
+        if (long.TryParse(game.AppId, out long parsedId))
+        {
+            realAppId = parsedId;
+        }
+        else if (appList is not null && !string.IsNullOrWhiteSpace(game.Name))
+        {
+            var matches = appList.Search(game.Name, 1);
+            if (matches.Count > 0)
+            {
+                realAppId = matches[0].AppId;
+                game.DisplayAppId = realAppId.ToString();
+            }
+        }
+
+        if (game.HasPlaceholderName && realAppId > 0)
         {
             try
             {
-                var info = await appInfo.ResolveAsync(appid);
+                var info = await appInfo.ResolveAsync(realAppId);
                 if (!string.IsNullOrWhiteSpace(info?.Name))
                 {
                     game.Name = info.Name;
-                    appList.AddOrUpdate(appid, info.Name);
+                    appList?.AddOrUpdate(realAppId, info.Name);
                 }
             }
             catch { }
         }
+
         Fixes.Clear();
         _allFixes = [];
         FixTags.Clear();
@@ -589,24 +607,52 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         IsLoadingFixes = true;
         try
         {
-            var data = await api.GetDenuvoFixesAsync(game.AppId) ?? DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
+            var data = await api.GetDenuvoFixesAsync(game.AppId);
+            if (realAppId > 0 && realAppId.ToString() != game.AppId)
+            {
+                var steamData = await api.GetDenuvoFixesAsync(realAppId.ToString());
+                if (steamData?.Fixes is { Count: > 0 })
+                {
+                    data ??= steamData;
+                    foreach (var sf in steamData.Fixes)
+                    {
+                        if (!data.Fixes.Any(f => f.Id == sf.Id))
+                            data.Fixes.Add(sf);
+                    }
+                }
+            }
+
+            data ??= DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
             if (data.Name.StartsWith("App ", StringComparison.OrdinalIgnoreCase) && !game.HasPlaceholderName)
             {
                 data.Name = game.Name;
             }
 
-            // Depotbox "online"-tagged fixes are replaced by ones scraped live from online-fix.me.
-            data.Fixes.RemoveAll(f => f.Tags.Any(t => string.Equals(t.Id, "online", StringComparison.OrdinalIgnoreCase)));
+            // Cache any hoster URLs returned by the worker
+            foreach (var fix in data.Fixes)
+            {
+                if (!string.IsNullOrWhiteSpace(fix.DownloadUrl) && fix.DownloadUrl.Contains("hosters.online-fix.me"))
+                {
+                    api.CacheOnlineFixHosterUrl(fix.Id, fix.DownloadUrl, fix.FixFilename);
+                    api.CacheOnlineFixHosterUrl(game.AppId, fix.DownloadUrl, fix.FixFilename);
+                    if (realAppId > 0) api.CacheOnlineFixHosterUrl(realAppId.ToString(), fix.DownloadUrl, fix.FixFilename);
+                }
+            }
+
+            // If title doesn't already have verified fixes, or to enrich with direct link, scrape online-fix.me
             try
             {
-                if (long.TryParse(game.AppId, out long ofId) && !string.IsNullOrWhiteSpace(game.Name))
+                string searchKey = realAppId > 0 ? realAppId.ToString() : game.AppId;
+                if (!string.IsNullOrWhiteSpace(game.Name))
                 {
-                    var of = await api.ScrapeOnlineFixForGameAsync(ofId, game.Name);
+                    var of = await api.ScrapeOnlineFixForGameAsync(searchKey, game.Name);
                     if (of?.DirectFixUrl is not null)
                     {
+                        // Found a live verified fix from online-fix.me scraper - replace any unverified fixes
+                        data.Fixes.RemoveAll(f => f.Tags.Any(t => string.Equals(t.Id, "online", StringComparison.OrdinalIgnoreCase)));
                         data.Fixes.Add(new DenuvoFix
                         {
-                            Id = $"{ofId}_ofme_0",
+                            Id = realAppId > 0 ? $"{realAppId}_ofme_0" : $"{game.AppId}_ofme_0",
                             Title = of.Title,
                             Description = of.VersionStr,
                             FixFilename = of.FixFileName,
@@ -632,7 +678,8 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         _allFixes = data.Fixes.Select(f => new FixItemVm(f)).ToList();
         
         long gameAppId = 0;
-        long.TryParse(game.AppId, out gameAppId);
+        if (!long.TryParse(game.AppId, out gameAppId))
+            long.TryParse(game.DisplayAppId, out gameAppId);
         string? installDir = gameAppId > 0 ? await Task.Run(() => library.GetInstallDir(gameAppId)) : null;
         
         foreach (var f in _allFixes)
@@ -727,6 +774,8 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         if (await PromptSignInIfGuestAsync(Resources.Strings.Fixes_SignIn)) return;
         if (SelectedGame is not { } game) return;
         long.TryParse(game.AppId, out long appId);
+        if (appId == 0 && long.TryParse(game.DisplayAppId, out long displayId))
+            appId = displayId;
 
         EnqueueDownloadJob(fix, slot, game, appId);
     }

@@ -691,4 +691,5 @@ Cancel - keep downloading</value></data>
   <data name="CloudSaves_OpenFolder" xml:space="preserve"><value>Open Folder</value></data>
   <data name="CloudSaves_NoSavesFound" xml:space="preserve"><value>No game saves detected yet.</value></data>
   <data name="CloudSaves_NoSnapshots" xml:space="preserve"><value>No snapshots yet for this game.</value></data>
+  <data name="Add_BypassNotice" xml:space="preserve"><value>Some games might need bypass in order to work, to get them simply go to Fixes tab on the side menu, search for your game then select it, and simply just click the Fix button. Rest is just enjoying the game.</value></data>
 </root>

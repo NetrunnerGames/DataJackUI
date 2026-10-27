@@ -30,8 +30,12 @@ public class PopularGamesTests
         var list = await api.GetPopularGamesAsync();
         Assert.NotEmpty(list);
 
-        // PUBG (578080) must be excluded
-        Assert.DoesNotContain(list, g => g.AppId == 578080);
+        // Free-to-play games must be excluded
+        long[] freeAppIds = [730, 570, 578080, 1172470, 1422450, 3393110, 440, 230410, 2767030];
+        foreach (var fid in freeAppIds)
+        {
+            Assert.DoesNotContain(list, g => g.AppId == fid);
+        }
 
         foreach (var g in list)
         {

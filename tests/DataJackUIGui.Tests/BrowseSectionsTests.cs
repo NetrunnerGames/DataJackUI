@@ -103,25 +103,4 @@ public class BrowseSectionsTests
         Assert.Equal(card.HeaderImage, card.Cover);
     }
 
-    [Fact]
-    public async Task CheckGameFixBadgesAsync_ReturnsExpectedBadges()
-    {
-        var auth = new AuthService();
-        var covers = new CoverCache();
-        var settings = new SettingsService();
-        var cache = new CacheService();
-        var appList = new SteamAppListCache();
-        var appInfo = new SteamAppInfoCache(cache, appList);
-        var api = new DataJackUIApiClient(auth, appInfo, appList, covers, settings);
-
-        // AppID 2358720 is Black Myth: Wukong, which has a Bypass fix
-        var (wukongBypass, wukongOnline) = await api.CheckGameFixBadgesAsync("2358720", "Black Myth: Wukong");
-        Assert.True(wukongBypass, "Black Myth: Wukong should have a Bypass badge");
-        Assert.False(wukongOnline, "Black Myth: Wukong should not have an Online Fix badge");
-
-        // of_17320 has an Online Fix
-        var (onlineBypass, onlineOnline) = await api.CheckGameFixBadgesAsync("of_17320", "DayZ");
-        Assert.False(onlineBypass);
-        Assert.True(onlineOnline, "of_17320 should have an Online Fix badge");
-    }
 }

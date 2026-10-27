@@ -155,6 +155,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 
     /// <summary>Set by App: navigate to Manage and open this appid's detail (the install banner's "Reveal").</summary>
     public Action<long>? NavigateToGame { get; set; }
+    public Action<string?>? NavigateToFixes { get; set; }
 
     public ObservableCollection<SourceRowViewModel> Sources { get; } = [];
     public ObservableCollection<DlcDepot> DlcDepots { get; } = [];
@@ -215,46 +216,6 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     [NotifyPropertyChangedFor(nameof(IsDelistedGame))]
     [NotifyCanExecuteChangedFor(nameof(FetchCommand))]
     private GameDetails? _details;
-
-    [ObservableProperty]
-    private bool _hasBypassFix;
-
-    [ObservableProperty]
-    private bool _hasOnlineFix;
-
-    private CancellationTokenSource? _fixesBadgeCts;
-
-    partial void OnDetailsChanged(GameDetails? value)
-    {
-        _fixesBadgeCts?.Cancel();
-        _fixesBadgeCts = null;
-        HasBypassFix = false;
-        HasOnlineFix = false;
-
-        if (value is null) return;
-
-        var cts = _fixesBadgeCts = new CancellationTokenSource();
-        var token = cts.Token;
-        string appid = value.AppId.ToString();
-        string? name = value.Name;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var (hasBypass, hasOnline) = await _api.CheckGameFixBadgesAsync(appid, name, token);
-                if (!token.IsCancellationRequested)
-                {
-                    RunOnUi(() =>
-                    {
-                        HasBypassFix = hasBypass;
-                        HasOnlineFix = hasOnline;
-                    });
-                }
-            }
-            catch { }
-        }, token);
-    }
 
     public bool HasDetails => Details is not null;
     public bool ShowResultsGrid => ShowItems && !HasDetails;
@@ -873,6 +834,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         foreach (var item in list)
         {
             if (_hardware.IsBlacklisted(item.AppId)) continue;
+            if (DataJackUIApiClient.IsKnownFreeOrExcluded(item.AppId)) continue;
             if (SteamDelistedHelper.CheckDelistedFast(item.AppId) == true) continue;
             var card = new AddGameCardVm(item.AppId, item.Name);
             _ = card.EnsureCoverAsync(_covers);
@@ -890,6 +852,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         foreach (var item in list)
         {
             if (_hardware.IsBlacklisted(item.AppId)) continue;
+            if (DataJackUIApiClient.IsKnownFreeOrExcluded(item.AppId)) continue;
             if (SteamDelistedHelper.CheckDelistedFast(item.AppId) == true) continue;
             var card = new AddGameCardVm(item.AppId, item.Name);
             _ = card.EnsureCoverAsync(_covers);
@@ -906,6 +869,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         var list = await _api.GetPopularGamesAsync();
         foreach (var item in list)
         {
+            if (DataJackUIApiClient.IsKnownFreeOrExcluded(item.AppId)) continue;
             PopularGames.Add(item);
             _ = EnsureHeroCachedAsync(item);
         }
@@ -1484,6 +1448,13 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     private void RevealInstalled()
     {
         if ((_installedAppId ?? Details?.AppId) is { } appId) NavigateToGame?.Invoke(appId);
+    }
+
+    /// <summary>Navigate to Fixes tab from the bypass notice card, pre-filling the game name if available.</summary>
+    [RelayCommand]
+    private void OpenFixes()
+    {
+        NavigateToFixes?.Invoke(Details?.Name);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────

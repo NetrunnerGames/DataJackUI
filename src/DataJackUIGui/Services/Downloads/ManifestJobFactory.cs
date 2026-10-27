@@ -566,7 +566,30 @@ public class ManifestJobFactory(
             string recordPath = Path.Combine(fixDir, $"{fixKey}.json");
 
             var record = new DenuvoFixRecord { AppId = appId, FixId = fixId, AppliedAt = DateTimeOffset.UtcNow.ToString("o") };
-            using var archive = ZipFile.OpenRead(file.FilePath);
+            ZipArchive? archive = null;
+            try
+            {
+                archive = ZipFile.OpenRead(file.FilePath);
+            }
+            catch (Exception)
+            {
+                // Non-zip archive (e.g. .rar or .7z) or non-standard zip: copy directly into game folder so user has fix files
+                string targetFile = Path.Combine(installDir, file.FileName);
+                try
+                {
+                    File.Copy(file.FilePath, targetFile, overwrite: true);
+                    string msg = string.Format(Resources.Strings.Fixes_Toast_FixApplied_Body, gameName) + $" ({file.FileName})";
+                    toast.Show(Resources.Strings.Fixes_Toast_FixApplied, msg);
+                    return new JobResult(true, msg, targetFile);
+                }
+                catch (Exception copyEx)
+                {
+                    toast.Show(Resources.Strings.Fixes_Toast_CouldntApply, copyEx.Message, error: true);
+                    return new JobResult(false, copyEx.Message);
+                }
+            }
+            using (archive)
+            {
             var plan = new List<(string RelPath, string Dest, string? BakRel, ZipArchiveEntry Entry)>();
             int failed = 0;
 
@@ -617,6 +640,7 @@ public class ManifestJobFactory(
             string message = string.Format(Resources.Strings.Fixes_Toast_FixApplied_Body, gameName);
             toast.Show(Resources.Strings.Fixes_Toast_FixApplied, message);
             return new JobResult(true, message, installDir);
+            }
         }
         catch (Exception ex)
         {

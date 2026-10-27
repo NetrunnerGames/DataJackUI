@@ -79,7 +79,7 @@
                             </StackPanel>
                         </ui:Button>
 
-                        <!-- Sign in with Google -->
+                        <!-- Sign in with Google (disabled for now, discord is default)
                         <ui:Button
                             Margin="10,0,0,0"
                             Appearance="Transparent"
@@ -107,6 +107,7 @@
                                     Text="{x:Static res:Strings.Nav_SignInGoogle}" />
                             </StackPanel>
                         </ui:Button>
+                        -->
                     </StackPanel>
                     <!-- Signing-in spinner -->
                     <StackPanel

@@ -351,6 +351,16 @@ public partial class App : Application
         download.NavigateToGame = openInManage;
         builds.NavigateToManage = openInManage;
 
+        var fixes = _host.Services.GetRequiredService<FixesViewModel>();
+        download.NavigateToFixes = gameName => Dispatcher.Invoke(() =>
+        {
+            window.NavigateToFixes();
+            if (!string.IsNullOrWhiteSpace(gameName))
+            {
+                fixes.SearchText = gameName;
+            }
+        });
+
         _host.Services.GetRequiredService<DownloadsViewModel>().RevealItem = _ => window.NavigateToAdd();
         builds.RequestShowDownloads = () => Dispatcher.Invoke(window.NavigateToDownloads);
 

@@ -667,45 +667,6 @@
                             </Border.Background>
                         </Border>
 
-                        <!-- Fix badges on top-right edge of banner ("Online Fix", "Bypass") -->
-                        <StackPanel
-                            Margin="0,14,14,0"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Top"
-                            Orientation="Horizontal">
-                            <!-- Online Fix badge -->
-                            <Border
-                                Margin="0,0,8,0"
-                                Padding="10,4.5"
-                                Background="#E6064E3B"
-                                BorderBrush="#9934D399"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                ToolTip="{x:Static res:Strings.OnlineFix_Title}"
-                                Visibility="{Binding HasOnlineFix, Converter={StaticResource BoolToVis}}">
-                                <TextBlock
-                                    FontSize="11.5"
-                                    FontWeight="SemiBold"
-                                    Foreground="#6EE7B7"
-                                    Text="Online Fix" />
-                            </Border>
-
-                            <!-- Bypass badge -->
-                            <Border
-                                Padding="10,4.5"
-                                Background="#E62E1065"
-                                BorderBrush="#99A78BFA"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                ToolTip="Bypass Fix"
-                                Visibility="{Binding HasBypassFix, Converter={StaticResource BoolToVis}}">
-                                <TextBlock
-                                    FontSize="11.5"
-                                    FontWeight="SemiBold"
-                                    Foreground="#C4B5FD"
-                                    Text="Bypass" />
-                            </Border>
-                        </StackPanel>
                     </Grid>
                     <StackPanel Margin="12,8,12,10">
                         <StackPanel Orientation="Horizontal">
@@ -761,6 +722,64 @@
                     </StackPanel>
                 </StackPanel>
             </Border>
+
+            <!-- Fixes / Bypass Notice Card -->
+            <Button
+                Margin="0,10,0,0"
+                Padding="0"
+                HorizontalContentAlignment="Stretch"
+                Command="{Binding OpenFixesCommand}"
+                Cursor="Hand"
+                ToolTip="Open Fixes tab"
+                Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border
+                            x:Name="Card"
+                            Padding="12,10"
+                            Background="#1A2D0D12"
+                            BorderBrush="#40F87171"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:SymbolIcon
+                                    Symbol="Wrench24"
+                                    FontSize="16"
+                                    Foreground="#f87171"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,10,0" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    FontSize="12"
+                                    LineHeight="17"
+                                    Foreground="#f87171"
+                                    TextWrapping="Wrap"
+                                    Text="{x:Static res:Strings.Add_BypassNotice}" />
+                                <ui:SymbolIcon
+                                    Grid.Column="2"
+                                    Symbol="ChevronRight24"
+                                    FontSize="14"
+                                    Foreground="#f87171"
+                                    Opacity="0.75"
+                                    VerticalAlignment="Center"
+                                    Margin="10,0,2,0" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Card" Property="Background" Value="#2D44121B" />
+                                <Setter TargetName="Card" Property="BorderBrush" Value="#80F87171" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
 
             <!-- CyberJack toggle -->
             <Grid
@@ -1431,52 +1450,49 @@
                         Visibility="{Binding PaymentSuccessMessage, Converter={StaticResource NullToCollapsed}}" />
                 </StackPanel>
 
-                <!-- Actions & Demo -->
-                <StackPanel Grid.Row="4" Margin="0,16,0,0">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                <!-- Actions -->
+                <Grid Grid.Row="4" Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                        <ui:Button
-                            Grid.Column="0"
-                            HorizontalAlignment="Left"
-                            Cursor="Hand"
-                            Command="{Binding CancelPaymentCommand}"
-                            Content="{x:Static res:Strings.Mode_Cancel}" />
-
-                        <ui:Button
-                            Grid.Column="1"
-                            Appearance="Primary"
-                            Cursor="Hand"
-                            Command="{Binding VerifyPaymentCommand}"
-                            Content="Verify &amp; Unlock"
-                            Icon="{ui:SymbolIcon Checkmark24}" />
-                    </Grid>
-
-                    <!-- OR Divider -->
-                    <Grid Margin="0,14,0,14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Height="1" Background="#26FFFFFF" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Margin="10,0" FontSize="11" FontWeight="SemiBold" Foreground="#6b7280" Text="OR" VerticalAlignment="Center" />
-                        <Border Grid.Column="2" Height="1" Background="#26FFFFFF" VerticalAlignment="Center" />
-                    </Grid>
-
-                    <!-- Play Demo Button -->
                     <ui:Button
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        Appearance="Secondary"
+                        Grid.Column="0"
+                        HorizontalAlignment="Left"
                         Cursor="Hand"
-                        Command="{Binding PlayDemoCommand}"
-                        Content="Play DEMO (10 Min)"
-                        Icon="{ui:SymbolIcon Play24}" />
-                </StackPanel>
+                        Command="{Binding CancelPaymentCommand}"
+                        Content="{x:Static res:Strings.Mode_Cancel}">
+                        <ui:Button.Style>
+                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                <Setter Property="Background" Value="#FF003C" />
+                                <Setter Property="BorderBrush" Value="#E60036" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#FF2456" />
+                                        <Setter Property="BorderBrush" Value="#FF3B67" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter Property="Background" Value="#D60032" />
+                                        <Setter Property="BorderBrush" Value="#D60032" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:Button.Style>
+                    </ui:Button>
+
+                    <ui:Button
+                        Grid.Column="1"
+                        Appearance="Primary"
+                        Cursor="Hand"
+                        Command="{Binding VerifyPaymentCommand}"
+                        Content="Verify &amp; Unlock"
+                        Icon="{ui:SymbolIcon Checkmark24}" />
+                </Grid>
             </Grid>
         </Border>
     </Grid>
