@@ -517,7 +517,6 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         }
     }
 
-
     private async Task<bool> CheckIsDenuvoAsync(long appId)
     {
         // 0. If Denuvo was verified removed (e.g. from PCGamingWiki removal list), override stale notices

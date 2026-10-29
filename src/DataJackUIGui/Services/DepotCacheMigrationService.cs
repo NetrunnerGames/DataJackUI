@@ -129,7 +129,6 @@ public class DepotCacheMigrationService(SteamService steam, ILogger<DepotCacheMi
         }
     }
 
-
     /// <summary>
     /// Split <c>&lt;depot&gt;_&lt;gid&gt;.manifest</c>. Returns false for anything else, which is the
     /// point: an unrecognised name cannot be validated, so it is not moved.

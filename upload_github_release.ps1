@@ -40,7 +40,7 @@ if (-not $token) {
                 $token = $Matches[1].Trim()
                 break
             }
-        } catch { }
+        } catch { Write-Verbose "Token extraction failed: $_" }
     }
 }
 
@@ -48,7 +48,7 @@ if (-not $token) {
     try {
         $ghOut = & gh auth token 2>$null
         if ($ghOut) { $token = $ghOut.Trim() }
-    } catch { }
+    } catch { Write-Verbose "Token extraction failed: $_" }
 }
 
 if (-not $token) {
