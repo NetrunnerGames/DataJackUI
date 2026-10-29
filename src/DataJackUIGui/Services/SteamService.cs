@@ -151,9 +151,9 @@ public class SteamService(SettingsService settings)
                     string id = m.Groups[1].Value;
                     string block = m.Groups[2].Value;
                     if (firstId is null) firstId = id;
-                    if (block.Contains(@"""AutoLogin""") && (block.Contains(@"""1""") || block.Contains(@"1")))
+                    if (block.Contains(@"""AutoLogin""") && (block.Contains(@"""1""") || block.Contains('1')))
                         return id;
-                    if (block.Contains(@"""MostRecent""") && (block.Contains(@"""1""") || block.Contains(@"1")))
+                    if (block.Contains(@"""MostRecent""") && (block.Contains(@"""1""") || block.Contains('1')))
                         return id;
                 }
                 if (firstId is not null) return firstId;
