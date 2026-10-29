@@ -402,20 +402,25 @@ public partial class App : Application
         else
         {
             window.Show();
+            try { await main.InitializeAsync(); } catch { }
+
             var cache = _host.Services.GetRequiredService<CacheService>();
             var auth = _host.Services.GetRequiredService<AuthService>();
 
-            if (!auth.IsSignedIn)
+            if (!cache.OnboardingComplete)
             {
-                main.Onboarding.IsOpen = true;
-            }
-            else if (!cache.OnboardingComplete)
-            {
-                var unlocker = _host.Services.GetRequiredService<UnlockerService>();
-                var installer = _host.Services.GetRequiredService<PluginInstallerService>();
-                bool configured = unlocker.SelectedMode is (UnlockerMode.Ost or UnlockerMode.IceBreaker) && installer.IsInstalledLocally();
-                if (configured) cache.OnboardingComplete = true;
-                else main.Onboarding.IsOpen = true;
+                if (!auth.IsSignedIn)
+                {
+                    main.Onboarding.IsOpen = true;
+                }
+                else
+                {
+                    var unlocker = _host.Services.GetRequiredService<UnlockerService>();
+                    var installer = _host.Services.GetRequiredService<PluginInstallerService>();
+                    bool configured = unlocker.SelectedMode is (UnlockerMode.Ost or UnlockerMode.IceBreaker) && installer.IsInstalledLocally();
+                    if (configured) cache.OnboardingComplete = true;
+                    else main.Onboarding.IsOpen = true;
+                }
             }
         }
     }

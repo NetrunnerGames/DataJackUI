@@ -1,6 +1,8 @@
 using System.IO;
 using System.Text.Json;
 
+using Microsoft.Win32;
+
 namespace DataJackUIGui.Services;
 
 public class AppSettings
@@ -87,6 +89,51 @@ public class SettingsService
 {
     /// <summary>Fired when CustomUsername or CustomAvatarPath changes so UI displays can refresh immediately.</summary>
     public event Action? CustomProfileChanged;
+
+    private const string ProfileRegistrySubKey = @"Software\DataJackUI";
+    private const string RegCustomUsername = "CustomUsername";
+    private const string RegCustomAvatar = "CustomAvatarPath";
+
+    private void RestoreProfileFromRegistry()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(ProfileRegistrySubKey);
+            if (key is not null)
+            {
+                if (string.IsNullOrEmpty(_settings.CustomUsername) && key.GetValue(RegCustomUsername) is string regName && !string.IsNullOrWhiteSpace(regName))
+                {
+                    _settings.CustomUsername = regName;
+                }
+                if (string.IsNullOrEmpty(_settings.CustomAvatarPath) && key.GetValue(RegCustomAvatar) is string regAvatar && !string.IsNullOrWhiteSpace(regAvatar))
+                {
+                    _settings.CustomAvatarPath = regAvatar;
+                }
+            }
+        }
+        catch { /* best effort */ }
+    }
+
+    private void BackupProfileToRegistry()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(ProfileRegistrySubKey);
+            if (key is not null)
+            {
+                if (!string.IsNullOrEmpty(_settings.CustomUsername))
+                    key.SetValue(RegCustomUsername, _settings.CustomUsername, RegistryValueKind.String);
+                else
+                    key.DeleteValue(RegCustomUsername, throwOnMissingValue: false);
+
+                if (!string.IsNullOrEmpty(_settings.CustomAvatarPath))
+                    key.SetValue(RegCustomAvatar, _settings.CustomAvatarPath, RegistryValueKind.String);
+                else
+                    key.DeleteValue(RegCustomAvatar, throwOnMissingValue: false);
+            }
+        }
+        catch { /* best effort */ }
+    }
 
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui");
@@ -218,6 +265,7 @@ public class SettingsService
         PreserveCorrupt(FilePath);
         if (TryLoad(BakPath)) return;
         _settings = new AppSettings();
+        RestoreProfileFromRegistry();
     }
 
     private bool TryLoad(string path)
@@ -228,6 +276,7 @@ public class SettingsService
             if (JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) is { } loaded)
             {
                 _settings = loaded;
+                RestoreProfileFromRegistry();
                 return true;
             }
         }
@@ -400,6 +449,7 @@ public class SettingsService
             {
                 foreach (var p in new[] { FilePath, BakPath, TmpPath })
                     try { if (File.Exists(p)) File.Delete(p); } catch { }
+                BackupProfileToRegistry();
                 return;
             }
 
@@ -413,6 +463,7 @@ public class SettingsService
                     File.WriteAllText(TmpPath, json);
                     try { if (File.Exists(FilePath)) File.Copy(FilePath, BakPath, overwrite: true); } catch { }
                     File.Move(TmpPath, FilePath, overwrite: true);
+                    BackupProfileToRegistry();
                     return;
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

@@ -81,21 +81,49 @@ public class AuthService
         // Token still comfortably valid, or refresh succeeds → keep the session
         if (_expiresAt > DateTimeOffset.UtcNow.AddMinutes(2))
         {
-            bool inServer = await VerifyServerMembershipAsync();
-            if (!inServer) return false;
+            try
+            {
+                bool inServer = await VerifyServerMembershipAsync();
+                if (!inServer) return false;
+            }
+            catch
+            {
+                // Network glitch during membership verification: preserve session
+            }
             NotifyAuthStateChanged();
             return true;
         }
         try
         {
             await RefreshAsync();
-            bool inServer = await VerifyServerMembershipAsync();
-            if (!inServer) return false;
+            try
+            {
+                bool inServer = await VerifyServerMembershipAsync();
+                if (!inServer) return false;
+            }
+            catch
+            {
+                // Network glitch during membership verification: preserve session
+            }
             NotifyAuthStateChanged();
             return true;
         }
-        catch
+        catch (HttpRequestException)
         {
+            // Network connection failure or offline during app startup: preserve session
+            NotifyAuthStateChanged();
+            return true;
+        }
+        catch (TaskCanceledException)
+        {
+            // Network timeout during app startup: preserve session
+            NotifyAuthStateChanged();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            // Only clear session on definitive auth revocation/expiration
+            Debug.WriteLine($"[AuthService] Auth refresh failed: {ex.Message}");
             ClearSession(); // revoked/expired. Fall back to guest
             NotifyAuthStateChanged();
             return false;

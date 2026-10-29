@@ -33,7 +33,7 @@ public partial class OnboardingViewModel : ObservableObject
         _auth.AuthStateChanged += () =>
         {
             IsSignedIn = _auth.IsSignedIn;
-            if (!_auth.IsSignedIn) IsOpen = true;
+            if (!_auth.IsSignedIn && !_cache.OnboardingComplete) IsOpen = true;
         };
         IsSignedIn = _auth.IsSignedIn;
     }

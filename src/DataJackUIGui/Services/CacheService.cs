@@ -1,5 +1,6 @@
 using System.IO;
-using System.Text.Json;
+using System.Text.Json;
+using Microsoft.Win32;
 
 namespace DataJackUIGui.Services;
 
@@ -240,10 +241,39 @@ public class CacheService
 
     /// <summary>True once the first-run onboarding overlay has been completed (or auto-skipped because the
     /// user is already set up). Persisted so it shows at most once.</summary>
+    private const string RegSubKey = @"Software\DataJackUI";
+    private const string RegOnboardingComplete = "OnboardingComplete";
+
+    /// <summary>True once the first-run onboarding overlay has been completed (or auto-skipped because the
+    /// user is already set up). Persisted to cache and mirrored in HKCU\Software\DataJackUI so it survives updates and cache wipes.</summary>
     public bool OnboardingComplete
     {
-        get => _cache.OnboardingComplete;
-        set { _cache.OnboardingComplete = value; Save(); }
+        get
+        {
+            if (_cache.OnboardingComplete) return true;
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(RegSubKey);
+                if (key?.GetValue(RegOnboardingComplete) is int val && val == 1)
+                {
+                    _cache.OnboardingComplete = true;
+                    return true;
+                }
+            }
+            catch { /* best effort */ }
+            return _cache.OnboardingComplete;
+        }
+        set
+        {
+            _cache.OnboardingComplete = value;
+            try
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(RegSubKey);
+                key?.SetValue(RegOnboardingComplete, value ? 1 : 0, RegistryValueKind.DWord);
+            }
+            catch { /* best effort */ }
+            Save();
+        }
     }
 
     private void Load()
@@ -256,6 +286,20 @@ public class CacheService
         catch
         {
             _cache = new CacheData();
+        }
+
+        // Restore OnboardingComplete from registry if cache was cleared/recreated
+        if (!_cache.OnboardingComplete)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(RegSubKey);
+                if (key?.GetValue(RegOnboardingComplete) is int val && val == 1)
+                {
+                    _cache.OnboardingComplete = true;
+                }
+            }
+            catch { /* best effort */ }
         }
     }
 
