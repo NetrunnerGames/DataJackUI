@@ -16,9 +16,6 @@ public class TaskRequirementsTests
         Assert.False(settings.DonateKeys);
     }
 
-
-
-
     [Fact]
     public async Task HomeViewModel_AccountStatus_DisplaysCustomUsernameOrAnonymous()
     {
@@ -90,7 +87,6 @@ public class TaskRequirementsTests
             catch { }
         }
     }
-
 
     [Fact]
     public void SettingsService_Profile_PersistsAcrossCleanInstallViaRegistry()
