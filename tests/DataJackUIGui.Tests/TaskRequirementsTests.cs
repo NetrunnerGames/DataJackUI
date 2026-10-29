@@ -18,6 +18,79 @@ public class TaskRequirementsTests
 
 
 
+
+    [Fact]
+    public async Task HomeViewModel_AccountStatus_DisplaysCustomUsernameOrAnonymous()
+    {
+        string authBackup = AuthService.AuthFile + ".bak_test";
+        if (File.Exists(AuthService.AuthFile)) File.Copy(AuthService.AuthFile, authBackup, true);
+
+        try
+        {
+            var stored = new StoredAuth
+            {
+                AccessToken = "test-token",
+                RefreshToken = "test-refresh",
+                ExpiresAt = DateTimeOffset.UtcNow.AddHours(2),
+                Username = "TestUser",
+                UserId = "user-123"
+            };
+            AuthService.SaveStored(stored);
+
+            var settings = new SettingsService();
+            settings.CustomUsername = null;
+            var auth = new AuthService();
+
+            var steam = new SteamService(settings);
+            var cache = new CacheService();
+            var appList = new SteamAppListCache();
+            var appInfo = new SteamAppInfoCache(cache, appList);
+            var covers = new CoverCache(settings);
+            var vault = new LuaVault(steam);
+            var installer = new LuaInstaller(steam, settings, cache, vault);
+            var depotInfo = new SteamDepotInfo();
+            var drop = new DropInstallViewModel(installer, appList, appInfo, depotInfo);
+            var gh = new GithubProxy();
+            var unlocker = new UnlockerService(steam, settings, cache, gh);
+            var injector = new CefInjectorService(steam, Microsoft.Extensions.Logging.Abstractions.NullLogger<CefInjectorService>.Instance);
+            var plugin = new PluginInstallerService(steam, gh, injector, unlocker);
+            var toast = new ToastService();
+
+            var vm = new HomeViewModel(steam, auth, settings, appList, appInfo, covers, drop, unlocker, plugin, toast);
+            await auth.InitializeAsync();
+
+            // When signed in and no custom name is set, displays anonymous
+            Assert.Equal("Signed in as anonymous", vm.AccountStatus);
+
+            // When custom name is set in settings, immediately reflects it
+            settings.CustomUsername = "internetninja";
+            Assert.Equal("Signed in as internetninja", vm.AccountStatus);
+
+            // When cleared back to null/whitespace, displays anonymous
+            settings.CustomUsername = "   ";
+            Assert.Equal("Signed in as anonymous", vm.AccountStatus);
+
+            // Cleanup
+            settings.CustomUsername = null;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(authBackup))
+                {
+                    File.Copy(authBackup, AuthService.AuthFile, true);
+                    File.Delete(authBackup);
+                }
+                else
+                {
+                    File.Delete(AuthService.AuthFile);
+                }
+            }
+            catch { }
+        }
+    }
+
     [Fact]
     public void SettingsViewModel_ExposesUsernameAndUserId()
     {

@@ -41,6 +41,20 @@ public class SteamAppListCache
     /// <summary>Ensure the name list is loaded (from disk, or downloaded once). Safe to call repeatedly.</summary>
     public Task EnsureLoadedAsync() => _loadTask ??= LoadAsync();
 
+    public static string NormalizeForSearch(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var sb = new System.Text.StringBuilder(s.Length);
+        foreach (char c in s)
+        {
+            if (char.IsLetterOrDigit(c))
+                sb.Append(char.ToLowerInvariant(c));
+            else if (char.IsWhiteSpace(c))
+                sb.Append(' ');
+        }
+        return System.Text.RegularExpressions.Regex.Replace(sb.ToString(), @"\s+", " ").Trim();
+    }
+
     /// <summary>
     /// Searches cached app names for matches to query terms or AppID.
     /// Returns matches sorted by exact match -> starts with -> contains, then title length.
@@ -51,6 +65,7 @@ public class SteamAppListCache
         query = query.Trim();
 
         bool isNumeric = long.TryParse(query, out long targetAppId);
+        string normQuery = NormalizeForSearch(query);
         var matches = new List<(long AppId, string Name, int Rank, int Length)>();
 
         foreach (var (appId, name) in _names)
@@ -67,13 +82,23 @@ public class SteamAppListCache
             {
                 rank = 0; // Exact title match
             }
-            else if (name.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+            else
             {
-                rank = 1; // Starts with query
-            }
-            else if (name.Contains(query, StringComparison.OrdinalIgnoreCase))
-            {
-                rank = 2; // Contains query
+                string normName = NormalizeForSearch(name);
+                if (normName.Length > 0 && normName.Equals(normQuery, StringComparison.OrdinalIgnoreCase))
+                {
+                    rank = 0; // Exact normalized title match (e.g. "Assassins Creed III" == "Assassin's Creed® III")
+                }
+                else if (name.StartsWith(query, StringComparison.OrdinalIgnoreCase) ||
+                         (normQuery.Length > 0 && normName.StartsWith(normQuery, StringComparison.OrdinalIgnoreCase)))
+                {
+                    rank = 1; // Starts with query
+                }
+                else if (name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                         (normQuery.Length > 0 && normName.Contains(normQuery, StringComparison.OrdinalIgnoreCase)))
+                {
+                    rank = 2; // Contains query
+                }
             }
 
             if (rank >= 0)

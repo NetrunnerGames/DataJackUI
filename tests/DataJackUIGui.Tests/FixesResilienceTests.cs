@@ -1,4 +1,5 @@
 using DataJackUIGui.Services;
+using DataJackUIGui.Services.Downloads;
 using Xunit;
 
 namespace DataJackUIGui.Tests;
@@ -247,4 +248,89 @@ public class FixesResilienceTests
         Assert.NotEmpty(result.Games);
     }
 
+    [Fact]
+    public void SteamAppListCache_NormalizeForSearch_Removes_Punctuation_And_Symbols()
+    {
+        string normalized = SteamAppListCache.NormalizeForSearch("Assassin's Creed® III: Liberation HD™");
+        Assert.Equal("assassins creed iii liberation hd", normalized);
+    }
+
+    [Fact]
+    public void FixGameCardVm_Exposes_OnlineUrl_From_Listing()
+    {
+        var listing = new DataJackUIGui.Models.DenuvoGameListing
+        {
+            AppId = "of_18268",
+            Name = "Assassins Creed III",
+            OnlineUrl = "https://online-fix.me/games/adventures/18268-assassins-creed-iii-online.html"
+        };
+        var vm = new DataJackUIGui.ViewModels.FixGameCardVm(listing);
+        Assert.Equal("https://online-fix.me/games/adventures/18268-assassins-creed-iii-online.html", vm.OnlineUrl);
+    }
+
+    [Fact]
+    public async Task ResolveCandidateDirectLinks_Prioritizes_Pixeldrain()
+    {
+        var auth = new AuthService();
+        var appList = new SteamAppListCache();
+        var cache = new CacheService();
+        var appInfo = new SteamAppInfoCache(cache, appList);
+        var covers = new CoverCache();
+        var settings = new SettingsService();
+        var api = new DataJackUIApiClient(auth, appInfo, appList, covers, settings);
+
+        // Test with live hoster link for Assassins Creed III
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var candidates = await api.ResolveCandidateDirectLinksFromHosterAsync("https://hosters.online-fix.me:2053/Assassins%20Creed%20III", cts.Token);
+        Assert.NotEmpty(candidates);
+        // Pixeldrain should be #1 candidate because its score is 100
+        Assert.Contains("pixeldrain.com/api/file/", candidates[0].DirectUrl);
+        Assert.Contains("Fix_Repair", candidates[0].FileName);
+    }
+
+    [Fact]
+    public async Task ProcessGameData_With_SelectedTagId_Online_Filters_Detail_Fixes()
+    {
+        var settings = new SettingsService();
+        var auth = new AuthService();
+        var appList = new SteamAppListCache();
+        var cache = new CacheService();
+        var appInfo = new SteamAppInfoCache(cache, appList);
+        var covers = new CoverCache();
+        var api = new DataJackUIApiClient(auth, appInfo, appList, covers, settings);
+        var toast = new ToastService();
+        var steam = new SteamService(settings);
+        var library = new SteamLibraryService(steam);
+
+        var vm = new DataJackUIGui.ViewModels.FixesViewModel(api, auth, covers, appInfo, appList, toast, settings, null!, null!, library, steam);
+        vm.SelectedTagId = "online";
+
+        var listing = new DataJackUIGui.Models.DenuvoGameListing
+        {
+            AppId = "208480",
+            Name = "Assassins Creed III",
+            Tags = [new() { Id = "online", Name = "Online Fix" }]
+        };
+        var card = new DataJackUIGui.ViewModels.FixGameCardVm(listing);
+
+        var fakeData = new DataJackUIGui.Models.DenuvoFixesResponse
+        {
+            AppId = "208480",
+            Name = "Assassins Creed III",
+            Fixes =
+            [
+                new() { Id = "208480_ofme_0", Title = "Online Fix", Tags = [new() { Id = "online", Name = "Online Fix" }] },
+                new() { Id = "208480_bypass", Title = "Bypass Fix", Tags = [new() { Id = "bypass", Name = "Bypass" }] }
+            ]
+        };
+
+        var mi = typeof(DataJackUIGui.ViewModels.FixesViewModel).GetMethod("ProcessGameDataAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(mi);
+        var task = (Task)mi.Invoke(vm, [card, fakeData])!;
+        await task;
+
+        Assert.Equal("online", vm.SelectedFixTagId);
+        Assert.Single(vm.Fixes);
+        Assert.Equal("208480_ofme_0", vm.Fixes[0].Id);
+    }
 }

@@ -1485,6 +1485,10 @@ public class DataJackUIApiClient
                     itemTags.Add(new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" });
                 }
 
+                string? onlineUrl = null;
+                if (item.TryGetProperty("online_url", out var ou)) onlineUrl = ou.GetString();
+                else if (item.TryGetProperty("onlineUrl", out var ou2)) onlineUrl = ou2.GetString();
+
                 if (!dict.TryGetValue(appid, out var listing))
                 {
                     listing = new DenuvoGameListing
@@ -1493,13 +1497,16 @@ public class DataJackUIApiClient
                         Name = name,
                         HeaderImage = headerImage,
                         FixCount = 1,
-                        Tags = itemTags
+                        Tags = itemTags,
+                        OnlineUrl = onlineUrl
                     };
                     dict[appid] = listing;
                 }
                 else
                 {
                     listing.FixCount++;
+                    if (string.IsNullOrWhiteSpace(listing.OnlineUrl) && !string.IsNullOrWhiteSpace(onlineUrl))
+                        listing.OnlineUrl = onlineUrl;
                     foreach (var t in itemTags)
                     {
                         if (!listing.Tags.Any(x => string.Equals(x.Id, t.Id, StringComparison.OrdinalIgnoreCase)))
@@ -1571,7 +1578,7 @@ public class DataJackUIApiClient
         var mergedFixes = allFixes.DistinctBy(f => f.Id).ToList();
         if (mergedFixes.Count == 0)
         {
-            return CreateFallbackFixesResponse(appid, name);
+            return null;
         }
 
         return new DenuvoFixesResponse
@@ -1866,7 +1873,54 @@ public class DataJackUIApiClient
     }
 
     public sealed record OnlineFixScrapeResult(
-        string SearchName, string Title, string ArticleUrl, string VersionStr, string? DirectFixUrl, string? FixFileName);
+        string SearchName, string Title, string ArticleUrl, string VersionStr, string? DirectFixUrl, string? FixFileName,
+        IReadOnlyList<string>? CandidateUrls = null, string? Notes = null);
+
+    public void CacheOnlineFixScrape(string key, OnlineFixScrapeResult result)
+    {
+        if (string.IsNullOrWhiteSpace(key) || result is null) return;
+        lock (_ofLock)
+        {
+            _ofCache[key] = result;
+        }
+    }
+
+    /// <summary>
+    /// Directly scrapes an online-fix.me article URL without performing a site search.
+    /// Result is cached under the provided key, the article URL, and the game title.
+    /// </summary>
+    public async Task<OnlineFixScrapeResult?> ScrapeOnlineFixArticleUrlAsync(
+        string key, string articleUrl, string gameName, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(articleUrl)) return null;
+
+        lock (_ofLock)
+        {
+            if (_ofCache.TryGetValue(key, out var hit) && hit is not null) return hit;
+            if (_ofCache.TryGetValue(articleUrl, out var hitUrl) && hitUrl is not null) return hitUrl;
+        }
+
+        OnlineFixScrapeResult? result = null;
+        try
+        {
+            result = await ResolveOnlineFixViaWorkerAsync(key, gameName, articleUrl, ct);
+            if (result is null)
+                result = await ScrapeOnlineFixArticleAsync(articleUrl, gameName, ct);
+        }
+        catch { }
+
+        lock (_ofLock)
+        {
+            _ofCache[key] = result;
+            _ofCache[articleUrl] = result;
+            if (result is not null)
+            {
+                if (!string.IsNullOrWhiteSpace(result.Title)) _ofCache[result.Title] = result;
+                if (!string.IsNullOrWhiteSpace(gameName)) _ofCache[gameName] = result;
+            }
+        }
+        return result;
+    }
 
     /// <summary>
     /// Finds the game's article on online-fix.me and scrapes its game version + direct fix download link.
@@ -1879,18 +1933,32 @@ public class DataJackUIApiClient
     {
         if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(gameName) || gameName.StartsWith("App ", StringComparison.OrdinalIgnoreCase))
             return null;
-        lock (_ofLock) { if (_ofCache.TryGetValue(key, out var hit)) return hit; }
+        lock (_ofLock)
+        {
+            if (_ofCache.TryGetValue(key, out var hit)) return hit;
+            if (_ofCache.TryGetValue(gameName, out var hitName)) return hitName;
+        }
 
         OnlineFixScrapeResult? result = null;
         try
         {
-            string? articleUrl = await SearchOnlineFixArticleAsync(gameName, ct);
-            if (articleUrl is not null)
-                result = await ScrapeOnlineFixArticleAsync(articleUrl, gameName, ct);
+            result = await ResolveOnlineFixViaWorkerAsync(key, gameName, null, ct);
+            if (result is null)
+            {
+                string? articleUrl = await SearchOnlineFixArticleAsync(gameName, ct);
+                if (articleUrl is not null)
+                    result = await ScrapeOnlineFixArticleAsync(articleUrl, gameName, ct);
+            }
         }
         catch { }
 
-        lock (_ofLock) _ofCache[key] = result;
+        lock (_ofLock)
+        {
+            _ofCache[key] = result;
+            if (!string.IsNullOrWhiteSpace(gameName)) _ofCache[gameName] = result;
+            if (result is not null && !string.IsNullOrWhiteSpace(result.Title))
+                _ofCache[result.Title] = result;
+        }
         return result;
     }
 
@@ -2014,6 +2082,75 @@ public class DataJackUIApiClient
         return false;
     }
 
+    /// <summary>
+    /// Calls the cloudflare worker at https://bots.netrunnergames.workers.dev/api/onlinefix/resolve
+    /// to search/scrape online-fix.me and translate Russian notes using Workers AI.
+    /// If direct_fix_url is not returned but hoster_url is present, resolves direct candidate links from hoster.
+    /// </summary>
+    private async Task<OnlineFixScrapeResult?> ResolveOnlineFixViaWorkerAsync(
+        string key, string gameName, string? articleUrl, CancellationToken ct)
+    {
+        try
+        {
+            var query = new List<string>();
+            if (!string.IsNullOrWhiteSpace(articleUrl))
+                query.Add($"url={Uri.EscapeDataString(articleUrl)}");
+            if (!string.IsNullOrWhiteSpace(gameName))
+                query.Add($"name={Uri.EscapeDataString(gameName)}");
+
+            if (query.Count == 0) return null;
+
+            string endpoint = $"https://bots.netrunnergames.workers.dev/api/onlinefix/resolve?{string.Join("&", query)}";
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(12));
+
+            using var res = await _http.GetAsync(endpoint, timeoutCts.Token);
+            if (!res.IsSuccessStatusCode) return null;
+
+            using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(timeoutCts.Token), cancellationToken: timeoutCts.Token);
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("success", out var okElem) || !okElem.GetBoolean()) return null;
+            if (!root.TryGetProperty("data", out var dataElem) || dataElem.ValueKind != JsonValueKind.Object) return null;
+
+            string title = dataElem.TryGetProperty("title", out var tProp) ? tProp.GetString() ?? gameName : gameName;
+            string foundArticleUrl = dataElem.TryGetProperty("article_url", out var aProp) ? aProp.GetString() ?? (articleUrl ?? "") : (articleUrl ?? "");
+            string version = dataElem.TryGetProperty("version", out var vProp) ? vProp.GetString() ?? "Game version: Latest" : "Game version: Latest";
+            string? notes = dataElem.TryGetProperty("notes", out var nProp) ? nProp.GetString() : null;
+            string? directUrl = dataElem.TryGetProperty("direct_fix_url", out var dProp) ? dProp.GetString() : null;
+            string? hosterUrl = dataElem.TryGetProperty("hoster_url", out var hProp) ? hProp.GetString() : null;
+            string? fileName = dataElem.TryGetProperty("file_name", out var fProp) ? fProp.GetString() : null;
+
+            List<string> candidateUrls = [];
+            if (!string.IsNullOrWhiteSpace(directUrl))
+            {
+                candidateUrls.Add(directUrl);
+            }
+
+            if (!string.IsNullOrWhiteSpace(hosterUrl))
+            {
+                CacheOnlineFixHosterUrl(key, hosterUrl, fileName);
+                if (!string.IsNullOrWhiteSpace(foundArticleUrl)) CacheOnlineFixHosterUrl(foundArticleUrl, hosterUrl, fileName);
+
+                if (string.IsNullOrWhiteSpace(directUrl))
+                {
+                    var links = await ResolveCandidateDirectLinksFromHosterAsync(hosterUrl, ct);
+                    if (links.Count > 0)
+                    {
+                        directUrl = links[0].DirectUrl;
+                        fileName ??= links[0].FileName;
+                        candidateUrls = links.Select(l => l.DirectUrl).ToList();
+                    }
+                }
+            }
+
+            return new OnlineFixScrapeResult(gameName, title, foundArticleUrl, version, directUrl, fileName, candidateUrls, notes);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private async Task<OnlineFixScrapeResult?> ScrapeOnlineFixArticleAsync(string articleUrl, string searchName, CancellationToken ct)
     {
         string html = await GetOnlineFixHtmlAsync(articleUrl, ct);
@@ -2040,12 +2177,17 @@ public class DataJackUIApiClient
         }
 
         string? direct = null, fileName = null;
+        List<string> candidateUrls = [];
         var hosterMatch = Regex.Match(html, @"href=""(https://hosters\.online-fix\.me:2053/[^""]+)""", RegexOptions.IgnoreCase);
         if (hosterMatch.Success)
         {
-            var (d, f) = await ResolveDirectLinkFromHosterAsync(hosterMatch.Groups[1].Value, ct);
-            direct = d;
-            fileName = f;
+            var links = await ResolveCandidateDirectLinksFromHosterAsync(hosterMatch.Groups[1].Value, ct);
+            if (links.Count > 0)
+            {
+                direct = links[0].DirectUrl;
+                fileName = links[0].FileName;
+                candidateUrls = links.Select(l => l.DirectUrl).ToList();
+            }
         }
 
         if (string.IsNullOrEmpty(title))
@@ -2054,7 +2196,7 @@ public class DataJackUIApiClient
             title = Regex.Replace(title, @"^\d+-", "").Replace(".html", "").Replace('-', ' ').Trim();
         }
 
-        return new OnlineFixScrapeResult(searchName, title, articleUrl, versionStr, direct, fileName);
+        return new OnlineFixScrapeResult(searchName, title, articleUrl, versionStr, direct, fileName, candidateUrls, null);
     }
 
     private async Task<string> GetOnlineFixHtmlAsync(string url, CancellationToken ct)
@@ -2075,7 +2217,37 @@ public class DataJackUIApiClient
         catch { return ""; }
     }
 
+    private static int GetHosterScore(string url)
+    {
+        if (url.Contains("pixeldrain.com", StringComparison.OrdinalIgnoreCase)) return 100;
+        if (url.Contains("fileditch", StringComparison.OrdinalIgnoreCase)) return 40;
+        if (url.Contains("vikingfile.com", StringComparison.OrdinalIgnoreCase)) return 20;
+        if (url.Contains("gofile.io", StringComparison.OrdinalIgnoreCase)) return 10;
+        if (url.Contains("filekeeper.net", StringComparison.OrdinalIgnoreCase)) return 5;
+        return 1;
+    }
+
+    private static string NormalizeDirectLink(string dl)
+    {
+        if (string.IsNullOrWhiteSpace(dl)) return dl;
+        if (dl.Contains("pixeldrain.com/u/", StringComparison.OrdinalIgnoreCase))
+        {
+            return Regex.Replace(dl, @"pixeldrain\.com/u/", "pixeldrain.com/api/file/", RegexOptions.IgnoreCase);
+        }
+        if (!dl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"https://hosters.online-fix.me:2053/{dl.TrimStart('/')}";
+        }
+        return dl;
+    }
+
     public async Task<(string? DirectUrl, string? FileName)> ResolveDirectLinkFromHosterAsync(string hosterUrl, CancellationToken ct = default)
+    {
+        var list = await ResolveCandidateDirectLinksFromHosterAsync(hosterUrl, ct);
+        return list.Count > 0 ? (list[0].DirectUrl, list[0].FileName) : (null, null);
+    }
+
+    public async Task<List<(string DirectUrl, string FileName)>> ResolveCandidateDirectLinksFromHosterAsync(string hosterUrl, CancellationToken ct = default)
     {
         try
         {
@@ -2083,7 +2255,7 @@ public class DataJackUIApiClient
             string hosterHtml = await GetOnlineFixHtmlAsync(hosterUrl, ct);
             hosterHtml = hosterHtml.Replace("&quot;", "\"").Replace("&amp;", "&");
 
-            var candidates = new List<(string FileName, string DirectLink)>();
+            var rawCandidates = new List<(string FileName, string DirectLink)>();
             foreach (Match lm in Regex.Matches(hosterHtml, @"data-links=['""](\[\{[\s\S]*?\}\])['""]", RegexOptions.IgnoreCase))
             {
                 try
@@ -2095,28 +2267,35 @@ public class DataJackUIApiClient
                         string? dl = item.TryGetProperty("direct_link", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;
                         if (string.IsNullOrEmpty(fn) || string.IsNullOrEmpty(dl)) continue;
                         if (fn.ToLowerInvariant().Contains("gdkhelper")) continue; // MS Store fix — needs the whole game, not usable on Steam
-                        candidates.Add((fn, dl));
+                        rawCandidates.Add((fn, dl));
                     }
                 }
                 catch { }
             }
 
-            string? chosen = candidates.FirstOrDefault(c => c.FileName.ToLowerInvariant().Contains("fix_repair")).FileName
-                ?? candidates.FirstOrDefault(c => { string l = c.FileName.ToLowerInvariant(); return l.Contains("fix") && !l.Contains("ofme"); }).FileName
-                ?? candidates.FirstOrDefault(c => c.FileName.ToLowerInvariant().Contains("ofme")).FileName
-                ?? candidates.FirstOrDefault().FileName;
+            if (rawCandidates.Count == 0) return [];
 
-            if (chosen is not null)
+            var fileGroups = rawCandidates.GroupBy(c => c.FileName, StringComparer.OrdinalIgnoreCase).ToList();
+            var chosenGroup = fileGroups.FirstOrDefault(g => g.Key.ToLowerInvariant().Contains("fix_repair"))
+                ?? fileGroups.FirstOrDefault(g => { string l = g.Key.ToLowerInvariant(); return l.Contains("fix") && !l.Contains("ofme"); })
+                ?? fileGroups.FirstOrDefault(g => g.Key.ToLowerInvariant().Contains("ofme"))
+                ?? fileGroups.FirstOrDefault();
+
+            if (chosenGroup is null) return [];
+
+            var results = new List<(string DirectUrl, string FileName)>();
+            foreach (var item in chosenGroup.OrderByDescending(c => GetHosterScore(c.DirectLink)))
             {
-                string dl = candidates.First(c => c.FileName == chosen).DirectLink;
-                string direct = dl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
-                    ? dl
-                    : $"https://hosters.online-fix.me:2053/{dl.TrimStart('/')}";
-                return (direct, chosen);
+                string normUrl = NormalizeDirectLink(item.DirectLink);
+                if (!string.IsNullOrEmpty(normUrl) && !results.Any(r => r.DirectUrl.Equals(normUrl, StringComparison.OrdinalIgnoreCase)))
+                {
+                    results.Add((normUrl, chosenGroup.Key));
+                }
             }
+            return results;
         }
         catch { }
-        return (null, null);
+        return [];
     }
 
     /// <summary>Downloads the scraped online-fix.me direct link (with the UA/Referer the hoster requires).</summary>
@@ -2131,10 +2310,17 @@ public class DataJackUIApiClient
         string? hosterUrl = null;
         string? hosterFileName = null;
 
+        string baseKey = key.Contains("_ofme_", StringComparison.Ordinal)
+            ? key.Substring(0, key.IndexOf("_ofme_", StringComparison.Ordinal))
+            : key;
+
         lock (_ofLock)
         {
-            _ofCache.TryGetValue(key, out scrape);
-            if (_ofHosterCache.TryGetValue(key, out var h))
+            if (!_ofCache.TryGetValue(key, out scrape) && baseKey != key)
+            {
+                _ofCache.TryGetValue(baseKey, out scrape);
+            }
+            if (_ofHosterCache.TryGetValue(key, out var h) || (baseKey != key && _ofHosterCache.TryGetValue(baseKey, out h)))
             {
                 hosterUrl = h.HosterUrl;
                 hosterFileName = h.FileName;
@@ -2143,29 +2329,46 @@ public class DataJackUIApiClient
 
         for (int attempt = 0; attempt < 2; attempt++)
         {
-            string? url = scrape?.DirectFixUrl;
+            List<string> candidateUrls = [];
+            if (scrape?.CandidateUrls is { Count: > 0 } list)
+            {
+                candidateUrls.AddRange(list);
+            }
+            else if (!string.IsNullOrWhiteSpace(scrape?.DirectFixUrl))
+            {
+                candidateUrls.Add(scrape.DirectFixUrl);
+            }
+
             string fileName = scrape?.FixFileName ?? hosterFileName ?? fallbackName;
 
             // If we have a cached hoster URL but no direct url yet, resolve directly from hoster
-            if (url is null && !string.IsNullOrWhiteSpace(hosterUrl))
+            if (candidateUrls.Count == 0 && !string.IsNullOrWhiteSpace(hosterUrl))
             {
-                var (resolvedDirect, resolvedFile) = await ResolveDirectLinkFromHosterAsync(hosterUrl, ct);
-                if (resolvedDirect is not null)
+                var resolvedCandidates = await ResolveCandidateDirectLinksFromHosterAsync(hosterUrl, ct);
+                if (resolvedCandidates.Count > 0)
                 {
-                    url = resolvedDirect;
-                    if (resolvedFile is not null) fileName = resolvedFile;
+                    candidateUrls.AddRange(resolvedCandidates.Select(c => c.DirectUrl));
+                    if (resolvedCandidates[0].FileName is not null)
+                        fileName = resolvedCandidates[0].FileName;
                 }
             }
 
-            if (url is null)
+            if (candidateUrls.Count == 0)
             {
                 string searchName = scrape?.SearchName ?? fallbackName;
-                scrape = await ScrapeOnlineFixForGameAsync(key, searchName, ct);
-                url = scrape?.DirectFixUrl;
+                scrape = await ScrapeOnlineFixForGameAsync(baseKey, searchName, ct);
+                if (scrape?.CandidateUrls is { Count: > 0 } slist)
+                {
+                    candidateUrls.AddRange(slist);
+                }
+                else if (!string.IsNullOrWhiteSpace(scrape?.DirectFixUrl))
+                {
+                    candidateUrls.Add(scrape.DirectFixUrl);
+                }
                 if (!string.IsNullOrWhiteSpace(scrape?.FixFileName)) fileName = scrape.FixFileName!;
             }
 
-            if (url is not null)
+            foreach (var url in candidateUrls)
             {
                 try
                 {
@@ -2174,20 +2377,30 @@ public class DataJackUIApiClient
                     req.Headers.Referrer = new Uri(OnlineFixReferer);
                     using var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
                     if (res.IsSuccessStatusCode)
+                    {
+                        var mediaType = res.Content.Headers.ContentType?.MediaType;
+                        if (mediaType != null && (mediaType.Contains("text/html", StringComparison.OrdinalIgnoreCase) || mediaType.Contains("text/plain", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            continue; // Hoster served HTML error/challenge page, try next candidate
+                        }
                         return await HttpFileDownloader.SaveResponseAsync(res, fileName, progress, ct);
+                    }
                 }
                 catch (OperationCanceledException) { throw; }
                 catch { }
             }
 
             // Link likely expired: drop cache and retry
-            lock (_ofLock) _ofCache.Remove(key);
+            lock (_ofLock)
+            {
+                _ofCache.Remove(key);
+                if (baseKey != key) _ofCache.Remove(baseKey);
+            }
             scrape = null;
         }
 
         throw new InvalidOperationException($"No online-fix.me download link found for '{key}'");
     }
-
     // ── Plumbing ────────────────────────────────────────────────────
 
     private async Task<HttpResponseMessage> SendAsync(

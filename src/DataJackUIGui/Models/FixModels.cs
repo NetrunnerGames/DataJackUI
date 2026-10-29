@@ -17,6 +17,7 @@ public class DenuvoGameListing
     [JsonPropertyName("appid")] public string AppId { get; set; } = "";
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("header_image")] public string? HeaderImage { get; set; }
+    [JsonPropertyName("online_url")] public string? OnlineUrl { get; set; }
 
     [JsonPropertyName("fixCount")]
     public int FixCount
@@ -153,6 +154,9 @@ public class DenuvoFix
 
     [JsonPropertyName("downloadUrl")]
     public string? DownloadUrlCamel { set => DownloadUrl = value; }
+
+    [JsonPropertyName("notes")] public string? Notes { get; set; }
+    [JsonPropertyName("notes_en")] public string? NotesEn { set => Notes = value; }
 
     [JsonPropertyName("createdAt")] public string? CreatedAt { get; set; }
     [JsonPropertyName("created_at")] public string? CreatedAtSnake { set => CreatedAt = value; }

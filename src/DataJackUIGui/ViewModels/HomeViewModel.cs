@@ -25,6 +25,7 @@ public partial class HomeViewModel : ObservableObject
 
     private readonly SteamService _steam;
     private readonly AuthService _auth;
+    private readonly SettingsService _settings;
     private readonly SteamAppListCache _appList;
     private readonly SteamAppInfoCache _appInfo;
     private readonly CoverCache _covers;
@@ -70,12 +71,13 @@ public partial class HomeViewModel : ObservableObject
     // ── Active unlocker mode ────────────────────────────────────────
     [ObservableProperty] private string _modeStatus = Resources.Strings.Home_NoModeSelected;
 
-    public HomeViewModel(SteamService steam, AuthService auth,
+    public HomeViewModel(SteamService steam, AuthService auth, SettingsService settings,
         SteamAppListCache appList, SteamAppInfoCache appInfo, CoverCache covers, DropInstallViewModel drop,
         UnlockerService unlocker, PluginInstallerService plugin, ToastService toast)
     {
         _steam = steam;
         _auth = auth;
+        _settings = settings;
         _appList = appList;
         _appInfo = appInfo;
         _covers = covers;
@@ -84,6 +86,7 @@ public partial class HomeViewModel : ObservableObject
         _toast = toast;
         Drop = drop;
         _auth.AuthStateChanged += RefreshAccount;
+        _settings.CustomProfileChanged += RefreshAccount;
         // Library refresh on any install (drag-drop, plugin, Add page, Fixes) is driven by
         // LuaInstaller.Installed, wired in App → RefreshLibraryAsync.
     }
@@ -228,8 +231,10 @@ public partial class HomeViewModel : ObservableObject
     private void RefreshAccount()
     {
         IsSignedIn = _auth.IsSignedIn;
-        AccountStatus = IsSignedIn
-            ? (_auth.DisplayName is { } n ? string.Format(Resources.Strings.Home_SignedInAs, n) : Resources.Strings.Home_SignedIn)
-            : Resources.Strings.Home_BrowsingAsGuest;
+        string effectiveName = !string.IsNullOrWhiteSpace(_settings.CustomUsername)
+            ? _settings.CustomUsername
+            : "anonymous";
+
+        AccountStatus = string.Format(Resources.Strings.Home_SignedInAs, effectiveName);
     }
 }

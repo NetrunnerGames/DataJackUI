@@ -85,6 +85,9 @@ public class AppSettings
 
 public class SettingsService
 {
+    /// <summary>Fired when CustomUsername or CustomAvatarPath changes so UI displays can refresh immediately.</summary>
+    public event Action? CustomProfileChanged;
+
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui");
     private static readonly string FilePath = Path.Combine(Dir, "settings.json");
@@ -369,6 +372,7 @@ public class SettingsService
             if (_settings.CustomUsername == normalized) return;
             _settings.CustomUsername = normalized;
             Save();
+            CustomProfileChanged?.Invoke();
         }
     }
 
@@ -382,6 +386,7 @@ public class SettingsService
             if (_settings.CustomAvatarPath == normalized) return;
             _settings.CustomAvatarPath = normalized;
             Save();
+            CustomProfileChanged?.Invoke();
         }
     }
 

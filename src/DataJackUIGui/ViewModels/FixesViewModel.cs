@@ -19,6 +19,7 @@ public partial class FixGameCardVm : ObservableObject
     public int FixCount { get; }
     public IReadOnlyList<string> TagIds { get; }
     public string FixCountLabel => FixTypeLabel;
+    public string? OnlineUrl => g.OnlineUrl;
 
     public bool HasPlaceholderName =>
         string.IsNullOrWhiteSpace(Name) ||
@@ -225,6 +226,8 @@ public partial class FixItemVm(DenuvoFix f) : ObservableObject
     public string DateLabel { get; } = FormatDate(f.CreatedAt);
     public string? SizeLabel { get; } = FormatSize(f.FileSize, f.SizeStr);
     public bool HasSize => !string.IsNullOrEmpty(SizeLabel);
+    public string? Notes { get; } = f.Notes;
+    public bool HasNotes => !string.IsNullOrWhiteSpace(Notes);
 
     /// <summary>In-flight queue items for this fix's two slots. The buttons and their progress bars bind
     /// straight through, so the shared queue stays the only owner of download state.</summary>
@@ -622,7 +625,18 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
                 }
             }
 
-            data ??= DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
+            if (data is null && game.TagIds.Any(t => t.Equals("bypass", StringComparison.OrdinalIgnoreCase)))
+            {
+                data = DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
+            }
+            data ??= new DenuvoFixesResponse
+            {
+                AppId = game.AppId,
+                Name = game.Name,
+                HeaderImage = game.HeaderImage,
+                Fixes = []
+            };
+
             if (data.Name.StartsWith("App ", StringComparison.OrdinalIgnoreCase) && !game.HasPlaceholderName)
             {
                 data.Name = game.Name;
@@ -645,19 +659,26 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
                 string searchKey = realAppId > 0 ? realAppId.ToString() : game.AppId;
                 if (!string.IsNullOrWhiteSpace(game.Name))
                 {
-                    var of = await api.ScrapeOnlineFixForGameAsync(searchKey, game.Name);
+                    var of = !string.IsNullOrWhiteSpace(game.OnlineUrl)
+                        ? await api.ScrapeOnlineFixArticleUrlAsync(searchKey, game.OnlineUrl, game.Name)
+                        : await api.ScrapeOnlineFixForGameAsync(searchKey, game.Name);
                     if (of?.DirectFixUrl is not null)
                     {
                         // Found a live verified fix from online-fix.me scraper - replace any unverified fixes
                         data.Fixes.RemoveAll(f => f.Tags.Any(t => string.Equals(t.Id, "online", StringComparison.OrdinalIgnoreCase)));
-                        data.Fixes.Add(new DenuvoFix
+                        var newFix = new DenuvoFix
                         {
                             Id = realAppId > 0 ? $"{realAppId}_ofme_0" : $"{game.AppId}_ofme_0",
                             Title = of.Title,
                             Description = of.VersionStr,
+                            Notes = of.Notes,
                             FixFilename = of.FixFileName,
                             Tags = [new DenuvoTag { Id = "online", Name = "Online Fix", Slug = "online" }]
-                        });
+                        };
+                        data.Fixes.Add(newFix);
+                        api.CacheOnlineFixScrape(newFix.Id, of);
+                        api.CacheOnlineFixScrape(game.AppId, of);
+                        if (realAppId > 0) api.CacheOnlineFixScrape(realAppId.ToString(), of);
                     }
                 }
             }
@@ -667,7 +688,9 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         }
         catch
         {
-            var fallback = DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name);
+            var fallback = game.TagIds.Any(t => t.Equals("bypass", StringComparison.OrdinalIgnoreCase))
+                ? DataJackUIApiClient.CreateFallbackFixesResponse(game.AppId, game.Name)
+                : new DenuvoFixesResponse { AppId = game.AppId, Name = game.Name, HeaderImage = game.HeaderImage, Fixes = [] };
             await ProcessGameDataAsync(game, fallback);
         }
         finally { IsLoadingFixes = false; ClearCursor(); }
@@ -688,8 +711,34 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
             f.IsApplied = installDir is not null && File.Exists(ManifestJobFactory.GetFixRecordPath(installDir, f.Id));
         }
 
-        var distinct = _allFixes.SelectMany(f => f.Tags).GroupBy(t => t.Id).Select(g => g.First()).OrderBy(t => t.Name).ToList();
-        if (distinct.Count > 1) foreach (var t in distinct) FixTags.Add(new TagPillVm(t));
+        var distinct = _allFixes.SelectMany(f => f.Tags)
+            .GroupBy(t => t.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderBy(t => t.Name)
+            .ToList();
+
+        if (distinct.Count > 1)
+        {
+            foreach (var t in distinct) FixTags.Add(new TagPillVm(t));
+        }
+
+        // Inherit the active catalog tag filter (e.g. 'Online Fix') so opening a filtered game shows only the matching fix
+        if (!string.IsNullOrWhiteSpace(SelectedTagId) && _allFixes.Any(f => f.Tags.Any(t =>
+            string.Equals(t.Id, SelectedTagId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(t.Slug, SelectedTagId, StringComparison.OrdinalIgnoreCase) ||
+            (t.Id != null && t.Id.Contains(SelectedTagId, StringComparison.OrdinalIgnoreCase)))))
+        {
+            SelectedFixTagId = SelectedTagId;
+            foreach (var pill in FixTags)
+            {
+                pill.IsSelected = string.Equals(pill.Id, SelectedFixTagId, StringComparison.OrdinalIgnoreCase) ||
+                                  (pill.Id != null && pill.Id.Contains(SelectedFixTagId, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+        else
+        {
+            SelectedFixTagId = null;
+        }
 
         OnPropertyChanged(nameof(HasFixTags));
         ApplyFixFilter();
@@ -698,15 +747,22 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     [RelayCommand]
     private void SelectFixTag(string? tagId)
     {
-        SelectedFixTagId = SelectedFixTagId == tagId ? null : tagId;
-        foreach (var pill in FixTags) pill.IsSelected = pill.Id == SelectedFixTagId;
+        SelectedFixTagId = string.Equals(SelectedFixTagId, tagId, StringComparison.OrdinalIgnoreCase) ? null : tagId;
+        foreach (var pill in FixTags)
+            pill.IsSelected = string.Equals(pill.Id, SelectedFixTagId, StringComparison.OrdinalIgnoreCase);
         ApplyFixFilter();
     }
 
     private void ApplyFixFilter()
     {
         IEnumerable<FixItemVm> shown = _allFixes;
-        if (SelectedFixTagId is { } tag) shown = shown.Where(f => f.Tags.Any(t => t.Id == tag));
+        if (SelectedFixTagId is { } tag)
+        {
+            shown = shown.Where(f => f.Tags.Any(t =>
+                string.Equals(t.Id, tag, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(t.Slug, tag, StringComparison.OrdinalIgnoreCase) ||
+                (t.Id != null && t.Id.Contains(tag, StringComparison.OrdinalIgnoreCase))));
+        }
         Fixes.Clear();
         foreach (var f in shown) Fixes.Add(f);
     }
