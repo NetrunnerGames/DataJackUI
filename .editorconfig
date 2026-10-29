@@ -1,0 +1,34 @@
+# Top-most EditorConfig file
+root = true
+
+# Default rules for all files
+[*]
+charset = utf-8
+end_of_line = crlf
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# C# Code Analysis & StyleCop / Roslyn complexity suppression
+[*.cs]
+# CA1502: Avoid excessive complexity
+dotnet_diagnostic.CA1502.severity = none
+
+# CA1506: Avoid excessive class coupling
+dotnet_diagnostic.CA1506.severity = none
+
+# CA1505: Avoid unmaintainable code
+dotnet_diagnostic.CA1505.severity = none
+
+# StyleCop SA1507: Code should not contain multiple blank lines in a row
+dotnet_diagnostic.SA1507.severity = suggestion
+
+# StyleCop SA1402: File may only contain a single type
+dotnet_diagnostic.SA1402.severity = none
+
+# StyleCop SA1600: Elements should be documented
+dotnet_diagnostic.SA1600.severity = none
+
+# StyleCop SA1633: File should have header
+dotnet_diagnostic.SA1633.severity = none
