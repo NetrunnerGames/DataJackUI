@@ -99,7 +99,7 @@ public class TaskRequirementsTests
         string settingsPath = Path.Combine(dir, "settings.json");
         string bakPath = settingsPath + ".bak";
         
-        string savedJson = File.Exists(settingsPath) ? File.ReadAllText(settingsPath) : null;
+        string? savedJson = File.Exists(settingsPath) ? File.ReadAllText(settingsPath) : null;
         try
         {
             if (File.Exists(settingsPath)) File.Delete(settingsPath);
