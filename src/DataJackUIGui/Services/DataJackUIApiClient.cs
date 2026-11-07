@@ -17,7 +17,7 @@ public class ApiException(string message, HttpStatusCode? status = null) : Excep
 
 public record DownloadedFile(string FilePath, string FileName);
 
-/// <summary>Typed client for the DataJackUI backend API, authenticated with a Supabase bearer token.</summary>
+/// <summary>Typed client for the DataJackUI backend API, authenticated with a Auth bearer token.</summary>
 public class DataJackUIApiClient
 {
     static DataJackUIApiClient() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -1111,7 +1111,7 @@ public class DataJackUIApiClient
 
     /// <summary>
     /// The standard lua.tools daily download usage (25/day), counted live from the user_downloads
-    /// table via Supabase REST. The same source the website reads. RLS scopes it to the signed-in
+    /// table via Auth REST. The same source the website reads. RLS scopes it to the signed-in
     /// user, so no user id is needed. Null on failure / not signed in.
     /// </summary>
     public async Task<StandardUsage?> GetStandardUsageAsync(CancellationToken ct = default)
@@ -1119,11 +1119,11 @@ public class DataJackUIApiClient
         try
         {
             var todayUtc = DateTime.UtcNow.Date.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'");
-            string url = $"{AppConfig.SupabaseUrl}/rest/v1/user_downloads" +
+            string url = $"{AppConfig.AuthWorkerUrl}/rest/v1/user_downloads" +
                          $"?select=appid&downloaded_at=gte.{Uri.EscapeDataString(todayUtc)}";
             var req = new HttpRequestMessage(HttpMethod.Head, url);
-            if (!string.IsNullOrEmpty(AppConfig.SupabaseAnonKey))
-                req.Headers.TryAddWithoutValidation("apikey", AppConfig.SupabaseAnonKey);
+            if (!string.IsNullOrEmpty(AppConfig.AuthAnonKey))
+                req.Headers.TryAddWithoutValidation("apikey", AppConfig.AuthAnonKey);
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _auth.GetValidAccessTokenAsync());
             req.Headers.TryAddWithoutValidation("Prefer", "count=exact");
 

@@ -442,7 +442,7 @@ public class AuthService
         if (!res.IsSuccessStatusCode)
             throw new AuthException($"Auth exchange failed: {body}");
 
-        var session = JsonSerializer.Deserialize<SupabaseSession>(body)
+        var session = JsonSerializer.Deserialize<AuthSession>(body)
                ?? throw new AuthException("Invalid session returned from auth worker.");
 
         ApplySession(session);
@@ -627,22 +627,22 @@ public class AuthService
         }
     }
 
-    private async Task<SupabaseSession> ExchangeCodeAsync(string code, string verifier, CancellationToken ct)
+    private async Task<AuthSession> ExchangeCodeAsync(string code, string verifier, CancellationToken ct)
     {
-        var req = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.SupabaseUrl}/auth/v1/token?grant_type=pkce")
+        var req = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.AuthWorkerUrl}/auth/v1/token?grant_type=pkce")
         {
             Content = new StringContent(
                 JsonSerializer.Serialize(new { auth_code = code, code_verifier = verifier }),
                 Encoding.UTF8, "application/json"),
         };
-        req.Headers.Add("apikey", AppConfig.SupabaseAnonKey);
+        req.Headers.Add("apikey", AppConfig.AuthAnonKey);
 
         var res = await _http.SendAsync(req, ct);
         string body = await res.Content.ReadAsStringAsync(ct);
         if (!res.IsSuccessStatusCode)
             throw new AuthException(string.Format(Resources.Strings.Auth_Err_TokenExchangeFailed, (int)res.StatusCode, body));
 
-        return JsonSerializer.Deserialize<SupabaseSession>(body)
+        return JsonSerializer.Deserialize<AuthSession>(body)
                ?? throw new AuthException(Resources.Strings.Auth_Err_TokenExchangeEmpty);
     }
 
@@ -713,24 +713,24 @@ public class AuthService
             }
             catch
             {
-                // Fall through to standard refresh or let Supabase flow handle
+                // Fall through to standard refresh or let OAuth flow handle
             }
         }
 
-        var req = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.SupabaseUrl}/auth/v1/token?grant_type=refresh_token")
+        var req = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.AuthWorkerUrl}/auth/v1/token?grant_type=refresh_token")
         {
             Content = new StringContent(
                 JsonSerializer.Serialize(new { refresh_token = _refreshToken }),
                 Encoding.UTF8, "application/json"),
         };
-        req.Headers.Add("apikey", AppConfig.SupabaseAnonKey);
+        req.Headers.Add("apikey", AppConfig.AuthAnonKey);
 
         var res = await _http.SendAsync(req);
         string body = await res.Content.ReadAsStringAsync();
         if (!res.IsSuccessStatusCode)
             throw new AuthException(string.Format(Resources.Strings.Auth_Err_RefreshFailed, (int)res.StatusCode));
 
-        var session = JsonSerializer.Deserialize<SupabaseSession>(body)
+        var session = JsonSerializer.Deserialize<AuthSession>(body)
                       ?? throw new AuthException(Resources.Strings.Auth_Err_RefreshEmpty);
         ApplySession(session);
     }
@@ -767,7 +767,7 @@ public class AuthService
 
     // ── Internals ───────────────────────────────────────────────────
 
-    private void ApplySession(SupabaseSession session)
+    private void ApplySession(AuthSession session)
     {
         _accessToken = session.AccessToken;
         _refreshToken = session.RefreshToken;

@@ -42,9 +42,9 @@ public class AllowedAppIdsConverter : JsonConverter<List<long>>
 }
 
 /// <summary>
-/// User entitlement & access control profile from server API / Supabase KV.
+/// User entitlement & access control profile from server API / Neon Postgres KV.
 /// Entitlements are 100% server-enforced: the server validates Discord ID/OAuth session,
-/// checks user_entitlements in Supabase, and returns allowed tiers and app permissions.
+/// checks user_entitlements in Neon Postgres, and returns allowed tiers and app permissions.
 /// </summary>
 public record UserEntitlement
 {

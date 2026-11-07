@@ -5,8 +5,8 @@ namespace DataJackUIGui;
 /// </summary>
 public static class AppConfig
 {
-    public const string SupabaseUrl = "https://auth.netrunnergames.workers.dev";
-    public const string SupabaseAnonKey = "";
+    public const string AuthWorkerUrl = "https://auth.netrunnergames.workers.dev";
+    public const string AuthAnonKey = "";
 
     public const string ApiBaseUrl = "https://auth.netrunnergames.workers.dev";
 
@@ -17,7 +17,7 @@ public static class AppConfig
     // Key + stats are managed in Settings; key-gated source downloads hit it.
     public const string HubcapBaseUrl = "https://hubcapmanifest.com";
 
-    /// <summary>Must be registered in Supabase Auth → Redirect URLs.</summary>
+    /// <summary>Must be registered in Auth Worker → Redirect URLs.</summary>
     public const int OAuthCallbackPort = 53789;
     public const string OAuthCallbackUrl = "http://localhost:53789/callback";
 

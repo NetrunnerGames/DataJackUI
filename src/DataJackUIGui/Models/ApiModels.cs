@@ -170,17 +170,17 @@ public class SupporterStatus
     [JsonPropertyName("isSupporter")] public bool IsSupporter { get; set; }
 }
 
-// ── Supabase auth DTOs ──────────────────────────────────────────────
+// ── Auth session DTOs ──────────────────────────────────────────────
 
-public class SupabaseSession
+public class AuthSession
 {
     [JsonPropertyName("access_token")] public string AccessToken { get; set; } = "";
     [JsonPropertyName("refresh_token")] public string RefreshToken { get; set; } = "";
     [JsonPropertyName("expires_in")] public int ExpiresIn { get; set; }
-    [JsonPropertyName("user")] public SupabaseUser? User { get; set; }
+    [JsonPropertyName("user")] public AuthUser? User { get; set; }
 }
 
-public class SupabaseUser
+public class AuthUser
 {
     [JsonPropertyName("id")] public string Id { get; set; } = "";
     [JsonPropertyName("email")] public string? Email { get; set; }
