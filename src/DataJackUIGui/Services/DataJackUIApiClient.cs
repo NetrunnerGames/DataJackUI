@@ -1302,8 +1302,46 @@ public class DataJackUIApiClient
 
     /// <summary>DepotBox and Online-Fix game fixes endpoint. Returns game listings and tags (Bypass, Online Fix).</summary>
     /// <summary>Fetch listings for Online-Fix catalog exclusively.</summary>
-    public async Task<DenuvoListingsResponse?> GetOnlineFixListingsAsync(CancellationToken ct = default) =>
-        await GetDenuvoListingsAsync("online", ct);
+    public async Task<DenuvoListingsResponse?> GetOnlineFixListingsAsync(CancellationToken ct = default)
+    {
+        _ = Task.Run(async () =>
+        {
+            try { await _appList.EnsureLoadedAsync(); } catch { }
+        }, ct);
+
+        try
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(8));
+            var req = new HttpRequestMessage(HttpMethod.Get, $"{AppConfig.ApiBaseUrl}/api/online-fix/list");
+            using var res = await _http.SendAsync(req, timeoutCts.Token);
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadAsStringAsync(timeoutCts.Token);
+                var data = ParseDenuvoListings(json, _appList);
+                if (data is not null)
+                {
+                    data.Games = data.Games
+                        .Where(g => (!string.IsNullOrEmpty(g.OnlineUrl) && g.OnlineUrl.Contains("online-fix.me")) ||
+                                    (!string.IsNullOrEmpty(g.AppId) && g.AppId.StartsWith("of_", StringComparison.OrdinalIgnoreCase)))
+                        .ToList();
+                    return data;
+                }
+            }
+        }
+        catch { }
+
+        // Fallback to /api/fixes/list?tag=online
+        var fallback = await GetDenuvoListingsAsync("online", ct);
+        if (fallback is not null)
+        {
+            fallback.Games = fallback.Games
+                .Where(g => (!string.IsNullOrEmpty(g.OnlineUrl) && g.OnlineUrl.Contains("online-fix.me")) ||
+                            (!string.IsNullOrEmpty(g.AppId) && g.AppId.StartsWith("of_", StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+        }
+        return fallback;
+    }
 
     /// <summary>Game fixes endpoint. Returns game listings filtered by tag (defaults to "bypass" so online fixes never mix in).</summary>
     public async Task<DenuvoListingsResponse?> GetDenuvoListingsAsync(string? tag = "bypass", CancellationToken ct = default)
@@ -1688,6 +1726,10 @@ public class DataJackUIApiClient
                                                 tags.Add(new DenuvoTag { Id = tStr.ToLower(), Name = tStr.Equals("online", StringComparison.OrdinalIgnoreCase) ? "Online Fix" : tStr, Slug = tStr.ToLower() });
                                         }
                                     }
+
+                                    // Never display depotbox fixes that are tagged online - online fixes come exclusively from online-fix.me
+                                    if (tags.Any(t => t.Id == "online" || t.Id == "onlinefix"))
+                                        continue;
                                     if (tags.Count == 0)
                                     {
                                         tags.Add(new DenuvoTag { Id = "bypass", Name = "Bypass", Slug = "bypass" });
