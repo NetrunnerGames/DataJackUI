@@ -90,6 +90,7 @@ public partial class App : Application
                 services.AddSingleton<HomeViewModel>();
                 services.AddSingleton<ModeViewModel>();
                 services.AddSingleton<FixesViewModel>();
+                services.AddSingleton<OnlineFixesViewModel>();
                 services.AddSingleton<DownloadsViewModel>();
                 services.AddSingleton<PluginViewModel>();
                 services.AddSingleton<CloudSavesViewModel>();
@@ -103,6 +104,7 @@ public partial class App : Application
                 services.AddSingleton<BuildsView>();
                 services.AddSingleton<ModeView>();
                 services.AddSingleton<FixesView>();
+                services.AddSingleton<OnlineFixesView>();
                 services.AddSingleton<PluginView>();
                 services.AddSingleton<CloudSavesView>();
                 services.AddSingleton<SettingsView>();
@@ -301,6 +303,7 @@ public partial class App : Application
         };
         _host.Services.GetRequiredService<DownloadViewModel>().RequestSignIn = navigateToSignIn;
         _host.Services.GetRequiredService<FixesViewModel>().RequestSignIn = navigateToSignIn;
+        _host.Services.GetRequiredService<OnlineFixesViewModel>().RequestSignIn = navigateToSignIn;
 
         var toast = _host.Services.GetRequiredService<ToastService>();
         toast.Attach(window.RootToastPresenter);

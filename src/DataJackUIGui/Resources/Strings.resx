@@ -66,7 +66,7 @@
   <data name="Nav_Mode" xml:space="preserve"><value>Mode</value></data>
   <data name="Nav_Fixes" xml:space="preserve"><value>Game Fixes</value></data>
   <data name="Nav_CloudSaves" xml:space="preserve"><value>Cloud Saves</value></data>
-  <data name="Nav_OnlineFix" xml:space="preserve"><value>Online Fix</value></data>
+  <data name="Nav_OnlineFix" xml:space="preserve"><value>Online Fixes</value></data>
   <data name="Nav_RestartSteam" xml:space="preserve"><value>Restart Steam</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="Nav_SignInDiscord" xml:space="preserve"><value>Sign in with Discord</value></data>
