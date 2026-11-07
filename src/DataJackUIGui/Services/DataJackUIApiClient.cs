@@ -1778,10 +1778,11 @@ public class DataJackUIApiClient
 
         if (string.IsNullOrWhiteSpace(appid)) return (false, false);
 
+        // Check Bypass exclusively from DepotBox endpoints
         var endpoints = new[]
         {
-            $"{AppConfig.ApiBaseUrl}/api/game-fixes?tag=bypass,online&q={Uri.EscapeDataString(appid)}",
-            $"{AppConfig.ApiBaseUrl}/api/depotbox/api/game-fixes?tag=bypass,online&q={Uri.EscapeDataString(appid)}"
+            $"{AppConfig.ApiBaseUrl}/api/game-fixes?tag=bypass&q={Uri.EscapeDataString(appid)}",
+            $"{AppConfig.ApiBaseUrl}/api/depotbox/api/game-fixes?tag=bypass&q={Uri.EscapeDataString(appid)}"
         };
 
         foreach (var endpoint in endpoints)
@@ -1824,15 +1825,12 @@ public class DataJackUIApiClient
                                         else if (t.TryGetProperty("name", out var nProp)) id = nProp.GetString();
                                     }
                                     if (string.Equals(id, "bypass", StringComparison.OrdinalIgnoreCase)) hasBypass = true;
-                                    if (string.Equals(id, "online", StringComparison.OrdinalIgnoreCase) ||
-                                        string.Equals(id, "onlinefix", StringComparison.OrdinalIgnoreCase)) hasOnline = true;
                                 }
                             }
                             else if (tagsProp.ValueKind == JsonValueKind.String)
                             {
                                 string str = tagsProp.GetString() ?? "";
                                 if (str.Contains("bypass", StringComparison.OrdinalIgnoreCase)) hasBypass = true;
-                                if (str.Contains("online", StringComparison.OrdinalIgnoreCase)) hasOnline = true;
                             }
                         }
                     }
@@ -1863,8 +1861,20 @@ public class DataJackUIApiClient
                         }
                     }
 
-                    if (hasBypass || hasOnline) break;
+                    if (hasBypass) break;
                 }
+            }
+            catch { }
+        }
+
+        // Check Online Fix exclusively from online-fix.me scraper
+        if (!string.IsNullOrWhiteSpace(gameName))
+        {
+            try
+            {
+                var of = await ScrapeOnlineFixForGameAsync(appid, gameName, ct);
+                if (of?.DirectFixUrl is not null || of?.CandidateUrls is { Count: > 0 })
+                    hasOnline = true;
             }
             catch { }
         }
