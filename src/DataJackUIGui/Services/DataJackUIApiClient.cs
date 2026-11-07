@@ -1423,7 +1423,9 @@ public class DataJackUIApiClient
             }
             else if (root.ValueKind == JsonValueKind.Object)
             {
-                if (root.TryGetProperty("games", out var g) && g.ValueKind == JsonValueKind.Array)
+                if (root.TryGetProperty("items", out var itm) && itm.ValueKind == JsonValueKind.Array)
+                    arrayElem = itm;
+                else if (root.TryGetProperty("games", out var g) && g.ValueKind == JsonValueKind.Array)
                     arrayElem = g;
                 else if (root.TryGetProperty("fixes", out var f) && f.ValueKind == JsonValueKind.Array)
                     arrayElem = f;
