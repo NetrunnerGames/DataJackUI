@@ -73,7 +73,7 @@ public class AuthService
         UserId = stored.UserId;
         AvatarUrl = stored.AvatarUrl;
         Email = null;
-        DiscordId = null;
+        DiscordId = stored.DiscordId ?? (stored.UserId != null && stored.UserId.Length > 10 && stored.UserId.All(char.IsDigit) ? stored.UserId : null);
 
         // Immediately sync UI with restored cached credentials
         NotifyAuthStateChanged();
@@ -419,6 +419,7 @@ public class AuthService
             Username = Username,
             UserId = UserId,
             AvatarUrl = AvatarUrl,
+            DiscordId = DiscordId,
         });
 
         NotifyAuthStateChanged();
@@ -790,6 +791,7 @@ public class AuthService
             Username = Username,
             UserId = UserId,
             AvatarUrl = AvatarUrl,
+            DiscordId = DiscordId,
         });
     }
 

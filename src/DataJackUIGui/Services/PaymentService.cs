@@ -20,6 +20,7 @@ public class PaymentService
     public PaymentService(SettingsService settings, AuthService auth)
     {
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        _http.DefaultRequestHeaders.Add("User-Agent", "DataJackUI/2.0");
         _settings = settings;
         _auth = auth;
     }

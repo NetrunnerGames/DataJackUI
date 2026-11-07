@@ -1361,7 +1361,7 @@
                                 FontSize="15"
                                 FontWeight="SemiBold"
                                 Foreground="#f3f4f6"
-                                Text="Unlock Manifest" />
+                                Text="Unlock Game" />
                         </StackPanel>
                         <TextBlock
                             Margin="0,3,0,0"

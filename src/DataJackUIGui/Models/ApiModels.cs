@@ -211,6 +211,7 @@ public class StoredAuth
     public string? Username { get; set; }
     public string? UserId { get; set; }
     public string? AvatarUrl { get; set; }
+    public string? DiscordId { get; set; }
 }
 
 /// <summary>Per-source UI metadata, mirroring src/lib/source-meta.ts on the website.</summary>
