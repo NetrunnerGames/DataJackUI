@@ -12,6 +12,10 @@ public class DenuvoListingsResponse
 
 public class DenuvoGameListing
 {
+    [JsonPropertyName("size_str")] public string? SizeStr { get; set; }
+    [JsonPropertyName("sizeStr")] public string? SizeStrCamel { set => SizeStr = value; }
+    [JsonPropertyName("fix_id")] public string? FixId { get; set; }
+    [JsonPropertyName("fixId")] public string? FixIdCamel { set => FixId = value; }
     private int _fixCount;
 
     [JsonPropertyName("appid")] public string AppId { get; set; } = "";

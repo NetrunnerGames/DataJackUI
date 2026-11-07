@@ -1495,6 +1495,15 @@ public class DataJackUIApiClient
                 if (item.TryGetProperty("online_url", out var ou)) onlineUrl = ou.GetString();
                 else if (item.TryGetProperty("onlineUrl", out var ou2)) onlineUrl = ou2.GetString();
 
+                string? sizeStr = null;
+                if (item.TryGetProperty("size_str", out var sz)) sizeStr = sz.GetString();
+                else if (item.TryGetProperty("sizeStr", out var sz2)) sizeStr = sz2.GetString();
+                else if (item.TryGetProperty("size", out var sz3)) sizeStr = sz3.GetString();
+
+                string? fixId = null;
+                if (item.TryGetProperty("fix_id", out var fi)) fixId = fi.GetString();
+                else if (item.TryGetProperty("fixId", out var fi2)) fixId = fi2.GetString();
+
                 if (!dict.TryGetValue(appid, out var listing))
                 {
                     listing = new DenuvoGameListing
@@ -1504,7 +1513,9 @@ public class DataJackUIApiClient
                         HeaderImage = headerImage,
                         FixCount = 1,
                         Tags = itemTags,
-                        OnlineUrl = onlineUrl
+                        OnlineUrl = onlineUrl,
+                        SizeStr = sizeStr,
+                        FixId = fixId
                     };
                     dict[appid] = listing;
                 }

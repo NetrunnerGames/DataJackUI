@@ -98,23 +98,18 @@
             </vwp:VirtualizingItemsControl.ItemsPanel>
             <vwp:VirtualizingItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Button
+                    <Border
                         Width="248"
                         Height="180"
                         Margin="0,0,12,12"
-                        Padding="0"
-                        HorizontalContentAlignment="Stretch"
-                        VerticalContentAlignment="Stretch"
                         Background="#0DFFFFFF"
                         BorderBrush="#14FFFFFF"
                         BorderThickness="1"
-                        Command="{Binding DataContext.OpenGameCommand, ElementName=Root}"
-                        CommandParameter="{Binding}"
-                        Cursor="Hand">
-                        <Button.Tag>
+                        CornerRadius="10">
+                        <Border.Tag>
                             <Binding ElementName="Root" Path="DataContext" />
-                        </Button.Tag>
-                        <Button.ContextMenu>
+                        </Border.Tag>
+                        <Border.ContextMenu>
                             <ContextMenu>
                                 <MenuItem
                                     Command="{Binding PlacementTarget.Tag.CopyAppIdCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
@@ -127,31 +122,21 @@
                                     Header="{x:Static res:Strings.Common_ShowInFolder}"
                                     Icon="{ui:SymbolIcon FolderOpen24}" />
                             </ContextMenu>
-                        </Button.ContextMenu>
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border
-                                    Background="{TemplateBinding Background}"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="10">
-                                    <StackPanel>
-                                        <Border Height="116" Background="#11FFFFFF" ClipToBounds="True" CornerRadius="10,10,0,0">
-                                            <Image Source="{Binding Cover, Converter={StaticResource ImagePathToSource}}" Stretch="UniformToFill" />
-                                        </Border>
-                                        <StackPanel Margin="12,8,12,10">
-                                            <TextBlock
-                                                FontSize="13"
-                                                FontWeight="SemiBold"
-                                                Foreground="#e5e7eb"
-                                                Text="{Binding Name}"
-                                                TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Border>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
+                        </Border.ContextMenu>
+                        <StackPanel>
+                            <Border Height="116" Background="#11FFFFFF" ClipToBounds="True" CornerRadius="10,10,0,0">
+                                <Image Source="{Binding Cover, Converter={StaticResource ImagePathToSource}}" Stretch="UniformToFill" />
+                            </Border>
+                            <StackPanel Margin="12,8,12,10">
+                                <TextBlock
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Foreground="#e5e7eb"
+                                    Text="{Binding Name}"
+                                    TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </DataTemplate>
             </vwp:VirtualizingItemsControl.ItemTemplate>
         </vwp:VirtualizingItemsControl>
@@ -284,267 +269,6 @@
                     ItemsSource="{Binding PageSizeOptions}"
                     SelectedItem="{Binding SelectedPageSize}" />
             </StackPanel>
-        </Grid>
-
-        <!-- ── Detail flyout ─────────────────────────────────────────── -->
-        <Grid
-            Grid.Row="0"
-            Grid.RowSpan="5"
-            Margin="-8,-16,-16,-8"
-            Background="#80000000"
-            Cursor="Arrow"
-            Visibility="{Binding IsDetailOpen, Converter={StaticResource BoolToVis}}">
-            <Border Background="Transparent" Cursor="Arrow" MouseLeftButtonUp="Scrim_Click" />
-            <Border
-                Width="420"
-                HorizontalAlignment="Right"
-                Background="#1c1c22"
-                BorderBrush="#22FFFFFF"
-                BorderThickness="1,0,0,0"
-                Cursor="Arrow">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <!-- Banner (Full Fit across drawer width) -->
-                    <Grid Grid.Row="0" DataContext="{Binding SelectedGame}">
-                        <Border Height="180" Background="#11FFFFFF" ClipToBounds="True">
-                            <Image Source="{Binding Cover, Converter={StaticResource ImagePathToSource}}" Stretch="UniformToFill" />
-                        </Border>
-
-                        <!-- Close Button floating top-right over banner -->
-                        <ui:Button
-                            Margin="0,12,12,0"
-                            Padding="8"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Top"
-                            Background="#991c1c22"
-                            BorderBrush="#33FFFFFF"
-                            BorderThickness="1"
-                            Click="Close_Click"
-                            CornerRadius="16"
-                            Icon="{ui:SymbolIcon Dismiss24}" />
-                    </Grid>
-
-                    <!-- Title & App ID -->
-                    <StackPanel Grid.Row="1" Margin="18,14,18,0" DataContext="{Binding SelectedGame}">
-                        <TextBlock FontSize="16.5" FontWeight="Bold" Foreground="#ffffff" Text="{Binding Name}" TextWrapping="Wrap" />
-                        <TextBlock Margin="0,2,0,0" FontSize="11.5" Foreground="#6b7280" Text="{Binding DisplayAppId, StringFormat='App ID: {0}'}" />
-                    </StackPanel>
-
-                    <!-- Fixes list -->
-                    <ScrollViewer Grid.Row="2" Margin="18,12,18,16" VerticalScrollBarVisibility="Auto" DataContext="{Binding DataContext, ElementName=Root}">
-                        <!-- Right margin keeps the scrollbar in its own lane instead of sitting on the rows. -->
-                        <StackPanel Margin="0,0,8,0">
-                            <!-- Loading fixes -->
-                            <StackPanel
-                                Margin="0,8,0,0"
-                                HorizontalAlignment="Center"
-                                Orientation="Horizontal"
-                                Visibility="{Binding IsLoadingFixes, Converter={StaticResource BoolToVis}}">
-                                <ui:ProgressRing Width="16" Height="16" IsIndeterminate="True" />
-                                <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" Foreground="#9ca3af" Text="{x:Static res:Strings.Common_Loading}" />
-                            </StackPanel>
-
-                            <!-- Per-game tag filter (only when this game's fixes span multiple tags) -->
-                            <ItemsControl
-                                Margin="0,0,0,10"
-                                ItemsSource="{Binding FixTags}"
-                                Visibility="{Binding HasFixTags, Converter={StaticResource BoolToVis}}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button
-                                            Margin="0,0,6,6"
-                                            Command="{Binding DataContext.SelectFixTagCommand, ElementName=Root}"
-                                            CommandParameter="{Binding Id}"
-                                            Cursor="Hand">
-                                            <Button.Template>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border
-                                                        x:Name="Pill"
-                                                        Padding="10,4"
-                                                        Background="#14a78bfa"
-                                                        BorderBrush="#40a78bfa"
-                                                        BorderThickness="1"
-                                                        CornerRadius="6">
-                                                        <TextBlock x:Name="PillText" FontSize="11" FontWeight="SemiBold" Foreground="#a78bfa" Text="{Binding Name}" />
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                            <Setter TargetName="Pill" Property="Background" Value="#a78bfa" />
-                                                            <Setter TargetName="Pill" Property="BorderBrush" Value="#a78bfa" />
-                                                            <Setter TargetName="PillText" Property="Foreground" Value="#ffffff" />
-                                                        </DataTrigger>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="Pill" Property="Background" Value="#28a78bfa" />
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Button.Template>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-
-                            <!-- Fix Cards -->
-                            <ItemsControl ItemsSource="{Binding Fixes}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border
-                                            Margin="0,0,0,10"
-                                            Padding="14,12"
-                                            Background="#0DFFFFFF"
-                                            BorderBrush="#1FFFFFFF"
-                                            BorderThickness="1"
-                                            CornerRadius="8">
-                                            <StackPanel>
-                                                <!-- Row 1: [Bypass] badge · size -->
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <ItemsControl ItemsSource="{Binding Tags}" VerticalAlignment="Center">
-                                                        <ItemsControl.ItemsPanel>
-                                                            <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
-                                                        </ItemsControl.ItemsPanel>
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <Border Margin="0,0,6,0" Padding="8,3" Background="#2a2440" BorderBrush="#40a78bfa" BorderThickness="1" CornerRadius="4">
-                                                                    <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="#c4b5fd" Text="{Binding Name}" />
-                                                                </Border>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-
-                                                    <TextBlock
-                                                        VerticalAlignment="Center"
-                                                        FontSize="12.5"
-                                                        FontWeight="SemiBold"
-                                                        Foreground="#a78bfa"
-                                                        Text="{Binding SizeLabel, StringFormat='•  {0}'}"
-                                                        Visibility="{Binding HasSize, Converter={StaticResource BoolToVis}}" />
-                                                </StackPanel>
-
-                                                <!-- Row 2: Fix button | Revert button -->
-                                                <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
-                                                    <ui:Button
-                                                        Margin="0,0,10,0"
-                                                        Padding="16,7"
-                                                        Appearance="Primary"
-                                                        Command="{Binding DataContext.DownloadFixCommand, ElementName=Root}"
-                                                        CommandParameter="{Binding}"
-                                                        Content="{x:Static res:Strings.Fixes_Fix}"
-                                                        Icon="{ui:SymbolIcon Wrench24}"
-                                                        IsEnabled="{Binding CanDownloadFix}"
-                                                        ToolTip="{Binding FixHint}"
-                                                        ToolTipService.ShowOnDisabled="True"
-                                                        Visibility="{Binding HasFix, Converter={StaticResource BoolToVis}}" />
-                                                    <ui:Button
-                                                        Margin="0,0,10,0"
-                                                        Padding="14,7"
-                                                        Command="{Binding DataContext.RevertFixCommand, ElementName=Root}"
-                                                        CommandParameter="{Binding}"
-                                                        Content="{x:Static res:Strings.Fixes_Revert}"
-                                                        Icon="{ui:SymbolIcon ArrowClockwise24}"
-                                                        Visibility="{Binding IsApplied, Converter={StaticResource BoolToVis}}" />
-                                                </StackPanel>
-
-                                                <!-- Progress Bar -->
-                                                <ProgressBar
-                                                    Height="4"
-                                                    Margin="0,8,0,0"
-                                                    IsIndeterminate="{Binding FixItem.IsIndeterminate, FallbackValue=False}"
-                                                    Maximum="100"
-                                                    Value="{Binding FixItem.Percent, Mode=OneWay, FallbackValue=0}"
-                                                    Visibility="{Binding FixItem.ShowProgress, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}" />
-
-                                                <!-- Setup Notes Callout -->
-                                                <Border
-                                                    Margin="0,10,0,0"
-                                                    Padding="10,8"
-                                                    Background="#1406b6d4"
-                                                    BorderBrush="#3306b6d4"
-                                                    BorderThickness="1"
-                                                    CornerRadius="6"
-                                                    Visibility="{Binding HasNotes, Converter={StaticResource BoolToVis}}">
-                                                    <StackPanel>
-                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                                            <ui:SymbolIcon
-                                                                Symbol="Info24"
-                                                                FontSize="14"
-                                                                Foreground="#22d3ee"
-                                                                Margin="0,0,6,0" />
-                                                            <TextBlock
-                                                                FontSize="12"
-                                                                FontWeight="SemiBold"
-                                                                Foreground="#22d3ee"
-                                                                Text="Setup Notes" />
-                                                        </StackPanel>
-                                                        <TextBlock
-                                                            FontSize="12"
-                                                            Foreground="#e2e8f0"
-                                                            Text="{Binding Notes}"
-                                                            TextWrapping="Wrap" />
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </ScrollViewer>
-
-                    <!-- Revert confirmation overlay (in-flyout card, same pattern as ModeView). -->
-                    <Grid
-                        Background="#99000000"
-                        Visibility="{Binding IsConfirmingRevert, Converter={StaticResource BoolToVis}}">
-                        <Border
-                            MaxWidth="360"
-                            Margin="16"
-                            Padding="20"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Background="#1c1c22"
-                            BorderBrush="#33FFFFFF"
-                            BorderThickness="1"
-                            CornerRadius="12">
-                            <StackPanel>
-                                <TextBlock
-                                    FontSize="16"
-                                    FontWeight="Bold"
-                                    Text="{Binding ConfirmRevertTitle}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    Margin="0,8,0,0"
-                                    FontSize="12.5"
-                                    Foreground="#9ca3af"
-                                    Text="{Binding ConfirmRevertBody}"
-                                    TextWrapping="Wrap" />
-                                <StackPanel
-                                    Margin="0,18,0,0"
-                                    HorizontalAlignment="Right"
-                                    Orientation="Horizontal">
-                                    <ui:Button
-                                        Margin="0,0,10,0"
-                                        Padding="14,7"
-                                        Command="{Binding CancelRevertConfirmCommand}"
-                                        Content="{x:Static res:Strings.Fixes_Revert_Cancel}" />
-                                    <ui:Button
-                                        Padding="14,7"
-                                        Appearance="Primary"
-                                        Command="{Binding ConfirmRevertCommand}"
-                                        Content="{x:Static res:Strings.Fixes_Revert}"
-                                        Icon="{ui:SymbolIcon ArrowClockwise24}" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </Grid>
-            </Border>
         </Grid>
     </Grid>
 </UserControl>
