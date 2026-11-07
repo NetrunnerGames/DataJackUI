@@ -2310,7 +2310,7 @@ public class DataJackUIApiClient
             foreach (Match li in Regex.Matches(ul.Groups[1].Value, @"<li>([\s\S]*?)</li>", RegexOptions.IgnoreCase))
             {
                 string textLi = li.Groups[1].Value;
-                if (Regex.IsMatch(textLi, @"kak-zastavit-kontroller-rabotat|How to make your controller work|reshenie-oshibok|необходимые для запуска игр", RegexOptions.IgnoreCase))
+                if (Regex.IsMatch(textLi, @"kak-zastavit-kontroller-rabotat|How to make your controller work|reshenie-oshibok|необходимые для запуска игр|Скачайте и распакуйте|Download the game.*and unzip|распаковать архивы", RegexOptions.IgnoreCase))
                     continue;
 
                 string clean = Regex.Replace(textLi, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Trim();
