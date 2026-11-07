@@ -243,7 +243,7 @@ public class FixesResilienceTests
         var api = new DataJackUIApiClient(auth, appInfo, appList, covers, settings);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        var result = await api.GetDenuvoListingsAsync(cts.Token);
+        var result = await api.GetDenuvoListingsAsync(ct: cts.Token);
         Assert.NotNull(result);
         Assert.NotEmpty(result.Games);
     }

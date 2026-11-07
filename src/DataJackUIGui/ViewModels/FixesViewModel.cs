@@ -420,10 +420,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
 
     // ── Load ─────────────────────────────────────────────────────────
 
-    protected virtual List<FixGameCardVm> FilterLoadedGames(List<FixGameCardVm> all) =>
-        all.Where(g => !g.MatchesTag("online") &&
-                       (string.IsNullOrEmpty(g.AppId) || !g.AppId.StartsWith("of_", StringComparison.OrdinalIgnoreCase)) &&
-                       (g.OnlineUrl == null || !g.OnlineUrl.Contains("online-fix"))).ToList();
+    protected virtual List<FixGameCardVm> FilterLoadedGames(List<FixGameCardVm> all) => all;
 
     protected virtual void PopulateTags()
     {
@@ -434,7 +431,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
 
     /// <param name="force">True to re-fetch even if already loaded (the Refresh button); otherwise the
     /// listing loads once per session.</param>
-    public async Task LoadAsync(bool force = false)
+    public virtual async Task LoadAsync(bool force = false)
     {
         if (!force && _allGames.Count > 0) return; // load once per session
         IsLoading = true;
@@ -493,7 +490,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
         ApplyFilter();
     }
 
-    private void ApplyFilter()
+    protected void ApplyFilter()
     {
         string q = SearchText.Trim();
         IEnumerable<FixGameCardVm> shown = _allGames;

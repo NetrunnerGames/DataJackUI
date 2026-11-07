@@ -1301,7 +1301,12 @@ public class DataJackUIApiClient
     // ── DepotBox game fixes ─────────────────────────────────────────
 
     /// <summary>DepotBox and Online-Fix game fixes endpoint. Returns game listings and tags (Bypass, Online Fix).</summary>
-    public async Task<DenuvoListingsResponse?> GetDenuvoListingsAsync(CancellationToken ct = default)
+    /// <summary>Fetch listings for Online-Fix catalog exclusively.</summary>
+    public async Task<DenuvoListingsResponse?> GetOnlineFixListingsAsync(CancellationToken ct = default) =>
+        await GetDenuvoListingsAsync("online", ct);
+
+    /// <summary>Game fixes endpoint. Returns game listings filtered by tag (defaults to "bypass" so online fixes never mix in).</summary>
+    public async Task<DenuvoListingsResponse?> GetDenuvoListingsAsync(string? tag = "bypass", CancellationToken ct = default)
     {
         // Fire app-list loading in background so catalog loading is never blocked by cold/stale disk cache
         _ = Task.Run(async () =>
@@ -1316,10 +1321,11 @@ public class DataJackUIApiClient
             new DenuvoTag { Id = "online", Name = "Online Fix", Slug = "online" }
         };
 
+        string query = !string.IsNullOrEmpty(tag) ? $"?tag={Uri.EscapeDataString(tag)}" : "";
         var endpoints = new[]
         {
-            $"{AppConfig.ApiBaseUrl}/api/fixes/list",
-            $"{AppConfig.ApiBaseUrl}/api/game-fixes"
+            $"{AppConfig.ApiBaseUrl}/api/fixes/list{query}",
+            $"{AppConfig.ApiBaseUrl}/api/game-fixes{query}"
         };
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
