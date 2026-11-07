@@ -2158,6 +2158,42 @@ public class DataJackUIApiClient
     /// to search/scrape online-fix.me and translate Russian notes using Workers AI.
     /// If direct_fix_url is not returned but hoster_url is present, resolves direct candidate links from hoster.
     /// </summary>
+    /// <summary>Translates Russian notes to English using Google Translate GTX API locally if worker AI is exhausted/missing.</summary>
+    public async Task<string?> TranslateRuToEnAsync(string text, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        try
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+
+            string url = $"https://translate.googleapis.com/translate_a/single?client=gtx&sl=ru&tl=en&dt=t&q={Uri.EscapeDataString(text.Trim())}";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+
+            using var res = await _http.SendAsync(req, timeoutCts.Token);
+            if (!res.IsSuccessStatusCode) return text;
+
+            using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(timeoutCts.Token), cancellationToken: timeoutCts.Token);
+            var root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0 && root[0].ValueKind == JsonValueKind.Array)
+            {
+                var sb = new StringBuilder();
+                foreach (var seg in root[0].EnumerateArray())
+                {
+                    if (seg.ValueKind == JsonValueKind.Array && seg.GetArrayLength() > 0 && seg[0].ValueKind == JsonValueKind.String)
+                    {
+                        sb.Append(seg[0].GetString());
+                    }
+                }
+                string translated = sb.ToString().Trim();
+                if (!string.IsNullOrWhiteSpace(translated)) return translated;
+            }
+        }
+        catch { }
+        return text;
+    }
+
     private async Task<OnlineFixScrapeResult?> ResolveOnlineFixViaWorkerAsync(
         string key, string gameName, string? articleUrl, CancellationToken ct)
     {
@@ -2187,6 +2223,11 @@ public class DataJackUIApiClient
             string foundArticleUrl = dataElem.TryGetProperty("article_url", out var aProp) ? aProp.GetString() ?? (articleUrl ?? "") : (articleUrl ?? "");
             string version = dataElem.TryGetProperty("version", out var vProp) ? vProp.GetString() ?? "Game version: Latest" : "Game version: Latest";
             string? notes = dataElem.TryGetProperty("notes", out var nProp) ? nProp.GetString() : null;
+            if (!string.IsNullOrWhiteSpace(notes) && Regex.IsMatch(notes, @"[Ѐ-ӿ]"))
+            {
+                // Translate locally using Google Translate if Worker AI didn't translate or neurons were exhausted
+                notes = await TranslateRuToEnAsync(notes, ct);
+            }
             string? directUrl = dataElem.TryGetProperty("direct_fix_url", out var dProp) ? dProp.GetString() : null;
             string? hosterUrl = dataElem.TryGetProperty("hoster_url", out var hProp) ? hProp.GetString() : null;
             string? fileName = dataElem.TryGetProperty("file_name", out var fProp) ? fProp.GetString() : null;
@@ -2261,13 +2302,36 @@ public class DataJackUIApiClient
             }
         }
 
+        // Extract notes from article HTML if resolving locally
+        string? notes = null;
+        var rawNotes = new List<string>();
+        foreach (Match ul in Regex.Matches(html, @"<ul>([\s\S]*?)</ul>", RegexOptions.IgnoreCase))
+        {
+            foreach (Match li in Regex.Matches(ul.Groups[1].Value, @"<li>([\s\S]*?)</li>", RegexOptions.IgnoreCase))
+            {
+                string textLi = li.Groups[1].Value;
+                if (Regex.IsMatch(textLi, @"kak-zastavit-kontroller-rabotat|How to make your controller work|reshenie-oshibok|необходимые для запуска игр", RegexOptions.IgnoreCase))
+                    continue;
+
+                string clean = Regex.Replace(textLi, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Trim();
+                if (clean.Length > 5)
+                {
+                    rawNotes.Add(clean);
+                }
+            }
+        }
+        if (rawNotes.Count > 0)
+        {
+            notes = await TranslateRuToEnAsync(string.Join("\n", rawNotes), ct);
+        }
+
         if (string.IsNullOrEmpty(title))
         {
             title = Uri.UnescapeDataString(articleUrl.Split('/').LastOrDefault() ?? "Online Fix");
             title = Regex.Replace(title, @"^\d+-", "").Replace(".html", "").Replace('-', ' ').Trim();
         }
 
-        return new OnlineFixScrapeResult(searchName, title, articleUrl, versionStr, direct, fileName, candidateUrls, null);
+        return new OnlineFixScrapeResult(searchName, title, articleUrl, versionStr, direct, fileName, candidateUrls, notes);
     }
 
     private async Task<string> GetOnlineFixHtmlAsync(string url, CancellationToken ct)
