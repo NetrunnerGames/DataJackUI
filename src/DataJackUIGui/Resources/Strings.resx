@@ -64,7 +64,7 @@
   <data name="Nav_Add" xml:space="preserve"><value>Add</value></data>
   <data name="Nav_Manage" xml:space="preserve"><value>Manage</value></data>
   <data name="Nav_Mode" xml:space="preserve"><value>Mode</value></data>
-  <data name="Nav_Fixes" xml:space="preserve"><value>Fixes</value></data>
+  <data name="Nav_Fixes" xml:space="preserve"><value>Game Fixes</value></data>
   <data name="Nav_CloudSaves" xml:space="preserve"><value>Cloud Saves</value></data>
   <data name="Nav_OnlineFix" xml:space="preserve"><value>Online Fix</value></data>
   <data name="Nav_RestartSteam" xml:space="preserve"><value>Restart Steam</value></data>
@@ -323,7 +323,7 @@ This deletes the .lua files from Steam\config\stplug-in.</value></data>
   <data name="Manage_RestartSteam_Failed" xml:space="preserve"><value>Couldn't find or launch Steam. Set its location in Settings.</value></data>
 
   <!-- ── Fixes ── -->
-  <data name="Fixes_Title" xml:space="preserve"><value>Fixes</value></data>
+  <data name="Fixes_Title" xml:space="preserve"><value>Game Fixes</value></data>
   <data name="OnlineFix_Title" xml:space="preserve"><value>Online Fix</value></data>
   <data name="OnlineFix_Subtitle" xml:space="preserve"><value>Multiplayer, co-op, and network fixes for supported games</value></data>
   <data name="Fixes_Loading" xml:space="preserve"><value>Loading fixes…</value></data>

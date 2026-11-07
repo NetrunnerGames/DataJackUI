@@ -420,7 +420,10 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
 
     // ── Load ─────────────────────────────────────────────────────────
 
-    protected virtual List<FixGameCardVm> FilterLoadedGames(List<FixGameCardVm> all) => all;
+    protected virtual List<FixGameCardVm> FilterLoadedGames(List<FixGameCardVm> all) =>
+        all.Where(g => !g.MatchesTag("online") &&
+                       (string.IsNullOrEmpty(g.AppId) || !g.AppId.StartsWith("of_", StringComparison.OrdinalIgnoreCase)) &&
+                       (g.OnlineUrl == null || !g.OnlineUrl.Contains("online-fix"))).ToList();
 
     protected virtual void PopulateTags()
     {
