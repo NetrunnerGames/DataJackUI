@@ -211,6 +211,7 @@ public class StoredAuth
     public string? Username { get; set; }
     public string? UserId { get; set; }
     public string? AvatarUrl { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? DiscordId { get; set; }
 }
 

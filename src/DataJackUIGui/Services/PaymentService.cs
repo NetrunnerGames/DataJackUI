@@ -181,6 +181,17 @@ public class PaymentService
 
             // Successfully verified! Save to local settings
             _settings.UnlockApp(appId);
+
+            // Immediately synchronize cloud entitlements in auth state
+            try
+            {
+                await _auth.RefreshEntitlementsAsync();
+            }
+            catch
+            {
+                // Non-fatal
+            }
+
             return (true, null);
         }
         catch (Exception ex)
