@@ -151,7 +151,7 @@ public class UpdateService : IDisposable
                 int read;
                 while ((read = await stream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
                 {
-                    await fileStream.WriteAsync(buffer, 0, read, ct);
+                    await fileStream.WriteAsync(buffer.AsMemory(0, read), ct);
                     totalRead += read;
                     if (totalBytes > 0)
                         progress?.Report((int)((totalRead * 100) / totalBytes));
@@ -164,7 +164,7 @@ public class UpdateService : IDisposable
                 using var sha = SHA256.Create();
                 using var stream = File.OpenRead(installerFile);
                 byte[] hash = sha.ComputeHash(stream);
-                string computed = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                string computed = Convert.ToHexString(hash).ToLowerInvariant();
                 if (!string.Equals(computed, info.CheckSum.Value.Trim(), StringComparison.OrdinalIgnoreCase))
                 {
                     PluginLog.Log($"[UpdateService] Checksum mismatch! Expected {info.CheckSum.Value}, got {computed}");
