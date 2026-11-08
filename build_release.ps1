@@ -163,15 +163,22 @@ if (Test-Path $VelopackSetupExePath) {
 
 # 6. Package Portable ZIP from publish output
 Write-Host "`n5. Packaging Portable ZIP in Releases..." -ForegroundColor Yellow
-$PortableZip = "$ReleasesDir/DataJackUI-win-Portable.zip"
-$PortableRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-win-Portable.zip"
+$PortableZip = "$ReleasesDir/DataJackUI-Portable.zip"
+$PortableRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-Portable.zip"
+$WinPortableZip = "$ReleasesDir/DataJackUI-win-Portable.zip"
+$WinPortableRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-win-Portable.zip"
+
 if (Test-Path $PortableZip) { Remove-Item -Force $PortableZip }
 if (Test-Path $PortableRootZip) { Remove-Item -Force $PortableRootZip }
+if (Test-Path $WinPortableZip) { Remove-Item -Force $WinPortableZip }
+if (Test-Path $WinPortableRootZip) { Remove-Item -Force $WinPortableRootZip }
 
 if (Test-Path $PublishDir) {
     [System.IO.Compression.ZipFile]::CreateFromDirectory((Resolve-Path $PublishDir), $PortableZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
     Copy-Item $PortableZip $PortableRootZip -Force
-    Write-Host "Portable ZIP created: $PortableZip" -ForegroundColor Green
+    Copy-Item $PortableZip $WinPortableZip -Force
+    Copy-Item $PortableZip $WinPortableRootZip -Force
+    Write-Host "Portable ZIP created: $PortableZip (and $WinPortableZip)" -ForegroundColor Green
 } else {
     Write-Host "Warning: PublishDir ($PublishDir) not found for Portable ZIP creation!" -ForegroundColor Red
 }

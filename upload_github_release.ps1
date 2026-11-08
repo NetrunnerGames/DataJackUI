@@ -94,6 +94,7 @@ $assets = @(
     "DataJackUI-Inno-Setup.zip",
     "DataJackUI-win-Setup.exe",
     "DataJackUI-win-Setup.zip",
+    "DataJackUI-Portable.zip",
     "DataJackUI-win-Portable.zip",
     "RELEASES",
     "releases.win.json",
