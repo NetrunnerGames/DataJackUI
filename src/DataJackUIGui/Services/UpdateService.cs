@@ -148,7 +148,7 @@ public class UpdateService : IDisposable
                 using var sha = SHA256.Create();
                 using var stream = File.OpenRead(installerFile);
                 byte[] hash = sha.ComputeHash(stream);
-                string computed = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                string computed = Convert.ToHexString(hash).ToLowerInvariant();
                 if (!string.Equals(computed, info.CheckSum.Value.Trim(), StringComparison.OrdinalIgnoreCase))
                 {
                     PluginLog.Log($"[UpdateService] Checksum mismatch! Expected {info.CheckSum.Value}, got {computed}");
