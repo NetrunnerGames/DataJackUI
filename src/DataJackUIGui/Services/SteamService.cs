@@ -182,9 +182,67 @@ public class SteamService(SettingsService settings)
         return null;
     }
 
-    /// <summary>Open a store/steam URL or file path with the shell (browser, Steam client, Explorer).</summary>
-    public static void OpenUrl(string url) =>
-        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+    /// <summary>Open a store/steam URL or file path. If it's a web URL, prefer launching directly via external browser executable (e.g. Firefox) to bypass environment hooks.</summary>
+    public static void OpenUrl(string url)
+    {
+        if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            // Try resolving Firefox executable directly
+            string? browserExe = ResolveExternalBrowserExe();
+            if (!string.IsNullOrEmpty(browserExe) && File.Exists(browserExe))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = browserExe,
+                        Arguments = $"\"{url}\"",
+                        UseShellExecute = false
+                    });
+                    return;
+                }
+                catch { /* fallback to shell execute */ }
+            }
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch
+        {
+            try
+            {
+                string escaped = url.Replace("^", "^^").Replace("&", "^&");
+                Process.Start(new ProcessStartInfo("cmd.exe", $"/c start \"\" \"{escaped}\"") { CreateNoWindow = true });
+            }
+            catch { }
+        }
+    }
+
+    private static string? ResolveExternalBrowserExe()
+    {
+        string[] candidates = [
+            @"C:\Program Files\Mozilla Firefox\firefox.exe",
+            @"C:\Program Files (x86)\Mozilla Firefox\firefox.exe",
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Mozilla Firefox\firefox.exe")
+        ];
+
+        foreach (var p in candidates)
+        {
+            if (File.Exists(p)) return p;
+        }
+
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\firefox.exe");
+            if (key?.GetValue(null) is string exePath && File.Exists(exePath))
+                return exePath;
+        }
+        catch { }
+
+        return null;
+    }
 
     /// <summary>Open Explorer with the given file selected.</summary>
     public static void RevealInExplorer(string filePath) =>
