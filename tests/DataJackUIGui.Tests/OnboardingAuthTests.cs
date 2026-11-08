@@ -80,9 +80,12 @@ public class OnboardingAuthTests : IDisposable
         Assert.Equal("Waiting for Discord...", vm.WaitingMessage);
         Assert.False(vm.IsSigningIn);
 
-        // Start Google sign-in
+        // Start Google sign-in: launches authorization URL in external default browser (e.g. Firefox)
         var googleTask = vm.SignInGoogleCommand.ExecuteAsync(null);
         Assert.Equal("Waiting for Google...", vm.WaitingMessage);
+
+        // Let the OS launch the browser process before cancelling
+        await Task.Delay(500);
 
         // Cancel Google sign-in and await task completion
         vm.CancelSignIn();

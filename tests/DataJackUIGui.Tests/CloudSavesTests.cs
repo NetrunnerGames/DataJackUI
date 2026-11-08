@@ -317,24 +317,22 @@ public class CloudSavesTests : IDisposable
     }
 
     [Fact]
-    public void GoogleDrive_ConnectionState_AndDisconnect_BehavesCorrectly()
+    public async Task CloudSaves_ConnectGoogleDrive_InitiatesRealBrowserFlow_AndHandlesCancellation()
     {
-        // Initial state: not connected
-        _cloudSaves.DisconnectGoogleDrive();
-        Assert.False(_cloudSaves.IsGoogleDriveConnected);
-        Assert.Null(_cloudSaves.GetGoogleDriveAccount());
+        using var cts = new CancellationTokenSource();
+        // Trigger the real browser authorization method in background
+        var connectTask = _cloudSaves.ConnectGoogleDriveAsync(status => { }, cts.Token);
 
-        // Simulate connecting with an authorized Google account email
-        const string mockGoogleAccount = "netrunner.dev@gmail.com";
-        _settings.CloudSavesGDriveAccount = mockGoogleAccount;
+        // Allow real process start (e.g. Firefox) to launch
+        await Task.Delay(500);
 
-        Assert.True(_cloudSaves.IsGoogleDriveConnected);
-        Assert.Equal(mockGoogleAccount, _cloudSaves.GetGoogleDriveAccount());
+        // Cancel authorization flow
+        cts.Cancel();
+        var (success, message, account) = await connectTask;
 
-        // Disconnecting clears the account
-        _cloudSaves.DisconnectGoogleDrive();
-        Assert.False(_cloudSaves.IsGoogleDriveConnected);
-        Assert.Null(_cloudSaves.GetGoogleDriveAccount());
+        Assert.False(success);
+        Assert.Contains("timed out", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(account);
     }
 
     [Fact]
