@@ -658,7 +658,7 @@ public partial class CloudSavesService(
             $"client_id={Uri.EscapeDataString(GoogleClientId)}&" +
             $"redirect_uri={Uri.EscapeDataString(redirectUri)}&" +
             "response_type=code&" +
-            "scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.file%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email&" +
+            "scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.file&" +
             $"code_challenge={challenge}&code_challenge_method=S256&" +
             "access_type=offline&prompt=consent";
 
@@ -726,7 +726,7 @@ public partial class CloudSavesService(
             if (!tokenRes.IsSuccessStatusCode)
                 return (false, $"Token exchange failed: {tokenJson}", null);
 
-            // Fetch user email using ephemeral in-memory access token (token is never stored to disk)
+            // Fetch user identity via Google Drive v3 about endpoint (same as SteaMidra)
             string? userEmail = null;
             try
             {
@@ -734,16 +734,32 @@ public partial class CloudSavesService(
                 if (doc.RootElement.TryGetProperty("access_token", out var atProp))
                 {
                     string at = atProp.GetString()!;
-                    var userReq = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
+                    var userReq = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/drive/v3/about?fields=user");
                     userReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", at);
                     var userRes = await _httpClient.SendAsync(userReq, ct);
                     if (userRes.IsSuccessStatusCode)
                     {
                         string userBody = await userRes.Content.ReadAsStringAsync(ct);
                         using var userDoc = JsonDocument.Parse(userBody);
-                        if (userDoc.RootElement.TryGetProperty("email", out var emailProp))
+                        if (userDoc.RootElement.TryGetProperty("user", out var uProp))
                         {
-                            userEmail = emailProp.GetString();
+                            if (uProp.TryGetProperty("emailAddress", out var emailProp))
+                                userEmail = emailProp.GetString();
+                            else if (uProp.TryGetProperty("displayName", out var nameProp))
+                                userEmail = nameProp.GetString();
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(userEmail))
+                    {
+                        var fallbackReq = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
+                        fallbackReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", at);
+                        var fallbackRes = await _httpClient.SendAsync(fallbackReq, ct);
+                        if (fallbackRes.IsSuccessStatusCode)
+                        {
+                            using var fallbackDoc = JsonDocument.Parse(await fallbackRes.Content.ReadAsStringAsync(ct));
+                            if (fallbackDoc.RootElement.TryGetProperty("email", out var emailProp))
+                                userEmail = emailProp.GetString();
                         }
                     }
                 }

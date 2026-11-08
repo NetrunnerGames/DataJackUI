@@ -75,6 +75,17 @@ public class AuthService
         Email = null;
         DiscordId = stored.DiscordId ?? (stored.UserId != null && stored.UserId.Length > 10 && stored.UserId.All(char.IsDigit) ? stored.UserId : null);
 
+        if (string.IsNullOrEmpty(DiscordId))
+        {
+            CurrentEntitlement = new UserEntitlement
+            {
+                DiscordId = UserId ?? "",
+                Tier = "single",
+                IsOwner = false,
+                IsBanned = false
+            };
+        }
+
         // Immediately sync UI with restored cached credentials
         NotifyAuthStateChanged();
 
@@ -296,9 +307,9 @@ public class AuthService
             $"client_id={Uri.EscapeDataString(GoogleClientId)}&" +
             $"redirect_uri={Uri.EscapeDataString(redirectUri)}&" +
             "response_type=code&" +
-            "scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile%20openid&" +
+            "scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.file&" +
             $"code_challenge={challenge}&code_challenge_method=S256&" +
-            "access_type=offline&prompt=select_account";
+            "access_type=offline&prompt=consent";
 
         SteamService.OpenUrl(authUrl);
 
@@ -369,7 +380,7 @@ public class AuthService
         if (string.IsNullOrEmpty(accessToken))
             throw new AuthException("Invalid token response from Google.");
 
-        // Fetch user profile
+        // Fetch user profile via Google Drive v3 about endpoint (same as SteaMidra)
         string? userEmail = null;
         string? userName = null;
         string? userPicture = null;
@@ -377,18 +388,38 @@ public class AuthService
 
         try
         {
-            var userReq = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
+            var userReq = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/drive/v3/about?fields=user");
             userReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
             var userRes = await _http.SendAsync(userReq, ct);
             if (userRes.IsSuccessStatusCode)
             {
                 string userBody = await userRes.Content.ReadAsStringAsync(ct);
                 using var userDoc = JsonDocument.Parse(userBody);
-                var uRoot = userDoc.RootElement;
-                if (uRoot.TryGetProperty("id", out var idProp)) userId = idProp.GetString();
-                if (uRoot.TryGetProperty("email", out var emailProp)) userEmail = emailProp.GetString();
-                if (uRoot.TryGetProperty("name", out var nameProp)) userName = nameProp.GetString();
-                if (uRoot.TryGetProperty("picture", out var picProp)) userPicture = picProp.GetString();
+                if (userDoc.RootElement.TryGetProperty("user", out var uRoot))
+                {
+                    if (uRoot.TryGetProperty("permissionId", out var idProp)) userId = idProp.GetString();
+                    if (uRoot.TryGetProperty("emailAddress", out var emailProp)) userEmail = emailProp.GetString();
+                    if (uRoot.TryGetProperty("displayName", out var nameProp)) userName = nameProp.GetString();
+                    if (uRoot.TryGetProperty("photoLink", out var picProp)) userPicture = picProp.GetString();
+                }
+            }
+
+            // Fallback to userinfo if needed
+            if (string.IsNullOrEmpty(userEmail) || string.IsNullOrEmpty(userId))
+            {
+                var fallbackReq = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
+                fallbackReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                var fallbackRes = await _http.SendAsync(fallbackReq, ct);
+                if (fallbackRes.IsSuccessStatusCode)
+                {
+                    string fBody = await fallbackRes.Content.ReadAsStringAsync(ct);
+                    using var fDoc = JsonDocument.Parse(fBody);
+                    var fRoot = fDoc.RootElement;
+                    if (string.IsNullOrEmpty(userId) && fRoot.TryGetProperty("id", out var idProp)) userId = idProp.GetString();
+                    if (string.IsNullOrEmpty(userEmail) && fRoot.TryGetProperty("email", out var emailProp)) userEmail = emailProp.GetString();
+                    if (string.IsNullOrEmpty(userName) && fRoot.TryGetProperty("name", out var nameProp)) userName = nameProp.GetString();
+                    if (string.IsNullOrEmpty(userPicture) && fRoot.TryGetProperty("picture", out var picProp)) userPicture = picProp.GetString();
+                }
             }
         }
         catch { }
