@@ -56,7 +56,7 @@ Source: "..\bin\PublishFrameworkDependent\*"; DestDir: "{app}"; Flags: ignorever
 ; 2. Embed Velopack update manager assets so the app is recognized as installed by Velopack
 Source: "..\Releases\assets.win.json"; DestDir: "{app}\.."; Flags: ignoreversion
 Source: "..\Releases\releases.win.json"; DestDir: "{app}\.."; Flags: ignoreversion
-Source: "..\Releases\DataJackUI-{#MyAppVersion}-full.nupkg"; DestDir: "{app}\.."; Flags: ignoreversion
+; Source: "..\Releases\DataJackUI-{#MyAppVersion}-full.nupkg"; DestDir: "{app}\.."; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startmenuicon
