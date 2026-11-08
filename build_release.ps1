@@ -67,21 +67,21 @@ if (Test-Path $PublishDir) {
     Remove-Item -Recurse -Force $PublishDir -ErrorAction SilentlyContinue
 }
 
-# Ensure releases directory exists and prune older .nupkg packages, maintaining a rolling
-# window of the last 5 releases for seamless multi-version delta chaining.
+# Ensure releases directory exists and prune older .nupkg packages, maintaining
+# only the current release and 1 previous version for delta updates.
 if (-not (Test-Path $ReleasesDir)) {
     New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
 } else {
-    # Keep the latest 5 full packages for delta chaining across skipped releases
+    # Keep only the latest 2 full packages (current + 1 previous)
     $existingFullNupkgs = Get-ChildItem "$ReleasesDir/*-full.nupkg" | Sort-Object LastWriteTime -Descending
-    if ($existingFullNupkgs.Count -gt 5) {
-        $existingFullNupkgs | Select-Object -Skip 5 | Remove-Item -Force
+    if ($existingFullNupkgs.Count -gt 2) {
+        $existingFullNupkgs | Select-Object -Skip 2 | Remove-Item -Force
     }
 
-    # Keep the latest 5 delta diffs
+    # Keep only the latest 2 delta packages (current + 1 previous)
     $existingDeltaNupkgs = Get-ChildItem "$ReleasesDir/*-delta.nupkg" | Sort-Object LastWriteTime -Descending
-    if ($existingDeltaNupkgs.Count -gt 5) {
-        $existingDeltaNupkgs | Select-Object -Skip 5 | Remove-Item -Force
+    if ($existingDeltaNupkgs.Count -gt 2) {
+        $existingDeltaNupkgs | Select-Object -Skip 2 | Remove-Item -Force
     }
     # Note: Retain previous full and delta packages and RELEASES manifest so Velopack vpk pack
     # accurately links delta diffs against the existing base release in RELEASES and releases.win.json
@@ -101,7 +101,7 @@ dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --se
 
 # 3. Pack Application with Velopack
 Write-Host "`n2. Packaging Velopack Installer & Delta Updates..." -ForegroundColor Yellow
-vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop -o $ReleasesDir
+vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop --runtime win-x64 -o $ReleasesDir
 
 # 4. Package Plugin (Jack-in) into plugin.zip (if plugin source exists)
 if (Test-Path "src/DataJackUIPlugin") {

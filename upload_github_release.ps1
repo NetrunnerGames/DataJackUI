@@ -98,13 +98,17 @@ $assets = @(
     "assets.win.json"
 )
 
-# Add any nupkg files for the version
-$nupkgs = Get-ChildItem "$releasesDir/*$($TagName.TrimStart('v'))*.nupkg" | Select-Object -ExpandProperty Name
-$assets += $nupkgs
+# Add any nupkg files for the current version
+$currentVer = $TagName.TrimStart('v')
+$currentNupkgs = Get-ChildItem "$releasesDir/*$currentVer*.nupkg" | Select-Object -ExpandProperty Name
+$assets += $currentNupkgs
 
-# Also include rolling window of full and delta nupkgs present in Releases so delta builds work across versions
-$rollingNupkgs = Get-ChildItem "$releasesDir/*.nupkg" | Select-Object -ExpandProperty Name
-$assets += $rollingNupkgs
+# Include ONLY the immediately preceding version's full and delta nupkg (1 previous version)
+$prevFullNupkg = Get-ChildItem "$releasesDir/*-full.nupkg" | Where-Object { $_.Name -notmatch [regex]::Escape($currentVer) } | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty Name
+if ($prevFullNupkg) { $assets += $prevFullNupkg }
+
+$prevDeltaNupkg = Get-ChildItem "$releasesDir/*-delta.nupkg" | Where-Object { $_.Name -notmatch [regex]::Escape($currentVer) } | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty Name
+if ($prevDeltaNupkg) { $assets += $prevDeltaNupkg }
 
 $assets = $assets | Select-Object -Unique
 

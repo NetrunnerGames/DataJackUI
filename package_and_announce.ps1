@@ -39,7 +39,7 @@ if (-not (Test-Path "$ReleasesDir/DataJackUI-$Version-full.nupkg")) {
     dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --self-contained false -o $PublishDir
 
     Write-Host "Packaging Velopack Installer..." -ForegroundColor Yellow
-    vpk pack -u DataJackUI -v $Version -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop -o $ReleasesDir
+    vpk pack -u DataJackUI -v $Version -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop --runtime win-x64 -o $ReleasesDir
 }
 
 # 3. Create Standard ZIP containing ONLY the Setup EXE (zip filename matches exe filename)
