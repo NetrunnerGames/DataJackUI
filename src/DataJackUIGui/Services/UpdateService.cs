@@ -1,51 +1,31 @@
-using Velopack;
-using Velopack.Sources;
+using System.IO;
+using System.Reflection;
+using System.Security.Cryptography;
+using AutoUpdaterDotNET;
+using DataJackUIGui.Models;
 
 namespace DataJackUIGui.Services;
 
 /// <summary>
-/// Silent background auto-update via Velopack + GitHub Releases. Checks on launch,
-/// downloads the (delta) update in the background, and stages it to apply on next exit.
-/// <para>
-/// Resilience is two-layered: (1) <see cref="ProxiedFileDownloader"/> routes each repo's feed + package
-/// downloads through GitHub mirrors for blocked/throttled regions (e.g. China); (2) it tries each repo in
-/// <see cref="AppConfig.GithubReleasesRepos"/> in order, so if the PRIMARY repo is gone entirely
-/// (banned / DMCA'd / account removed. Something the mirrors can't fix) it falls through to a backup repo.
-/// </para>
+/// Background auto-update service powered by AutoUpdater.NET + Inno Setup.
+/// Checks on launch and periodically in the background.
+/// Downloads silently, verifies checksum, and prompts user with dark theme dialog to restart and apply.
 /// </summary>
 public class UpdateService : IDisposable
 {
-    private UpdateManager? _manager;
-
-    private UpdateManager? GetManager()
-    {
-        if (_manager is not null) return _manager;
-        try
-        {
-            var source = new SimpleWebSource(AppConfig.VelopackReleaseFeedUrl, new ProxiedFileDownloader());
-            _manager = new UpdateManager(source);
-        }
-        catch
-        {
-            _manager = null;
-        }
-        return _manager;
-    }
-
-    // The manager whose feed produced the staged update. Apply against this same one.
-    private UpdateManager? _stagedMgr;
-    private UpdateInfo? _staged;
+    private UpdateInfoEventArgs? _stagedArgs;
+    private string? _downloadedInstallerPath;
 
     /// <summary>Raised on the thread pool when an update has finished downloading and is ready.</summary>
     public event Action? UpdateReady;
 
     /// <summary>True once an update is downloaded and waiting to be applied.</summary>
-    public bool HasStagedUpdate => _staged is not null;
+    public bool HasStagedUpdate => _stagedArgs is not null && !string.IsNullOrEmpty(_downloadedInstallerPath);
 
     /// <summary>Details of the staged update, if any.</summary>
-    public UpdateInfo? StagedUpdate => _staged;
+    public UpdateInfoEventArgs? StagedUpdate => _stagedArgs;
 
-    /// <summary>Prompt delegate for asking the user whether to update now or later. Defaults to WinUI 3 dialog via <see cref="UiMessageBox"/>.</summary>
+    /// <summary>Prompt delegate for asking the user whether to update now or later.</summary>
     public Func<string, Task<bool>>? PromptUserForUpdate { get; set; }
 
     /// <summary>Periodic interval for recurring update checks (default: 6 hours).</summary>
@@ -56,20 +36,72 @@ public class UpdateService : IDisposable
 
     private CancellationTokenSource? _periodicCts;
 
-    // Test hooks for unit testing check, download, and restart workflows without live Velopack install
+    // Test hooks for unit testing check, download, and restart workflows
     internal Func<Task<string?>>? CustomCheckForUpdatesHandler { get; set; }
     internal Func<string, Task>? CustomDownloadUpdatesHandler { get; set; }
     internal Action<string[]?>? CustomApplyUpdatesHandler { get; set; }
 
-    /// <summary>
-    /// Checks for updates via Velopack's static release feed.
-    /// If an update is available, downloads the delta package in the background,
-    /// and stages it to apply automatically on application exit (without requiring manual restart).
-    /// </summary>
-    /// <returns>UpdateInfo if a new update was found and staged; otherwise null.</returns>
-    public async Task<UpdateInfo?> CheckAndAutoUpdateAsync(IProgress<int>? progress = null, CancellationToken ct = default)
+    public UpdateService()
     {
-        // 1. Support custom test hook if set
+        ConfigureAutoUpdater();
+    }
+
+    private void ConfigureAutoUpdater()
+    {
+        // 1. Silent download & execution properties
+        AutoUpdater.RunUpdateAsAdmin = false;
+        AutoUpdater.DownloadPath = Path.Combine(Path.GetTempPath(), "DataJackUI_Updates");
+        AutoUpdater.ClearAppDirectory = false;
+        AutoUpdater.ShowSkipButton = true;
+        AutoUpdater.ShowRemindLaterButton = true;
+        AutoUpdater.Synchronous = false;
+        
+        // Pass /SILENT to Inno Setup installer so it shows a simple progress bar during install
+        // CustomArgs /SILENT passed directly to Inno Setup process in ApplyAndRestart
+
+        // JSON format parser
+        AutoUpdater.ParseUpdateInfoEvent += AutoUpdaterOnParseUpdateInfoEvent;
+    }
+
+    private void AutoUpdaterOnParseUpdateInfoEvent(ParseUpdateInfoEventArgs args)
+    {
+        try
+        {
+            var json = System.Text.Json.JsonDocument.Parse(args.RemoteData);
+            var root = json.RootElement;
+
+            string version = root.TryGetProperty("version", out var v) ? v.GetString() ?? "" : "";
+            string url = root.TryGetProperty("url", out var u) ? u.GetString() ?? "" : "";
+            string changelog = root.TryGetProperty("changelog", out var c) ? c.GetString() ?? "" : "";
+            string checksum = root.TryGetProperty("checksum", out var cs) ? cs.GetString() ?? "" : "";
+
+            args.UpdateInfo = new UpdateInfoEventArgs
+            {
+                CurrentVersion = version,
+                ChangelogURL = changelog,
+                DownloadURL = url,
+                Mandatory = new Mandatory
+                {
+                    Value = false
+                },
+                CheckSum = !string.IsNullOrEmpty(checksum) ? new CheckSum
+                {
+                    Value = checksum,
+                    HashingAlgorithm = "SHA256"
+                } : null
+            };
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Log($"[UpdateService] Error parsing update JSON: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Checks for updates silently in the background, downloads the installer, and stages it.
+    /// </summary>
+    public async Task<UpdateInfoEventArgs?> CheckAndAutoUpdateAsync(IProgress<int>? progress = null, CancellationToken ct = default)
+    {
         if (CustomCheckForUpdatesHandler is not null)
         {
             var targetVer = await CustomCheckForUpdatesHandler();
@@ -82,24 +114,68 @@ public class UpdateService : IDisposable
             return null;
         }
 
-        // 2. Production Velopack workflow via SimpleWebSource (static CDN, no scraping, no GitHub API limits)
-        var mgr = GetManager();
-        if (mgr is null || !mgr.IsInstalled) return null;
-
         try
         {
-            var info = await mgr.CheckForUpdatesAsync();
-            if (info is null) return null;
+            var tcs = new TaskCompletionSource<UpdateInfoEventArgs?>();
+            
+            void CheckHandler(UpdateInfoEventArgs? args)
+            {
+                AutoUpdater.CheckForUpdateEvent -= CheckHandler;
+                tcs.TrySetResult(args);
+            }
 
-            bool hasDelta = info.DeltasToTarget != null && info.DeltasToTarget.Length > 0;
-            PluginLog.Log($"[UpdateService] Update available -> Target: v{info.TargetFullRelease.Version}. Mode: {(hasDelta ? $"Delta ({info.DeltasToTarget!.Length} diffs, ~{info.DeltasToTarget[0].Size / 1024} KB)" : "Full package fallback (no delta match)")}");
+            AutoUpdater.CheckForUpdateEvent += CheckHandler;
+            AutoUpdater.Start(AppConfig.AutoUpdaterFeedUrl);
 
-            // Downloads the delta package automatically (Velopack selects delta over full when available)
-            await mgr.DownloadUpdatesAsync(info, progress != null ? progress.Report : null, ct);
-            _stagedMgr = mgr;
-            _staged = info;
+            var info = await tcs.Task;
+            if (info is null || !info.IsUpdateAvailable) return null;
 
-            PluginLog.Log($"[UpdateService] Successfully staged update v{info.TargetFullRelease.Version}.");
+            PluginLog.Log($"[UpdateService] Update available -> Target: v{info.CurrentVersion}. Downloading silently...");
+
+            // Download update installer to temp path
+            string tempDir = AutoUpdater.DownloadPath;
+            Directory.CreateDirectory(tempDir);
+            string installerFile = Path.Combine(tempDir, Path.GetFileName(info.DownloadURL));
+            if (string.IsNullOrEmpty(Path.GetExtension(installerFile)))
+                installerFile += ".exe";
+
+            using (var client = new System.Net.Http.HttpClient())
+            using (var response = await client.GetAsync(info.DownloadURL, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, ct))
+            {
+                response.EnsureSuccessStatusCode();
+                long totalBytes = response.Content.Headers.ContentLength ?? 15_000_000;
+                using var stream = await response.Content.ReadAsStreamAsync(ct);
+                using var fileStream = File.Create(installerFile);
+                byte[] buffer = new byte[81920];
+                long totalRead = 0;
+                int read;
+                while ((read = await stream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer, 0, read, ct);
+                    totalRead += read;
+                    if (totalBytes > 0)
+                        progress?.Report((int)((totalRead * 100) / totalBytes));
+                }
+            }
+
+            // Verify SHA256 checksum if provided
+            if (info.CheckSum != null && !string.IsNullOrEmpty(info.CheckSum.Value))
+            {
+                using var sha = SHA256.Create();
+                using var stream = File.OpenRead(installerFile);
+                byte[] hash = sha.ComputeHash(stream);
+                string computed = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                if (!string.Equals(computed, info.CheckSum.Value.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    PluginLog.Log($"[UpdateService] Checksum mismatch! Expected {info.CheckSum.Value}, got {computed}");
+                    try { File.Delete(installerFile); } catch { }
+                    return null;
+                }
+            }
+
+            _stagedArgs = info;
+            _downloadedInstallerPath = installerFile;
+            PluginLog.Log($"[UpdateService] Successfully staged update v{info.CurrentVersion} at {installerFile}.");
             UpdateReady?.Invoke();
             return info;
         }
@@ -117,15 +193,10 @@ public class UpdateService : IDisposable
     }
 
     /// <summary>
-    /// Checks for updates. If a new release is found, prompts the user via a WinUI 3 dialog
-    /// whether they wish to update now or later.
-    /// If "Update Now" is selected, retrieves the delta package quickly, stages it, and restarts the app.
-    /// If "Later" is selected, downloads and stages the update in the background for application on exit.
+    /// Checks for updates. Prompts user if an update is found, or shows feedback if already up to date.
     /// </summary>
-    /// <returns>True if an update was found and the user elected to update now; otherwise false.</returns>
     public async Task<bool> CheckForUpdatesAndPromptAsync()
     {
-        // 1. Support custom test hook if set
         if (CustomCheckForUpdatesHandler is not null)
         {
             var targetVer = await CustomCheckForUpdatesHandler();
@@ -135,13 +206,13 @@ public class UpdateService : IDisposable
                 ? await PromptUserForUpdate(targetVer)
                 : await DefaultPromptAsync(targetVer);
 
+            if (CustomDownloadUpdatesHandler is not null)
+                await CustomDownloadUpdatesHandler(targetVer);
+
+            UpdateReady?.Invoke();
+
             if (updateNow)
             {
-                if (CustomDownloadUpdatesHandler is not null)
-                    await CustomDownloadUpdatesHandler(targetVer);
-
-                UpdateReady?.Invoke();
-
                 if (CustomApplyUpdatesHandler is not null)
                     CustomApplyUpdatesHandler(null);
                 else
@@ -149,58 +220,36 @@ public class UpdateService : IDisposable
 
                 return true;
             }
-            else
-            {
-                if (CustomDownloadUpdatesHandler is not null)
-                    await CustomDownloadUpdatesHandler(targetVer);
-                UpdateReady?.Invoke();
-                return false;
-            }
-        }
-
-        // 2. Production Velopack workflow
-        var mgr = GetManager();
-        if (mgr is null || !mgr.IsInstalled) return false;
-
-        try
-        {
-            var info = await mgr.CheckForUpdatesAsync();
-            if (info is null) return false;
-
-            string targetVersion = info.TargetFullRelease.Version.ToString();
-
-            bool updateNow = PromptUserForUpdate is not null
-                ? await PromptUserForUpdate(targetVersion)
-                : await DefaultPromptAsync(targetVersion);
-
-            await mgr.DownloadUpdatesAsync(info);
-            _stagedMgr = mgr;
-            _staged = info;
-
-            if (updateNow)
-            {
-                UpdateReady?.Invoke();
-                ApplyAndRestart();
-                return true;
-            }
-            else
-            {
-                UpdateReady?.Invoke();
-                return false;
-            }
-        }
-        catch
-        {
             return false;
         }
+
+        var update = await CheckAndAutoUpdateAsync();
+        if (update is null || !update.IsUpdateAvailable)
+        {
+            string currentVer = Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "2.19.0";
+            await UiMessageBox.ShowInfoAsync("Check for Updates", $"You are running the latest version of DataJackUI (v{currentVer}).");
+            return false;
+        }
+
+        string targetVersion = update.CurrentVersion;
+        bool promptResult = PromptUserForUpdate is not null
+            ? await PromptUserForUpdate(targetVersion)
+            : await DefaultPromptAsync(targetVersion);
+
+        if (promptResult)
+        {
+            ApplyAndRestart();
+            return true;
+        }
+        return false;
     }
 
     private static async Task<bool> DefaultPromptAsync(string version)
     {
         return await UiMessageBox.ShowConfirmAsync(
             "Update Available",
-            $"A new version of DataJackUI (v{version}) is available.\n\nWould you like to update now?",
-            "Update Now",
+            $"DataJackUI v{version} has been downloaded and is ready to install.\n\nRestart now to complete the update?",
+            "Restart Now",
             "Later");
     }
 
@@ -247,29 +296,36 @@ public class UpdateService : IDisposable
         _periodicCts = null;
     }
 
-    /// <summary>Apply the staged update now and relaunch into the new version. <paramref name="restartArgs"/>
-    /// are passed to the relaunched process (e.g. the loader's --minimized --tray-locked) so the new
-    /// instance keeps its session semantics.</summary>
+    /// <summary>
+    /// Launches the staged Inno Setup installer with /SILENT switch and terminates current process.
+    /// </summary>
     public void ApplyAndRestart(string[]? restartArgs = null)
     {
-        if (_stagedMgr is not null && _staged is not null)
+        if (string.IsNullOrEmpty(_downloadedInstallerPath) || !File.Exists(_downloadedInstallerPath))
+            return;
+
+        try
         {
-            var args = restartArgs ?? new[] { "--restarted" };
-            _stagedMgr.ApplyUpdatesAndRestart(_staged.TargetFullRelease, args);
+            var psi = new System.Diagnostics.ProcessStartInfo(_downloadedInstallerPath, "/SILENT")
+            {
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(psi);
+            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                System.Windows.Application.Current.Shutdown();
+            });
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Log($"[UpdateService] Error launching updater: {ex.Message}");
         }
     }
 
-    /// <summary>Apply the staged update after the app exits (no forced restart).</summary>
+    /// <summary>Apply on exit if a staged update is ready.</summary>
     public void ApplyOnExit()
     {
-        if (_stagedMgr is not null && _staged is not null)
-        {
-            try
-            {
-                _stagedMgr.WaitExitThenApplyUpdates(_staged.TargetFullRelease, silent: true, restart: false);
-            }
-            catch { }
-        }
+        ApplyAndRestart();
     }
 
     public void Dispose()

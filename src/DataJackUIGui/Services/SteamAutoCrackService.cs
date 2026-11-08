@@ -6,7 +6,6 @@ using System.Text.Json;
 using DataJackUIGui.Models;
 using DataJackUIGui.Services.Downloads;
 using Microsoft.Extensions.Logging;
-using Velopack.Windows;
 
 namespace DataJackUIGui.Services;
 
@@ -89,88 +88,103 @@ public class SteamAutoCrackService(
     /// "net10-x64-desktop" resolves fine on 1.2.0 without an upgrade. Their asset carries no RID in its
     /// name, so the OS architecture is the honest guess at which runtime it wants.
     /// </remarks>
-    private static string RuntimeId => RuntimeInformation.OSArchitecture switch
+    private static string RuntimeArchitecture => RuntimeInformation.OSArchitecture switch
     {
-        Architecture.X86 => "net10-x86-desktop",
-        Architecture.Arm64 => "net10-arm64-desktop",
-        _ => "net10-x64-desktop",
+        Architecture.X86 => "x86",
+        Architecture.Arm64 => "arm64",
+        _ => "x64",
     };
 
-    // Velopack marks Runtimes [Obsolete] ("no longer used by Velopack, and does not represent the
-    // current supported runtimes" - docs.velopack.io/packaging/bootstrapping). It is deprecated because
-    // Velopack now bootstraps runtimes through its own installer rather than at app runtime, which is
-    // not what we need: this is an on-demand install for a THIRD-PARTY exe, long after our own setup ran.
-    //
-    // The API still works on 1.2.0 - verified live against .NET 10, which has no static field:
-    //   GetRuntimeByName("net10-x64-desktop") -> ".NET 10 WindowsDesktop (x64)"
-    //   CheckIsInstalled() -> true on a machine with WindowsDesktop.App 10.0.9
-    //   GetDownloadUrl()   -> builds.dotnet.microsoft.com/.../windowsdesktop-runtime-10.0.11-win-x64.exe
-    //
-    // If a future Velopack drops these types, the replacement is doing it by hand: query
-    // dotnetcli.blob.core.windows.net for the latest 10.0 release, download the desktop runtime exe and
-    // run it with /install /quiet-style switches. Detection can fall back to parsing `dotnet
-    // --list-runtimes` for a Microsoft.WindowsDesktop.App 10.x entry.
-#pragma warning disable CS0618 // deliberate: see above
-
     /// <summary>
-    /// Is the runtime their exe needs already present? Local and cheap - no network, no install.
+    /// Checks if Microsoft.WindowsDesktop.App 10.x is installed locally.
     /// </summary>
-    /// <remarks>
-    /// Presence of the major version is all their exe needs; patch-level servicing is Windows Update's
-    /// job, so this deliberately does not chase 10.0.x updates.
-    /// </remarks>
     public async Task<bool> RuntimeInstalledAsync()
     {
-        try
+        return await Task.Run(() =>
         {
-            var runtime = Runtimes.GetRuntimeByName(RuntimeId);
-            return runtime is not null && await runtime.CheckIsInstalled();
-        }
-        catch (Exception ex)
-        {
-            log.LogDebug(ex, "Checking for the .NET runtime failed");
+            try
+            {
+                string baseDotnet = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "shared", "Microsoft.WindowsDesktop.App");
+                if (Directory.Exists(baseDotnet))
+                {
+                    var dirs = Directory.GetDirectories(baseDotnet, "10.*");
+                    if (dirs.Length > 0) return true;
+                }
+
+                var psi = new ProcessStartInfo("dotnet", "--list-runtimes")
+                {
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var p = Process.Start(psi);
+                if (p is not null)
+                {
+                    string output = p.StandardOutput.ReadToEnd();
+                    p.WaitForExit(3000);
+                    if (output.Contains("Microsoft.WindowsDesktop.App 10.", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogDebug(ex, "Checking for the .NET runtime failed");
+            }
             return false;
-        }
+        });
     }
 
     /// <summary>
-    /// Make sure the .NET 10 Desktop runtime is present, installing it if not. Returns Ready when their
-    /// exe can actually start.
+    /// Make sure the .NET 10 Desktop runtime is present, downloading and installing it if not.
     /// </summary>
     public async Task<SacPrepareResult> EnsureRuntimeAsync(
         IProgress<double?>? progress, CancellationToken ct = default)
     {
         try
         {
-            var runtime = Runtimes.GetRuntimeByName(RuntimeId);
-            if (runtime is null)
-            {
-                log.LogDebug("Unknown .NET runtime id {Id}", RuntimeId);
-                return SacPrepareResult.RuntimeFailed;
-            }
-
-            if (await runtime.CheckIsInstalled()) return SacPrepareResult.Ready;
-
-            if (!await runtime.CheckIsSupported())
-            {
-                log.LogDebug("{Runtime} is not supported on this machine", runtime.DisplayName);
-                return SacPrepareResult.RuntimeFailed;
-            }
+            if (await RuntimeInstalledAsync()) return SacPrepareResult.Ready;
 
             Directory.CreateDirectory(ToolDir);
-            string installer = Path.Combine(ToolDir, $"{runtime.Id}.exe");
+            string arch = RuntimeArchitecture;
+            string installer = Path.Combine(ToolDir, $"windowsdesktop-runtime-10.0-{arch}.exe");
+
+            string downloadUrl = $"https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.14/windowsdesktop-runtime-10.0.14-win-{arch}.exe";
             ct.ThrowIfCancellationRequested();
-            await runtime.DownloadToFile(installer, progress != null ? p => progress.Report((double)p / 100) : null);
-            ct.ThrowIfCancellationRequested();
-            var result = await runtime.InvokeInstaller(installer, false, null);
-            try { File.Delete(installer); } catch { }
-            return result switch
+
+            using (var client = new System.Net.Http.HttpClient())
+            using (var response = await client.GetAsync(downloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, ct))
             {
-                Runtimes.RuntimeInstallResult.InstallSuccess => SacPrepareResult.Ready,
-                Runtimes.RuntimeInstallResult.UserCancelled => SacPrepareResult.RuntimeDeclined,
-                Runtimes.RuntimeInstallResult.RestartRequired => SacPrepareResult.RuntimeNeedsRestart,
-                _ => SacPrepareResult.RuntimeFailed,
+                response.EnsureSuccessStatusCode();
+                long total = response.Content.Headers.ContentLength ?? 60_000_000;
+                using var stream = await response.Content.ReadAsStreamAsync(ct);
+                using var fileStream = File.Create(installer);
+                byte[] buffer = new byte[81920];
+                long read = 0;
+                int n;
+                while ((n = await stream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer, 0, n, ct);
+                    read += n;
+                    progress?.Report((double)read / total);
+                }
+            }
+
+            ct.ThrowIfCancellationRequested();
+            var installPsi = new ProcessStartInfo(installer, "/install /quiet /norestart")
+            {
+                UseShellExecute = true
             };
+            using var proc = Process.Start(installPsi);
+            if (proc is null) return SacPrepareResult.RuntimeFailed;
+            await proc.WaitForExitAsync(ct);
+
+            try { File.Delete(installer); } catch { }
+
+            if (proc.ExitCode == 0) return SacPrepareResult.Ready;
+            if (proc.ExitCode == 1602 || proc.ExitCode == 1223) return SacPrepareResult.RuntimeDeclined;
+            if (proc.ExitCode == 3010) return SacPrepareResult.RuntimeNeedsRestart;
+
+            return SacPrepareResult.RuntimeFailed;
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
@@ -179,7 +193,6 @@ public class SteamAutoCrackService(
             return SacPrepareResult.RuntimeFailed;
         }
     }
-#pragma warning restore CS0618
 
     // ── Tool ─────────────────────────────────────────────────────────
 

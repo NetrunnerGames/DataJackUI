@@ -93,6 +93,7 @@ public static class AppConfig
     /// Hosts releases.win.json, full packages, and delta diff packages.
     /// Uses static CDN distribution without requiring GitHub REST API calls or HTML scraping.
     /// </summary>
+    public const string AutoUpdaterFeedUrl = "https://proxy.netrunnergames.workers.dev/DataJackUI/update.json";
     public const string VelopackReleaseFeedUrl = "https://proxy.netrunnergames.workers.dev/DataJackUI";
 
     /// <summary>

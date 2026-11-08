@@ -446,7 +446,7 @@ public partial class App : Application
                 if (info != null)
                 {
                     var toast = _host.Services.GetRequiredService<ToastService>();
-                    string ver = info.TargetFullRelease.Version.ToString();
+                    string ver = info.CurrentVersion;
                     Dispatcher.Invoke(() => toast.Show(
                         "Update Downloaded",
                         $"DataJackUI v{ver} is ready and will apply automatically when you close the app."));

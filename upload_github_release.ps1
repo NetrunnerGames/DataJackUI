@@ -93,22 +93,9 @@ $assets = @(
     "DataJackUI-win-Setup.exe",
     "DataJackUI-win-Setup.zip",
     "DataJackUI-win-Portable.zip",
-    "RELEASES",
-    "releases.win.json",
-    "assets.win.json"
+    "update.json",
+    "plugin.zip"
 )
-
-# Add any nupkg files for the current version
-$currentVer = $TagName.TrimStart('v')
-$currentNupkgs = Get-ChildItem "$releasesDir/*$currentVer*.nupkg" | Select-Object -ExpandProperty Name
-$assets += $currentNupkgs
-
-# Include ONLY the immediately preceding version's full and delta nupkg (1 previous version)
-$prevFullNupkg = Get-ChildItem "$releasesDir/*-full.nupkg" | Where-Object { $_.Name -notmatch [regex]::Escape($currentVer) } | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty Name
-if ($prevFullNupkg) { $assets += $prevFullNupkg }
-
-$prevDeltaNupkg = Get-ChildItem "$releasesDir/*-delta.nupkg" | Where-Object { $_.Name -notmatch [regex]::Escape($currentVer) } | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty Name
-if ($prevDeltaNupkg) { $assets += $prevDeltaNupkg }
 
 $assets = $assets | Select-Object -Unique
 
