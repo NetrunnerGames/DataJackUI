@@ -405,7 +405,7 @@ public class AuthService
 
         CurrentEntitlement = new UserEntitlement
         {
-            DiscordId = "",
+            DiscordId = UserId ?? "",
             Tier = "single",
             IsOwner = false,
             IsBanned = false
@@ -422,6 +422,7 @@ public class AuthService
             DiscordId = DiscordId,
         });
 
+        await RefreshEntitlementsAsync(ct);
         NotifyAuthStateChanged();
     }
 
