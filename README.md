@@ -81,9 +81,7 @@ cd DataJackUI
 
 DataJackUI is developed using architecture adapted from community open-source projects:
 
-* **[LuaTools](https://github.com/madoiscool/LuaTools)** — Created by **`madoiscool`** and contributors. The manifest handling logic, RPC handlers, and client architecture in this project are derived from LuaTools.
-* **[Velopack](https://github.com/velopack/velopack)** — Desktop installer and update framework.
-* **[WPF UI](https://github.com/lepoco/wpfui)** — Fluent design system controls for WPF.
+[![GitHub Stats](https://github-stats-extended.vercel.app/api/pin?username=ExpectedNinja&repo=madoiscool%2FLuaTools&show_owner=true&hide_border=true&disable_animations=false&theme=dark_github_repocard)](https://github.com/madoiscool/LuaTools) [![GitHub Stats](https://github-stats-extended.vercel.app/api/pin?username=ExpectedNinja&hide_border=true&repo=velopack%2Fvelopack&show_owner=true&disable_animations=false&theme=dark_github_repocard)](https://github.com/velopack/velopack) [![GitHub Stats](https://github-stats-extended.vercel.app/api/pin?username=ExpectedNinja&hide_border=true&repo=lepoco%2Fwpfui&show_owner=true&disable_animations=false&theme=dark_github_repocard)](https://github.com/lepoco/wpfui) [![GitHub Stats](https://github-stats-extended.vercel.app/api/pin?username=ExpectedNinja&hide_border=true&repo=OpenSteam001%2FOpenSteamTool&show_owner=true&disable_animations=false&theme=dark_github_repocard)](https://github.com/OpenSteam001/OpenSteamTool) [![GitHub Stats](https://github-stats-extended.vercel.app/api/pin?username=ExpectedNinja&hide_border=true&repo=Midrags%2FSFF&show_owner=true&disable_animations=false&theme=dark_github_repocard)](https://github.com/Midrags/SFF) [![GitHub Stats](https://github-stats-extended.vercel.app/api/pin?username=ExpectedNinja&hide_border=true&repo=acidicoala%2FSmokeAPI&show_owner=true&disable_animations=false&theme=dark_github_repocard)](https://github.com/acidicoala/SmokeAPI)
 
 ## License
 
