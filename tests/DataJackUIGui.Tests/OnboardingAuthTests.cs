@@ -89,4 +89,31 @@ public class OnboardingAuthTests : IDisposable
         await googleTask;
         Assert.False(vm.IsSigningIn);
     }
+
+    [Fact]
+    public async Task AuthService_GoogleUser_SetsEntitlementsAndUserIdentity()
+    {
+        // Simulate Google authenticated state
+        var googleAuth = new StoredAuth
+        {
+            AccessToken = "ya29.test_google_token",
+            RefreshToken = "1//test_google_refresh",
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(2),
+            Username = "JohnnyNetrunner",
+            UserId = "google_user_sub_98765", // Google non-numeric or custom sub
+            AvatarUrl = "https://lh3.googleusercontent.com/a/test",
+            DiscordId = null
+        };
+        AuthService.SaveStored(googleAuth);
+
+        bool restored = await _auth.InitializeAsync();
+        Assert.True(restored);
+        Assert.True(_auth.IsSignedIn);
+        Assert.Equal("google_user_sub_98765", _auth.UserId);
+        Assert.Equal("JohnnyNetrunner", _auth.Username);
+        Assert.Null(_auth.DiscordId);
+        Assert.NotNull(_auth.CurrentEntitlement);
+        // By default a standard single-title entitlement is active
+        Assert.False(_auth.IsBanned);
+    }
 }

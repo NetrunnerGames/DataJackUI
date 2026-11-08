@@ -317,6 +317,27 @@ public class CloudSavesTests : IDisposable
     }
 
     [Fact]
+    public void GoogleDrive_ConnectionState_AndDisconnect_BehavesCorrectly()
+    {
+        // Initial state: not connected
+        _cloudSaves.DisconnectGoogleDrive();
+        Assert.False(_cloudSaves.IsGoogleDriveConnected);
+        Assert.Null(_cloudSaves.GetGoogleDriveAccount());
+
+        // Simulate connecting with an authorized Google account email
+        const string mockGoogleAccount = "netrunner.dev@gmail.com";
+        _settings.CloudSavesGDriveAccount = mockGoogleAccount;
+
+        Assert.True(_cloudSaves.IsGoogleDriveConnected);
+        Assert.Equal(mockGoogleAccount, _cloudSaves.GetGoogleDriveAccount());
+
+        // Disconnecting clears the account
+        _cloudSaves.DisconnectGoogleDrive();
+        Assert.False(_cloudSaves.IsGoogleDriveConnected);
+        Assert.Null(_cloudSaves.GetGoogleDriveAccount());
+    }
+
+    [Fact]
     public void AllXamlViews_AllSymbolIcons_AreValidEnumMembers()
     {
         string[] candidateDirs = [
