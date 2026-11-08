@@ -20,6 +20,7 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}/releases
 DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
+DisableWelcomePage=no
 DisableProgramGroupPage=no
 DisableDirPage=no
 AllowNoIcons=yes
