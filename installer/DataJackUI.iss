@@ -4,7 +4,7 @@
 
 #define MyAppName "DataJackUI"
 #ifndef MyAppVersion
-  #define MyAppVersion "2.19.0"
+  #define MyAppVersion "2.19.2"
 #endif
 #define MyAppPublisher "NetrunnerGames"
 #define MyAppURL "https://github.com/NetrunnerGames/DataJackUI"
