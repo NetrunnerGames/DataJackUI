@@ -1,12 +1,12 @@
-DataJackUI Setup
-================
+Welcome to DataJackUI
+======================
+
+Thank you for choosing DataJackUI.
+
+This setup wizard will guide you through installing DataJackUI on your system.
 
 System Requirements:
-- Windows 10 (Build 19041+) or Windows 11 (64-bit)
+- Windows 10 (64-bit) or Windows 11
 - Microsoft .NET 8.0 Desktop Runtime (x64)
-- Internet connection for online fix verification, manifests, and cloud saves
 
-Important Notes:
-- DataJackUI installs into your user profile directory without requiring administrator privileges.
-- Game fixes, DepotBox bypasses, and online fixes interact with your Steam client installation. Ensure Steam is running during game fix execution when prompted.
-- You can manage, verify, and uninstall DataJackUI at any time from Windows Settings > Installed Apps.
+Click Next to continue, or Cancel to exit Setup.
