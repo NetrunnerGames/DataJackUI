@@ -139,24 +139,8 @@ public class UpdateService : IDisposable
             if (string.IsNullOrEmpty(Path.GetExtension(installerFile)))
                 installerFile += ".exe";
 
-            using (var client = new System.Net.Http.HttpClient())
-            using (var response = await client.GetAsync(info.DownloadURL, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, ct))
-            {
-                response.EnsureSuccessStatusCode();
-                long totalBytes = response.Content.Headers.ContentLength ?? 15_000_000;
-                using var stream = await response.Content.ReadAsStreamAsync(ct);
-                using var fileStream = File.Create(installerFile);
-                byte[] buffer = new byte[81920];
-                long totalRead = 0;
-                int read;
-                while ((read = await stream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
-                {
-                    await fileStream.WriteAsync(buffer, 0, read, ct);
-                    totalRead += read;
-                    if (totalBytes > 0)
-                        progress?.Report((int)((totalRead * 100) / totalBytes));
-                }
-            }
+            // Download via ProxiedFileDownloader to route through Cloudflare Edge Cache & GitHub mirrors
+            await ProxiedFileDownloader.DownloadFileAsync(info.DownloadURL, installerFile, progress, ct);
 
             // Verify SHA256 checksum if provided
             if (info.CheckSum != null && !string.IsNullOrEmpty(info.CheckSum.Value))
