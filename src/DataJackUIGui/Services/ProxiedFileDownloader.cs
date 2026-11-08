@@ -36,7 +36,7 @@ public static class ProxiedFileDownloader
                 long totalRead = 0;
                 int read;
 
-                while ((read = await stream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
+                while ((read = await stream.ReadAsync(buffer, ct)) > 0)
                 {
                     await fileStream.WriteAsync(buffer.AsMemory(0, read), ct);
                     totalRead += read;
