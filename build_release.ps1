@@ -125,30 +125,58 @@ if (Test-Path "src/DataJackUIPlugin") {
     [System.IO.Compression.ZipFile]::CreateFromDirectory($PluginSrc, $ZipTarget)
 }
 
-# 5. Package Standard ZIP containing ONLY the Setup EXE (zip filename matches exe filename)
-Write-Host "`n4. Packaging Standard Setup EXE ZIP in Project Root..." -ForegroundColor Yellow
-$SetupExePath = "$ReleasesDir/DataJackUI-win-Setup.exe"
-$RootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-win-Setup.zip"
-$ReleasesZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/DataJackUI-win-Setup.zip"
+# 5. Package Setup EXE ZIPs (Inno Setup & Velopack) in Project Root & Releases
+Write-Host "`n4. Packaging Setup EXE ZIP..." -ForegroundColor Yellow
+$InnoSetupExePath = "$ReleasesDir/DataJackUI-Inno-Setup.exe"
+$VelopackSetupExePath = "$ReleasesDir/DataJackUI-win-Setup.exe"
 
-if (Test-Path $RootZip) { Remove-Item -Force $RootZip }
+# 5a. DataJackUI-Inno-Setup.zip containing DataJackUI-Inno-Setup.exe (preferred for Discord / distribution)
+if (Test-Path $InnoSetupExePath) {
+    $InnoZipTarget = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/DataJackUI-Inno-Setup.zip"
+    $InnoRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-Inno-Setup.zip"
+    if (Test-Path $InnoZipTarget) { Remove-Item -Force $InnoZipTarget }
+    if (Test-Path $InnoRootZip) { Remove-Item -Force $InnoRootZip }
 
-$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_Zip_$([Guid]::NewGuid().ToString('N'))"
-New-Item -ItemType Directory -Path $tempDir | Out-Null
-Copy-Item $SetupExePath "$tempDir/DataJackUI-win-Setup.exe" -Force
+    $tempDirInno = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_InnoZip_$([Guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $tempDirInno | Out-Null
+    Copy-Item $InnoSetupExePath "$tempDirInno/DataJackUI-Inno-Setup.exe" -Force
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($tempDirInno, $InnoRootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+    Copy-Item $InnoRootZip $InnoZipTarget -Force
+    Remove-Item -Recurse -Force $tempDirInno -ErrorAction SilentlyContinue
+    Write-Host "Inno Setup ZIP created: $InnoZipTarget" -ForegroundColor Green
+}
 
-[System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
-Copy-Item $RootZip $ReleasesZip -Force
-Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
+# 5b. DataJackUI-win-Setup.zip containing DataJackUI-win-Setup.exe (Velopack)
+if (Test-Path $VelopackSetupExePath) {
+    $RootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-win-Setup.zip"
+    $ReleasesZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/DataJackUI-win-Setup.zip"
+    if (Test-Path $RootZip) { Remove-Item -Force $RootZip }
+    if (Test-Path $ReleasesZip) { Remove-Item -Force $ReleasesZip }
+
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_Zip_$([Guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $tempDir | Out-Null
+    Copy-Item $VelopackSetupExePath "$tempDir/DataJackUI-win-Setup.exe" -Force
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+    Copy-Item $RootZip $ReleasesZip -Force
+    Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
+}
 
 # 6. Package Portable ZIP from publish output
 Write-Host "`n5. Packaging Portable ZIP in Releases..." -ForegroundColor Yellow
 $PortableZip = "$ReleasesDir/DataJackUI-win-Portable.zip"
+$PortableRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-win-Portable.zip"
 if (Test-Path $PortableZip) { Remove-Item -Force $PortableZip }
-[System.IO.Compression.ZipFile]::CreateFromDirectory((Resolve-Path $PublishDir), $PortableZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+if (Test-Path $PortableRootZip) { Remove-Item -Force $PortableRootZip }
+
+if (Test-Path $PublishDir) {
+    [System.IO.Compression.ZipFile]::CreateFromDirectory((Resolve-Path $PublishDir), $PortableZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+    Copy-Item $PortableZip $PortableRootZip -Force
+    Write-Host "Portable ZIP created: $PortableZip" -ForegroundColor Green
+} else {
+    Write-Host "Warning: PublishDir ($PublishDir) not found for Portable ZIP creation!" -ForegroundColor Red
+}
 
 Write-Host "`n====================================================" -ForegroundColor Green
-Write-Host " Successfully Created All Release Artifacts:" -ForegroundColor Green
-Write-Host " Root Zip: $RootZip" -ForegroundColor Green
+Write-Host " Successfully Created All Release Artifacts" -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
 Get-ChildItem $ReleasesDir | Select-Object Name, @{Name="SizeMB";Expression={[math]::Round($_.Length/1MB, 2)}}

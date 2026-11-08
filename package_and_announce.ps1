@@ -32,32 +32,33 @@ $ReleasesDir = "Releases"
 if (-not (Test-Path $ReleasesDir)) { New-Item -ItemType Directory -Path $ReleasesDir | Out-Null }
 
 $PublishDir = "bin/PublishFrameworkDependent"
-$SetupExe = "$ReleasesDir/DataJackUI-win-Setup.exe"
+$InnoSetupExe = "$ReleasesDir/DataJackUI-Inno-Setup.exe"
 
-if (-not (Test-Path "$ReleasesDir/DataJackUI-win-Setup.exe")) {
+if ((-not (Test-Path $InnoSetupExe)) -or (-not (Test-Path "$ReleasesDir/DataJackUI-Inno-Setup.zip"))) {
     & "$PSScriptRoot/build_release.ps1" -Bump "none"
 }
 
-# 3. Create Standard ZIP containing ONLY the Setup EXE (zip filename matches exe filename)
-$ExeName = "DataJackUI-win-Setup.exe"
-$ZipName = "DataJackUI-win-Setup.zip"
+# 3. Use Inno Setup ZIP for Discord release announcements
+$ExeName = "DataJackUI-Inno-Setup.exe"
+$ZipName = "DataJackUI-Inno-Setup.zip"
 $ZipPath = "$ReleasesDir/$ZipName"
 $RootZip = $ZipName
 
-if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
-if (Test-Path $RootZip) { Remove-Item -Force $RootZip }
+if (-not (Test-Path $ZipPath)) {
+    Write-Host "Creating Inno Setup ZIP archive containing $ExeName..." -ForegroundColor Yellow
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_Zip_$([Guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $tempDir | Out-Null
+    Copy-Item $InnoSetupExe "$tempDir/$ExeName" -Force
 
-Write-Host "Creating Standard ZIP archive containing $ExeName..." -ForegroundColor Yellow
-$tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_Zip_$([Guid]::NewGuid().ToString('N'))"
-New-Item -ItemType Directory -Path $tempDir | Out-Null
-Copy-Item $SetupExe "$tempDir/$ExeName" -Force
-
-[System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
-Copy-Item $RootZip $ZipPath -Force
-Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+    Copy-Item $RootZip $ZipPath -Force
+    Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
+} else {
+    Copy-Item $ZipPath $RootZip -Force
+}
 
 $zipSizeMb = [math]::Round((Get-Item $RootZip).Length / 1MB, 2)
-Write-Host "Created Standard ZIP ($zipSizeMb MB) at: $RootZip" -ForegroundColor Green
+Write-Host "Ready Inno Setup ZIP ($zipSizeMb MB) at: $RootZip" -ForegroundColor Green
 
 # 4. Resolve Changelog and Highlights from .txt files if not explicitly provided
 $ChangelogFile = Join-Path $PSScriptRoot "changelog.txt"

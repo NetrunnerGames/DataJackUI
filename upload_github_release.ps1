@@ -90,8 +90,9 @@ try {
 # 4. Resolve assets to upload
 $releasesDir = Join-Path $PSScriptRoot "Releases"
 $assets = @(
-    "DataJackUI-win-Setup.exe",
     "DataJackUI-Inno-Setup.exe",
+    "DataJackUI-Inno-Setup.zip",
+    "DataJackUI-win-Setup.exe",
     "DataJackUI-win-Setup.zip",
     "DataJackUI-win-Portable.zip",
     "RELEASES",
