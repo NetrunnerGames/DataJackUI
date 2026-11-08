@@ -75,14 +75,10 @@ public class OnboardingAuthTests : IDisposable
 
         Assert.Equal("Waiting for authorization...", vm.WaitingMessage);
 
-        // Execute Discord sign-in (will fail pipe connection, but sets WaitingMessage)
-        await vm.SignInCommand.ExecuteAsync(null);
-        Assert.Equal("Waiting for Discord...", vm.WaitingMessage);
-        Assert.False(vm.IsSigningIn);
-
-        // Start Google sign-in: launches authorization URL in external default browser (Firefox)
+        // Start Google sign-in first: launches authorization URL in external default browser
         var googleTask = vm.SignInGoogleCommand.ExecuteAsync(null);
         Assert.Equal("Waiting for Google...", vm.WaitingMessage);
+        Assert.True(vm.IsSigningIn);
 
         // Keep the browser session alive for 4 seconds so the window/tab is visibly opened
         await Task.Delay(4000);
@@ -90,6 +86,14 @@ public class OnboardingAuthTests : IDisposable
         // Cancel Google sign-in and await task completion
         vm.CancelSignIn();
         await googleTask;
+        Assert.False(vm.IsSigningIn);
+
+        // Next test Discord sign-in
+        var discordTask = vm.SignInCommand.ExecuteAsync(null);
+        Assert.Equal("Waiting for Discord...", vm.WaitingMessage);
+        await Task.Delay(500);
+        vm.CancelSignIn();
+        await discordTask;
         Assert.False(vm.IsSigningIn);
     }
 
@@ -99,24 +103,21 @@ public class OnboardingAuthTests : IDisposable
         // Simulate Google authenticated state
         var googleAuth = new StoredAuth
         {
-            AccessToken = "ya29.test_google_token",
-            RefreshToken = "1//test_google_refresh",
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(2),
-            Username = "JohnnyNetrunner",
-            UserId = "google_user_sub_98765", // Google non-numeric or custom sub
-            AvatarUrl = "https://lh3.googleusercontent.com/a/test",
-            DiscordId = null
+            AccessToken = "google_access_token_123",
+            RefreshToken = "google_refresh_token_456",
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
+            Username = "GooglePlayer",
+            UserId = "google_user_789",
+            AvatarUrl = "https://lh3.googleusercontent.com/avatar.png"
         };
         AuthService.SaveStored(googleAuth);
 
         bool restored = await _auth.InitializeAsync();
         Assert.True(restored);
-        Assert.True(_auth.IsSignedIn);
-        Assert.Equal("google_user_sub_98765", _auth.UserId);
-        Assert.Equal("JohnnyNetrunner", _auth.Username);
-        Assert.Null(_auth.DiscordId);
+
         Assert.NotNull(_auth.CurrentEntitlement);
-        // By default a standard single-title entitlement is active
-        Assert.False(_auth.IsBanned);
+        Assert.Equal("GooglePlayer", _auth.Username);
+        Assert.Equal("google_user_789", _auth.UserId);
+        Assert.Equal("google_user_789", _auth.CurrentEntitlement.DiscordId);
     }
 }

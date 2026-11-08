@@ -182,33 +182,9 @@ public class SteamService(SettingsService settings)
         return null;
     }
 
-    /// <summary>Open a store/steam URL or file path. If it's a web URL, prefer launching directly via Windows default browser executable to bypass environment hooks.</summary>
+    /// <summary>Open a store/steam URL or file path in the Windows default application/browser.</summary>
     public static void OpenUrl(string url)
     {
-        if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-        {
-            // Resolve whichever browser the user configured as default in Windows
-            var (browserExe, argsTemplate) = ResolveWindowsDefaultBrowser();
-            if (!string.IsNullOrEmpty(browserExe) && File.Exists(browserExe))
-            {
-                try
-                {
-                    string args = !string.IsNullOrEmpty(argsTemplate) && argsTemplate.Contains("%1")
-                        ? argsTemplate.Replace("%1", url)
-                        : $"\"{url}\"";
-
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = browserExe,
-                        Arguments = args,
-                        UseShellExecute = false
-                    });
-                    return;
-                }
-                catch { /* fallback to shell execute */ }
-            }
-        }
-
         try
         {
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
@@ -217,68 +193,11 @@ public class SteamService(SettingsService settings)
         {
             try
             {
+                // Fallback for systems where URL association handler fails via ProcessStartInfo directly
                 string escaped = url.Replace("^", "^^").Replace("&", "^&");
                 Process.Start(new ProcessStartInfo("cmd.exe", $"/c start \"\" \"{escaped}\"") { CreateNoWindow = true });
             }
             catch { }
-        }
-    }
-
-    /// <summary>Query the Windows registry to find the default registered browser executable and argument template.</summary>
-    private static (string? ExePath, string? ArgsTemplate) ResolveWindowsDefaultBrowser()
-    {
-        try
-        {
-            string? progId = null;
-            using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice")
-                          ?? Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"))
-            {
-                progId = key?.GetValue("ProgId") as string;
-            }
-
-            if (string.IsNullOrEmpty(progId)) return (null, null);
-
-            string? cmd = null;
-            using (var key = Registry.ClassesRoot.OpenSubKey($@"{progId}\shell\open\command")
-                          ?? Registry.CurrentUser.OpenSubKey($@"Software\Classes\{progId}\shell\open\command")
-                          ?? Registry.LocalMachine.OpenSubKey($@"Software\Classes\{progId}\shell\open\command"))
-            {
-                cmd = key?.GetValue(null) as string;
-            }
-
-            if (string.IsNullOrEmpty(cmd)) return (null, null);
-
-            string exe = "";
-            string args = "";
-
-            if (cmd.StartsWith("\""))
-            {
-                int endQuote = cmd.IndexOf('"', 1);
-                if (endQuote > 1)
-                {
-                    exe = cmd.Substring(1, endQuote - 1);
-                    args = cmd.Substring(endQuote + 1).Trim();
-                }
-            }
-            else
-            {
-                int firstSpace = cmd.IndexOf(' ');
-                if (firstSpace > 0)
-                {
-                    exe = cmd.Substring(0, firstSpace);
-                    args = cmd.Substring(firstSpace + 1).Trim();
-                }
-                else
-                {
-                    exe = cmd;
-                }
-            }
-
-            return (exe, args);
-        }
-        catch
-        {
-            return (null, null);
         }
     }
 
