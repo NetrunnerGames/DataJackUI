@@ -163,7 +163,7 @@ public class SteamAutoCrackService(
                 int n;
                 while ((n = await stream.ReadAsync(buffer, ct)) > 0)
                 {
-                    await fileStream.WriteAsync(buffer, 0, n, ct);
+                    await fileStream.WriteAsync(buffer.AsMemory(0, n), ct);
                     read += n;
                     progress?.Report((double)read / total);
                 }
