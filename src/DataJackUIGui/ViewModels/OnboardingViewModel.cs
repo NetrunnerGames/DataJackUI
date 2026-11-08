@@ -110,14 +110,7 @@ public partial class OnboardingViewModel : ObservableObject
         WaitingMessage = "Waiting for Google...";
         _signInCts?.Cancel();
         _signInCts = new CancellationTokenSource();
-        try
-        {
-            await _auth.SignInWithGoogleAsync(_signInCts.Token);
-            if (!string.IsNullOrEmpty(_auth.Email))
-            {
-                _settings.CloudSavesGDriveAccount = _auth.Email;
-            }
-        }
+        try { await _auth.SignInWithGoogleAsync(_signInCts.Token); }
         catch (OperationCanceledException) { }
         catch (Exception ex) { StatusLine = ex.Message; }
         finally { IsSigningIn = false; }

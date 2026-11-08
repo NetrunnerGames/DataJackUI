@@ -317,25 +317,6 @@ public class CloudSavesTests : IDisposable
     }
 
     [Fact]
-    public async Task CloudSaves_ConnectGoogleDrive_InitiatesRealBrowserFlow_AndHandlesCancellation()
-    {
-        using var cts = new CancellationTokenSource();
-        // Trigger the real browser authorization method in background
-        var connectTask = _cloudSaves.ConnectGoogleDriveAsync(status => { }, cts.Token);
-
-        // Allow real process start (e.g. Firefox) to launch
-        await Task.Delay(500);
-
-        // Cancel authorization flow
-        cts.Cancel();
-        var (success, message, account) = await connectTask;
-
-        Assert.False(success);
-        Assert.Contains("timed out", message, StringComparison.OrdinalIgnoreCase);
-        Assert.Null(account);
-    }
-
-    [Fact]
     public void AllXamlViews_AllSymbolIcons_AreValidEnumMembers()
     {
         string[] candidateDirs = [

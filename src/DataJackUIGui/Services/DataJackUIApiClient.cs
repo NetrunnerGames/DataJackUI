@@ -588,9 +588,7 @@ public class DataJackUIApiClient
 
             if (appIds.Count == 0)
             {
-                var stale = await LoadStaleBrowseCacheAsync(LatestMonthHitsCacheFile, ct);
-                if (stale.Count > 0) return stale;
-                return await GetWeeklyTopSellersAsync(ct);
+                return await LoadStaleBrowseCacheAsync(LatestMonthHitsCacheFile, ct);
             }
 
             // Fetch metadata for candidates (up to 35) to filter out free and delisted games

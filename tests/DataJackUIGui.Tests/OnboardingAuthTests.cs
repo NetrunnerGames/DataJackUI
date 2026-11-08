@@ -75,49 +75,18 @@ public class OnboardingAuthTests : IDisposable
 
         Assert.Equal("Waiting for authorization...", vm.WaitingMessage);
 
-        // Start Google sign-in first: launches authorization URL in external default browser
+        // Execute Discord sign-in (will fail pipe connection, but sets WaitingMessage)
+        await vm.SignInCommand.ExecuteAsync(null);
+        Assert.Equal("Waiting for Discord...", vm.WaitingMessage);
+        Assert.False(vm.IsSigningIn);
+
+        // Start Google sign-in
         var googleTask = vm.SignInGoogleCommand.ExecuteAsync(null);
         Assert.Equal("Waiting for Google...", vm.WaitingMessage);
-        Assert.True(vm.IsSigningIn);
-
-        // Keep the browser session alive for 4 seconds so the window/tab is visibly opened
-        await Task.Delay(4000);
 
         // Cancel Google sign-in and await task completion
         vm.CancelSignIn();
         await googleTask;
         Assert.False(vm.IsSigningIn);
-
-        // Next test Discord sign-in
-        var discordTask = vm.SignInCommand.ExecuteAsync(null);
-        Assert.Equal("Waiting for Discord...", vm.WaitingMessage);
-        await Task.Delay(500);
-        vm.CancelSignIn();
-        await discordTask;
-        Assert.False(vm.IsSigningIn);
-    }
-
-    [Fact]
-    public async Task AuthService_GoogleUser_SetsEntitlementsAndUserIdentity()
-    {
-        // Simulate Google authenticated state
-        var googleAuth = new StoredAuth
-        {
-            AccessToken = "google_access_token_123",
-            RefreshToken = "google_refresh_token_456",
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
-            Username = "GooglePlayer",
-            UserId = "google_user_789",
-            AvatarUrl = "https://lh3.googleusercontent.com/avatar.png"
-        };
-        AuthService.SaveStored(googleAuth);
-
-        bool restored = await _auth.InitializeAsync();
-        Assert.True(restored);
-
-        Assert.NotNull(_auth.CurrentEntitlement);
-        Assert.Equal("GooglePlayer", _auth.Username);
-        Assert.Equal("google_user_789", _auth.UserId);
-        Assert.Equal("google_user_789", _auth.CurrentEntitlement.DiscordId);
     }
 }

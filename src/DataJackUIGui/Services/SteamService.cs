@@ -182,24 +182,9 @@ public class SteamService(SettingsService settings)
         return null;
     }
 
-    /// <summary>Open a store/steam URL or file path in the Windows default application/browser.</summary>
-    public static void OpenUrl(string url)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-        }
-        catch
-        {
-            try
-            {
-                // Fallback for systems where URL association handler fails via ProcessStartInfo directly
-                string escaped = url.Replace("^", "^^").Replace("&", "^&");
-                Process.Start(new ProcessStartInfo("cmd.exe", $"/c start \"\" \"{escaped}\"") { CreateNoWindow = true });
-            }
-            catch { }
-        }
-    }
+    /// <summary>Open a store/steam URL or file path with the shell (browser, Steam client, Explorer).</summary>
+    public static void OpenUrl(string url) =>
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
 
     /// <summary>Open Explorer with the given file selected.</summary>
     public static void RevealInExplorer(string filePath) =>
