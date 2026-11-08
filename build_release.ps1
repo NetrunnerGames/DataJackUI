@@ -125,12 +125,10 @@ if (Test-Path "src/DataJackUIPlugin") {
     [System.IO.Compression.ZipFile]::CreateFromDirectory($PluginSrc, $ZipTarget)
 }
 
-# 5. Package Setup EXE ZIPs (Inno Setup & Velopack) in Project Root & Releases
-Write-Host "`n4. Packaging Setup EXE ZIP..." -ForegroundColor Yellow
+# 5. Package Setup ZIP (Inno Setup Installer for Discord & Releases)
+Write-Host "`n4. Packaging Inno Setup ZIP..." -ForegroundColor Yellow
 $InnoSetupExePath = "$ReleasesDir/DataJackUI-Inno-Setup.exe"
-$VelopackSetupExePath = "$ReleasesDir/DataJackUI-win-Setup.exe"
 
-# 5a. DataJackUI-Inno-Setup.zip containing DataJackUI-Inno-Setup.exe (preferred for Discord / distribution)
 if (Test-Path $InnoSetupExePath) {
     $InnoZipTarget = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/DataJackUI-Inno-Setup.zip"
     $InnoRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-Inno-Setup.zip"
@@ -146,39 +144,18 @@ if (Test-Path $InnoSetupExePath) {
     Write-Host "Inno Setup ZIP created: $InnoZipTarget" -ForegroundColor Green
 }
 
-# 5b. DataJackUI-win-Setup.zip containing DataJackUI-win-Setup.exe (Velopack)
-if (Test-Path $VelopackSetupExePath) {
-    $RootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-win-Setup.zip"
-    $ReleasesZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/DataJackUI-win-Setup.zip"
-    if (Test-Path $RootZip) { Remove-Item -Force $RootZip }
-    if (Test-Path $ReleasesZip) { Remove-Item -Force $ReleasesZip }
-
-    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_Zip_$([Guid]::NewGuid().ToString('N'))"
-    New-Item -ItemType Directory -Path $tempDir | Out-Null
-    Copy-Item $VelopackSetupExePath "$tempDir/DataJackUI-win-Setup.exe" -Force
-    [System.IO.Compression.ZipFile]::CreateFromDirectory($tempDir, $RootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
-    Copy-Item $RootZip $ReleasesZip -Force
-    Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
-}
-
 # 6. Package Portable ZIP from publish output
 Write-Host "`n5. Packaging Portable ZIP in Releases..." -ForegroundColor Yellow
 $PortableZip = "$ReleasesDir/DataJackUI-Portable.zip"
 $PortableRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-Portable.zip"
-$WinPortableZip = "$ReleasesDir/DataJackUI-win-Portable.zip"
-$WinPortableRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-win-Portable.zip"
 
 if (Test-Path $PortableZip) { Remove-Item -Force $PortableZip }
 if (Test-Path $PortableRootZip) { Remove-Item -Force $PortableRootZip }
-if (Test-Path $WinPortableZip) { Remove-Item -Force $WinPortableZip }
-if (Test-Path $WinPortableRootZip) { Remove-Item -Force $WinPortableRootZip }
 
 if (Test-Path $PublishDir) {
     [System.IO.Compression.ZipFile]::CreateFromDirectory((Resolve-Path $PublishDir), $PortableZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
     Copy-Item $PortableZip $PortableRootZip -Force
-    Copy-Item $PortableZip $WinPortableZip -Force
-    Copy-Item $PortableZip $WinPortableRootZip -Force
-    Write-Host "Portable ZIP created: $PortableZip (and $WinPortableZip)" -ForegroundColor Green
+    Write-Host "Portable ZIP created: $PortableZip" -ForegroundColor Green
 } else {
     Write-Host "Warning: PublishDir ($PublishDir) not found for Portable ZIP creation!" -ForegroundColor Red
 }

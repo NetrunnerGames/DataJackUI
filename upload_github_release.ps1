@@ -92,10 +92,7 @@ $releasesDir = Join-Path $PSScriptRoot "Releases"
 $assets = @(
     "DataJackUI-Inno-Setup.exe",
     "DataJackUI-Inno-Setup.zip",
-    "DataJackUI-win-Setup.exe",
-    "DataJackUI-win-Setup.zip",
     "DataJackUI-Portable.zip",
-    "DataJackUI-win-Portable.zip",
     "RELEASES",
     "releases.win.json",
     "assets.win.json",
