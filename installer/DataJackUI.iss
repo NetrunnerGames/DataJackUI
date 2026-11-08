@@ -1,5 +1,7 @@
-; DataJackUI Modern Inno Setup Script
-; UniGetUI Style Modern Dynamic Theme (Windows 10/11 auto dark/light sync)
+; DataJackUI Modern Inno Setup Script (Wrapping Velopack Bootstrap)
+; Provides the modern dynamic dark UI, EULA, directory selection, and custom tasks
+; while installing Velopack-managed files so that in-app 300KB delta updates work seamlessly.
+
 #define MyAppName "DataJackUI"
 #ifndef MyAppVersion
   #define MyAppVersion "2.19.0"
@@ -24,7 +26,7 @@ AllowNoIcons=yes
 LicenseFile=..\LICENSE
 InfoBeforeFile=welcome-info.txt
 OutputDir=..\Releases
-OutputBaseFilename=DataJackUI-win-Setup
+OutputBaseFilename=DataJackUI-Inno-Setup
 SetupIconFile=..\src\DataJackUIGui\icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2/ultra64
@@ -48,7 +50,13 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "startmenuicon"; Description: "Create a Start Menu shortcut"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
+; 1. Application files
 Source: "..\bin\PublishFrameworkDependent\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; 2. Embed Velopack update manager assets so the app is recognized as installed by Velopack
+Source: "..\Releases\assets.win.json"; DestDir: "{app}\.."; Flags: ignoreversion
+Source: "..\Releases\releases.win.json"; DestDir: "{app}\.."; Flags: ignoreversion
+Source: "..\Releases\DataJackUI-{#MyAppVersion}-full.nupkg"; DestDir: "{app}\.."; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startmenuicon

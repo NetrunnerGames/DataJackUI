@@ -99,32 +99,20 @@ if (Test-Path $PluginJsonFile) {
 Write-Host "`n1. Publishing DataJackUI WPF Application (v$DataJackVersion)..." -ForegroundColor Yellow
 dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --self-contained false -o $PublishDir
 
-# 3. Pack Application with Inno Setup (UniGetUI Style Modern Dynamic)
-Write-Host "`n2. Compiling Inno Setup Modern Installer..." -ForegroundColor Yellow
+# 3. Pack Velopack delta packages & binary releases
+Write-Host "`n2. Packaging Velopack Installer & Delta Updates..." -ForegroundColor Yellow
+vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop --runtime win-x64 -o $ReleasesDir
+
+# 4. Compile Inno Setup Modern Dynamic Installer (wraps Velopack metadata for seamless in-app delta updates)
+Write-Host "`n3. Compiling Inno Setup Modern Installer..." -ForegroundColor Yellow
 $isccPath = "C:\Program Files\Inno Setup 7\ISCC.exe"
 if (-not (Test-Path $isccPath)) {
     $isccCmd = Get-Command iscc.exe -ErrorAction SilentlyContinue
     if ($isccCmd) { $isccPath = $isccCmd.Source }
 }
-
-if (-not (Test-Path $isccPath)) {
-    throw "Inno Setup compiler (ISCC.exe) not found at: $isccPath"
-}
-
-& "$isccPath" "/DMyAppVersion=$DataJackVersion" "$PSScriptRoot/installer/DataJackUI.iss"
-
-# Generate update.json for AutoUpdater.NET with SHA256 checksum
-$setupFile = "$ReleasesDir/DataJackUI-win-Setup.exe"
-if (Test-Path $setupFile) {
-    $sha256 = (Get-FileHash -Path $setupFile -Algorithm SHA256).Hash.ToLowerInvariant()
-    $updateMeta = @{
-        version   = $DataJackVersion
-        url       = "https://github.com/NetrunnerGames/DataJackUI/releases/download/v$DataJackVersion/DataJackUI-win-Setup.exe"
-        changelog = "https://github.com/NetrunnerGames/DataJackUI/releases/tag/v$DataJackVersion"
-        checksum  = $sha256
-    }
-    $updateMeta | ConvertTo-Json -Depth 3 | Set-Content (Join-Path $ReleasesDir "update.json") -Encoding utf8
-    Write-Host "Generated AutoUpdater metadata: update.json (SHA256: $sha256)" -ForegroundColor Green
+if (Test-Path $isccPath) {
+    & "$isccPath" "/DMyAppVersion=$DataJackVersion" "$PSScriptRoot/installer/DataJackUI.iss"
+    Write-Host "Inno Setup modern installer created: DataJackUI-Inno-Setup.exe" -ForegroundColor Green
 }
 
 # 4. Package Plugin (Jack-in) into plugin.zip (if plugin source exists)

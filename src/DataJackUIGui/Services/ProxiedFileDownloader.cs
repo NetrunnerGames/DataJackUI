@@ -1,65 +1,71 @@
-using System.IO;
-using System.Net.Http;
+using Velopack.Sources;
 
 namespace DataJackUIGui.Services;
 
 /// <summary>
-/// Resilient file downloader for AutoUpdater.NET and application downloads that routes GitHub requests
-/// through Cloudflare Edge Cache and mirror proxies (<see cref="GithubProxy.Candidates"/>).
-/// Prevents throttling, slow downloads, and regional connection drops.
+/// An <see cref="IFileDownloader"/> for Velopack's auto-updater that makes its GitHub requests resilient
+/// in blocked/throttled regions (e.g. China). Velopack calls this for BOTH the release feed (the API, via
+/// DownloadString/DownloadBytes) and the package download (the .nupkg, via DownloadFile). Each call tries
+/// the DIRECT GitHub URL first, then falls through the same mirrors as <see cref="GithubProxy"/>
+/// (<see cref="GithubProxy.Candidates"/>), so the in-app self-update works where github.com is blocked.
+/// Wraps Velopack's stock <see cref="HttpClientFileDownloader"/>, only swapping the URL per attempt.
 /// </summary>
-public static class ProxiedFileDownloader
+public class ProxiedFileDownloader : IFileDownloader
 {
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(5) };
+    private readonly HttpClientFileDownloader _inner = new();
 
-    public static async Task DownloadFileAsync(
-        string url,
-        string targetFilePath,
-        IProgress<int>? progress = null,
-        CancellationToken ct = default)
+    public async Task DownloadFile(string url, string targetFile, Action<int> progress,
+        IDictionary<string, string>? headers = null, double timeout = 30, CancellationToken cancelToken = default)
     {
-        Exception? lastEx = null;
-
+        Exception? last = null;
         foreach (var candidate in GithubProxy.Candidates(url))
         {
-            ct.ThrowIfCancellationRequested();
             try
             {
-                using var response = await Http.GetAsync(candidate, HttpCompletionOption.ResponseHeadersRead, ct);
-                response.EnsureSuccessStatusCode();
-
-                long totalBytes = response.Content.Headers.ContentLength ?? -1;
-                await using var stream = await response.Content.ReadAsStreamAsync(ct);
-                await using var fileStream = new FileStream(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-
-                byte[] buffer = new byte[81920];
-                long totalRead = 0;
-                int read;
-
-                while ((read = await stream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
-                {
-                    await fileStream.WriteAsync(buffer.AsMemory(0, read), ct);
-                    totalRead += read;
-                    if (totalBytes > 0 && progress != null)
-                    {
-                        progress.Report((int)((totalRead * 100) / totalBytes));
-                    }
-                }
-
-                return; // Download succeeded
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
+                await _inner.DownloadFile(candidate, targetFile, progress, headers, timeout, cancelToken);
+                return;
             }
             catch (Exception ex)
             {
-                lastEx = ex;
-                PluginLog.Log($"[ProxiedFileDownloader] Failed downloading from {candidate}: {ex.Message}. Trying next candidate...");
-                try { if (File.Exists(targetFilePath)) File.Delete(targetFilePath); } catch { }
+                last = ex;
             }
         }
+        throw last ?? new Exception($"Failed to download {url} from GitHub or any mirror.");
+    }
 
-        throw lastEx ?? new HttpRequestException($"Failed to download {url} from any mirror candidate.");
+    public async Task<byte[]> DownloadBytes(string url, IDictionary<string, string>? headers = null, double timeout = 15)
+    {
+        Exception? last = null;
+        double effectiveTimeout = Math.Min(timeout, 15);
+        foreach (var candidate in GithubProxy.Candidates(url))
+        {
+            try
+            {
+                return await _inner.DownloadBytes(candidate, headers, effectiveTimeout);
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+            }
+        }
+        throw last ?? new Exception($"Failed to download {url} from GitHub or any mirror.");
+    }
+
+    public async Task<string> DownloadString(string url, IDictionary<string, string>? headers = null, double timeout = 10)
+    {
+        Exception? last = null;
+        double effectiveTimeout = Math.Min(timeout, 10);
+        foreach (var candidate in GithubProxy.Candidates(url))
+        {
+            try
+            {
+                return await _inner.DownloadString(candidate, headers, effectiveTimeout);
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+            }
+        }
+        throw last ?? new Exception($"Failed to download {url} from GitHub or any mirror.");
     }
 }

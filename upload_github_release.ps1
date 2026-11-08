@@ -91,11 +91,26 @@ try {
 $releasesDir = Join-Path $PSScriptRoot "Releases"
 $assets = @(
     "DataJackUI-win-Setup.exe",
+    "DataJackUI-Inno-Setup.exe",
     "DataJackUI-win-Setup.zip",
     "DataJackUI-win-Portable.zip",
-    "update.json",
+    "RELEASES",
+    "releases.win.json",
+    "assets.win.json",
     "plugin.zip"
 )
+
+# Add current version nupkgs (full + delta)
+$currentVer = $TagName.TrimStart('v')
+$currentNupkgs = Get-ChildItem "$releasesDir/*$currentVer*.nupkg" | Select-Object -ExpandProperty Name
+$assets += $currentNupkgs
+
+# Include ONLY 1 previous version nupkgs for delta chaining
+$prevFullNupkg = Get-ChildItem "$releasesDir/*-full.nupkg" | Where-Object { $_.Name -notmatch [regex]::Escape($currentVer) } | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty Name
+if ($prevFullNupkg) { $assets += $prevFullNupkg }
+
+$prevDeltaNupkg = Get-ChildItem "$releasesDir/*-delta.nupkg" | Where-Object { $_.Name -notmatch [regex]::Escape($currentVer) } | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty Name
+if ($prevDeltaNupkg) { $assets += $prevDeltaNupkg }
 
 $assets = $assets | Select-Object -Unique
 

@@ -504,14 +504,14 @@ public partial class SettingsViewModel : ObservableObject
 
             if (info != null)
             {
-                string ver = info.CurrentVersion;
+                string ver = info.TargetFullRelease.Version.ToString();
                 UpdateStatusText = $"Update v{ver} downloaded! It will apply automatically when DataJackUI closes.";
                 UpdateStatusColor = "#22c55e";
                 OnPropertyChanged(nameof(HasStagedUpdate));
             }
             else if (_updateService.HasStagedUpdate)
             {
-                string? ver = _updateService.StagedUpdate?.CurrentVersion;
+                string? ver = _updateService.StagedUpdate?.TargetFullRelease?.Version?.ToString();
                 UpdateStatusText = $"Update {(ver != null ? $"v{ver} " : "")}is downloaded and ready to apply on exit.";
                 UpdateStatusColor = "#22c55e";
                 OnPropertyChanged(nameof(HasStagedUpdate));
