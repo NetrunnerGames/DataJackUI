@@ -410,20 +410,18 @@ public partial class App : Application
             var cache = _host.Services.GetRequiredService<CacheService>();
             var auth = _host.Services.GetRequiredService<AuthService>();
 
-            if (!cache.OnboardingComplete)
+            // If the user is not signed in, enforce onboarding modal unconditionally
+            if (!auth.IsSignedIn)
             {
-                if (!auth.IsSignedIn)
-                {
-                    main.Onboarding.IsOpen = true;
-                }
-                else
-                {
-                    var unlocker = _host.Services.GetRequiredService<UnlockerService>();
-                    var installer = _host.Services.GetRequiredService<PluginInstallerService>();
-                    bool configured = unlocker.SelectedMode is (UnlockerMode.Ost or UnlockerMode.IceBreaker) && installer.IsInstalledLocally();
-                    if (configured) cache.OnboardingComplete = true;
-                    else main.Onboarding.IsOpen = true;
-                }
+                main.Onboarding.IsOpen = true;
+            }
+            else if (!cache.OnboardingComplete)
+            {
+                var unlocker = _host.Services.GetRequiredService<UnlockerService>();
+                var installer = _host.Services.GetRequiredService<PluginInstallerService>();
+                bool configured = unlocker.SelectedMode is (UnlockerMode.Ost or UnlockerMode.IceBreaker) && installer.IsInstalledLocally();
+                if (configured) cache.OnboardingComplete = true;
+                else main.Onboarding.IsOpen = true;
             }
         }
     }

@@ -45,6 +45,7 @@
                                         <BlurEffect KernelType="Gaussian" Radius="28" RenderingBias="Performance" />
                                     </Setter.Value>
                                 </Setter>
+                                <Setter Property="IsEnabled" Value="False" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
