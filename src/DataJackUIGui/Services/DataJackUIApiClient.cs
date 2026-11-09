@@ -2268,6 +2268,10 @@ public class DataJackUIApiClient
         string html = await GetOnlineFixHtmlAsync(articleUrl, ct);
         if (html.Length == 0) return null;
 
+        // Exclude closed/dead guides where free multiplayer is no longer possible
+        if (html.Contains("Руководство закрыто, бесплатная игра по сети более невозможна, покупайте игру."))
+            return null;
+
         string? title = null;
         var tm = Regex.Match(html, @"<h1[^>]*id=[""']news-title[""'][^>]*>(.*?)</h1>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
         if (!tm.Success) tm = Regex.Match(html, @"<h1[^>]*>(.*?)</h1>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
