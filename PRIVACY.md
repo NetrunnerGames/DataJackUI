@@ -45,7 +45,7 @@ This anonymous launch counter exists exclusively to:
 
 ## 4. User Accounts, Authentication & Local Storage
 
-DataJackUI supports signing in via **Discord** (using local Discord desktop IPC or OAuth) or **Google** (using OAuth 2.0 PKCE flow) to verify software entitlement and synchronize preferences.
+DataJackUI supports signing in via **Discord** (using local Discord desktop IPC or OAuth) to verify software entitlement and synchronize preferences. Additional authentication options are planned for future updates.
 
 ### Session Encryption at Rest
 To protect user sessions against unauthorized file extraction or cross-device cloning:
