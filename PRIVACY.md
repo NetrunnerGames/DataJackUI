@@ -8,7 +8,7 @@ We believe in complete transparency regarding network traffic, telemetry, authen
 * **No Secret Keystrokes or Password Logging**: We never access, capture, or log Steam passwords, Steam Guard codes, or payment credentials.
 * **Encrypted Local Storage (DPAPI + AES-256-GCM)**: Stored user authentication sessions on Windows are secured locally using machine-entropy DPAPI combined with authenticated AES-256-GCM encryption.
 * **Minimal Anonymous Telemetry**: The desktop client transmits a single anonymous ping on application startup solely to count aggregate active installations and application version distribution.
-* **Privacy Proxy Shield**: Telemetry pings and entitlement checks are proxied through an open Cloudflare Worker to protect client IP addresses from third-party analytics endpoints.
+* **Privacy Proxy Shield**: Telemetry pings and entitlement checks are proxied through an open Cloudflare Worker to protect client IP addresses from third-party endpoints.
 
 ## 2. Telemetry & Analytics
 
@@ -39,7 +39,7 @@ This anonymous launch counter exists exclusively to:
 
 * **No Steam Passwords or Auth Secrets**: We never collect, transmit, or log Steam passwords, Steam Guard codes, or session cookies.
 * **No Game Library Surveillance**: We do not monitor, scan, or report what games you have installed, purchase history, or gameplay sessions.
-* **No Arbitrary File System Surveillance**: Outside of the explicit game save directories designated for cloud backups and Steam directory configuration, DataJackUI does not scan or upload user files.
+* **No Arbitrary File System Surveillance**: Outside of the explicit game save directories designated for backups and Steam configuration directories, DataJackUI does not scan or upload user files.
 * **No Precise Location Tracking**: We do not collect GPS, country, or location coordinates.
 
 ## 4. User Accounts, Authentication & Local Storage
@@ -52,12 +52,14 @@ To protect user sessions against unauthorized file extraction or cross-device cl
 * **Non-Transferable**: Even if the encrypted credentials file is copied to another machine or user account, it cannot be decrypted.
 * **Graceful Revocation**: Signing out immediately clears and deletes the encrypted local session file.
 
-## 5. Cloud Saves & Backup Security
+## 5. Game Saves & Local Backup Management
 
-DataJackUI features a Cloud Saves manager that allows users to back up game save files to local storage with automatic pre-restore safety snapshots. Cloud sync integrations with remote storage providers are coming soon.
+DataJackUI includes a local save manager that scans detected Steam games and creates timestamped local snapshots to protect against save corruption or accidental data loss.
 
-### Local Snapshot Safety
-* **User Control**: Game save backups and restorations are executed solely upon user action or explicitly configured backup schedules. Save data remains entirely inside your own local machine.
+* **Local Storage by Default**: All save snapshots and backups are stored strictly on your local filesystem (default: `%APPDATA%\DataJackUI\save_backups` or your chosen custom folder).
+* **Zero Remote Save Transmission**: Game save files are never uploaded to any remote server or third-party cloud service. Cloud synchronization options are under development for future releases.
+* **Pre-Restore Safety Snapshots**: Before restoring an older save snapshot, the manager automatically archives your current active save files locally to prevent unintentional progress loss.
+* **Full User Control**: Backups, restores, and deletions are executed strictly upon your explicit command.
 
 ## 6. Other Network Interactions
 
@@ -67,8 +69,8 @@ DataJackUI performs network requests strictly to support its advertised features
    - Used for public store search queries, game metadata, and header banner images.
 2. **GitHub API & Velopack** (`api.github.com`):
    - Checks for software updates periodically and on startup to download delta update packages.
-3. **Manifest & API Endpoints** (DepotBox, `generator.ryuu.lol`, Cloudflare Auth Edge):
-   - Queries metadata, manifests, and fixes when explicitly requested by the user.
+3. **Manifest & Metadata Services** (Cloudflare Auth Edge & Upstream Repositories):
+   - Fetches game depot manifests, repair definitions, and fixes when initiated by the user.
 4. **Cloudflare DNS-over-HTTPS** (`https://1.1.1.1/dns-query`):
    - Optional fallback DNS resolver for environments with restricted or poisoned DNS.
 
@@ -78,5 +80,5 @@ The entire source code of DataJackUI is publicly available on GitHub under the M
 
 - **Analytics Service**: [`src/DataJackUIGui/Services/AnalyticsService.cs`](src/DataJackUIGui/Services/AnalyticsService.cs)
 - **Auth & Session Service**: [`src/DataJackUIGui/Services/AuthService.cs`](src/DataJackUIGui/Services/AuthService.cs)
-- **Cloud Saves Service**: [`src/DataJackUIGui/Services/CloudSavesService.cs`](src/DataJackUIGui/Services/CloudSavesService.cs)
+- **Save Backup Service**: [`src/DataJackUIGui/Services/CloudSavesService.cs`](src/DataJackUIGui/Services/CloudSavesService.cs)
 - **Settings Storage**: [`src/DataJackUIGui/Services/SettingsService.cs`](src/DataJackUIGui/Services/SettingsService.cs)
