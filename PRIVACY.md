@@ -52,13 +52,12 @@ To protect user sessions against unauthorized file extraction or cross-device cl
 * **Non-Transferable**: Even if the encrypted credentials file is copied to another machine or user account, it cannot be decrypted.
 * **Graceful Revocation**: Signing out immediately clears and deletes the encrypted local session file.
 
-## 5. Cloud Saves & OAuth Security
+## 5. Cloud Saves & Backup Security
 
-DataJackUI features a Cloud Saves manager that allows users to back up game save files to local storage or cloud providers (Google Drive, Microsoft OneDrive, Rclone).
+DataJackUI features a Cloud Saves manager that allows users to back up game save files to local storage with automatic pre-restore safety snapshots. Cloud sync integrations with remote storage providers are coming soon.
 
-### Ephemeral In-Memory Verification
-* **Restricted Scopes**: Cloud save integrations request only application-specific scopes (e.g. `drive.file` for Google Drive) rather than broad account access.
-* **User Control**: Cloud save backups and restorations are executed solely upon user action or explicitly configured backup schedules. Save data remains entirely inside your own cloud account.
+### Local Snapshot Safety
+* **User Control**: Game save backups and restorations are executed solely upon user action or explicitly configured backup schedules. Save data remains entirely inside your own local machine.
 
 ## 6. Other Network Interactions
 

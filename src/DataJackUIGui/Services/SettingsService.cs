@@ -349,7 +349,7 @@ public class SettingsService
     /// <summary>Cloud save backup provider ("OneDrive", "GoogleDrive", "Rclone", "Local").</summary>
     public string CloudSavesProvider
     {
-        get => _settings.CloudSavesProvider ?? "OneDrive";
+        get => _settings.CloudSavesProvider ?? "Local";
         set { _settings.CloudSavesProvider = value; Save(); }
     }
 

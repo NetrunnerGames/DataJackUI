@@ -122,8 +122,25 @@
                     Padding="12,6"
                     VerticalAlignment="Center"
                     VerticalContentAlignment="Center"
-                    ItemsSource="{Binding AvailableProviders}"
-                    SelectedItem="{Binding SelectedProvider, Mode=TwoWay}" />
+                    ItemsSource="{Binding ProviderOptions}"
+                    SelectedItem="{Binding SelectedProviderOption, Mode=TwoWay}">
+                    <ComboBox.ItemContainerStyle>
+                        <Style TargetType="ComboBoxItem">
+                            <Setter Property="IsEnabled" Value="{Binding IsEnabled}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                    <Setter Property="Opacity" Value="0.5" />
+                                    <Setter Property="Focusable" Value="False" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ComboBox.ItemContainerStyle>
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DisplayName}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
 
                 <!-- Compact Auto-Sync Checkbox (Area 3) -->
                 <CheckBox

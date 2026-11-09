@@ -32,7 +32,7 @@ DataJackUI provides an interface for Steam manifest acquisition, native DLL hook
 * **Jack-in Plugin Backend**: Native RPC integration matching the `Jack-in` Steam CEF store plugin for 1-click manifest addition inside the Steam client.
 * **Hook & Unlocker Administration**: Management interface for OpenSteamTools and IceBreaker backend hooks.
 * **Fixes & Diagnostics**: Integrated game fix repository and repair workflows with file backups.
-* **Cloud Saves**: Backup, sync, and restore game saves locally or to cloud providers (OneDrive, Google Drive, Rclone) with automatic pre-restore safety snapshots and customizable local backup paths.
+* **Cloud Saves**: Backup, sync, and restore game saves locally with automatic pre-restore safety snapshots and customizable local backup paths (cloud provider integrations coming soon).
 * **Cloudflare DoH Resolution**: Fallback DNS over HTTPS (`https://1.1.1.1/dns-query`) for networks where DNS lookup is restricted or throttled.
 
 ## Privacy & Telemetry Disclosure

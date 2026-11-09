@@ -667,7 +667,7 @@ Cancel - keep downloading</value></data>
   <data name="Builds_Select_SharedHint" xml:space="preserve"><value>Shared runtime — usually already installed. Tick to download anyway.</value></data>
   <data name="Downloads_ClearHistory_Confirm" xml:space="preserve"><value>Remove all {0} entries from the download history? Downloaded files are not affected.</value></data>
   <data name="CloudSaves_Title" xml:space="preserve"><value>Cloud Saves</value></data>
-  <data name="CloudSaves_Subtitle" xml:space="preserve"><value>Backup saves rejected by Steam and sync them seamlessly to OneDrive, Google Drive, or Rclone.</value></data>
+  <data name="CloudSaves_Subtitle" xml:space="preserve"><value>Backup saves rejected by Steam and manage local snapshots (cloud provider sync coming soon).</value></data>
   <data name="CloudSaves_Scan" xml:space="preserve"><value>Scan</value></data>
   <data name="CloudSaves_ScanTooltip" xml:space="preserve"><value>Scan system for game saves</value></data>
   <data name="CloudSaves_BackupAll" xml:space="preserve"><value>Backup All</value></data>

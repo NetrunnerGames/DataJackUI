@@ -1,3 +1,4 @@
+using DataJackUIGui.Models;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -134,7 +135,26 @@ public partial class CloudSavesViewModel : ObservableObject
     [ObservableProperty] private string _rcloneStatus = "Checking…";
     [ObservableProperty] private bool _isRcloneDetected;
 
-    public string[] AvailableProviders => ["OneDrive", "GoogleDrive", "Rclone", "Local"];
+    public CloudProviderOption[] ProviderOptions { get; } =
+    [
+        new CloudProviderOption { Key = "Local", DisplayName = "Local Storage", IsEnabled = true },
+        new CloudProviderOption { Key = "Cloud", DisplayName = "Cloud Storage (Coming Soon)", IsEnabled = false }
+    ];
+
+    public string[] AvailableProviders => ["Local"];
+
+    public CloudProviderOption? SelectedProviderOption
+    {
+        get => ProviderOptions.FirstOrDefault(p => string.Equals(p.Key, SelectedProvider, StringComparison.OrdinalIgnoreCase)) ?? ProviderOptions[0];
+        set
+        {
+            if (value != null && value.IsEnabled && !string.Equals(SelectedProvider, value.Key, StringComparison.OrdinalIgnoreCase))
+            {
+                SelectedProvider = value.Key;
+                OnPropertyChanged();
+            }
+        }
+    }
 
     public string SelectedProvider
     {
@@ -145,6 +165,7 @@ public partial class CloudSavesViewModel : ObservableObject
             {
                 _settings.CloudSavesProvider = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectedProviderOption));
                 OnPropertyChanged(nameof(IsRcloneProvider));
                 OnPropertyChanged(nameof(IsLocalProvider));
                 OnPropertyChanged(nameof(IsGoogleDriveProvider));
