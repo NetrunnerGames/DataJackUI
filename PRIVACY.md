@@ -2,8 +2,6 @@
 
 We believe in complete transparency regarding network traffic, telemetry, authentication, cloud storage, and user privacy. DataJackUI is open-source software; every network call and data-handling mechanism is auditable directly in the repository code.
 
----
-
 ## 1. Executive Summary
 
 * **Zero Hardware Fingerprinting**: We do not collect MAC addresses, UUIDs, CPU/GPU serial numbers, or hardware identifiers.
@@ -11,8 +9,6 @@ We believe in complete transparency regarding network traffic, telemetry, authen
 * **Encrypted Local Storage (DPAPI + AES-256-GCM)**: Stored user authentication sessions on Windows are secured locally using machine-entropy DPAPI combined with authenticated AES-256-GCM encryption.
 * **Minimal Anonymous Telemetry**: The desktop client transmits a single anonymous ping on application startup solely to count aggregate active installations and application version distribution.
 * **Privacy Proxy Shield**: Telemetry pings and entitlement checks are proxied through an open Cloudflare Worker to protect client IP addresses from third-party analytics endpoints.
-
----
 
 ## 2. Telemetry & Analytics
 
@@ -39,16 +35,12 @@ This anonymous launch counter exists exclusively to:
 1. Estimate daily active user counts to forecast server capacity and bandwidth requirements.
 2. Monitor version adoption rates to determine which releases require delta update packages via Velopack.
 
----
-
 ## 3. What We DO NOT Collect
 
 * **No Steam Passwords or Auth Secrets**: We never collect, transmit, or log Steam passwords, Steam Guard codes, or session cookies.
 * **No Game Library Surveillance**: We do not monitor, scan, or report what games you have installed, purchase history, or gameplay sessions.
 * **No Arbitrary File System Surveillance**: Outside of the explicit game save directories designated for cloud backups and Steam directory configuration, DataJackUI does not scan or upload user files.
 * **No Precise Location Tracking**: We do not collect GPS, country, or location coordinates.
-
----
 
 ## 4. User Accounts, Authentication & Local Storage
 
@@ -60,8 +52,6 @@ To protect user sessions against unauthorized file extraction or cross-device cl
 * **Non-Transferable**: Even if the encrypted credentials file is copied to another machine or user account, it cannot be decrypted.
 * **Graceful Revocation**: Signing out immediately clears and deletes the encrypted local session file.
 
----
-
 ## 5. Cloud Saves & OAuth Security
 
 DataJackUI features a Cloud Saves manager that allows users to back up game save files to local storage or cloud providers (Google Drive, Microsoft OneDrive, Rclone).
@@ -69,8 +59,6 @@ DataJackUI features a Cloud Saves manager that allows users to back up game save
 ### Ephemeral In-Memory Verification
 * **Restricted Scopes**: Cloud save integrations request only application-specific scopes (e.g. `drive.file` for Google Drive) rather than broad account access.
 * **User Control**: Cloud save backups and restorations are executed solely upon user action or explicitly configured backup schedules. Save data remains entirely inside your own cloud account.
-
----
 
 ## 6. Other Network Interactions
 
@@ -84,8 +72,6 @@ DataJackUI performs network requests strictly to support its advertised features
    - Queries metadata, manifests, and fixes when explicitly requested by the user.
 4. **Cloudflare DNS-over-HTTPS** (`https://1.1.1.1/dns-query`):
    - Optional fallback DNS resolver for environments with restricted or poisoned DNS.
-
----
 
 ## 7. Open Source Verification
 
