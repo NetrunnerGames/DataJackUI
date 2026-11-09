@@ -345,7 +345,6 @@ public class AuthService
         NotifyAuthStateChanged();
     }
 
-
     /// <summary>
     /// Native Discord Desktop IPC sign-in.
     /// </summary>
