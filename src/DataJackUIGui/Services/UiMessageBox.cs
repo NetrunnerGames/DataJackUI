@@ -13,12 +13,14 @@ public static class UiMessageBox
             return await dispatcher.InvokeAsync(() => ShowConfirmAsync(title, body, confirmText, cancelText)).Task.Unwrap();
         }
 
+        bool hasCancel = !string.IsNullOrWhiteSpace(cancelText);
         var msgBox = new Wpf.Ui.Controls.MessageBox
         {
             Title = title,
             Content = body,
             PrimaryButtonText = confirmText,
-            CloseButtonText = cancelText,
+            CloseButtonText = hasCancel ? cancelText : "",
+            IsCloseButtonEnabled = hasCancel,
         };
 
         if (Application.Current?.MainWindow is Window mainWindow && mainWindow.IsVisible)

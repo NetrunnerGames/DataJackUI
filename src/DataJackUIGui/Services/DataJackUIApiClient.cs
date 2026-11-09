@@ -2263,6 +2263,235 @@ public class DataJackUIApiClient
         }
     }
 
+    private static string CleanGuideText(string raw)
+
+    {
+
+        string val = Regex.Replace(raw, @"<span class=['""]fa fa-arrow-right['""]></span>", " -> ", RegexOptions.IgnoreCase);
+
+        val = Regex.Replace(val, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase);
+
+        val = Regex.Replace(val, @"<[^>]+>", "");
+
+        val = val.Replace("&quot;", "\"").Replace("&amp;", "&").Replace("&nbsp;", " ");
+
+        var items = val.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+
+                       .Select(l => l.Trim())
+
+                       .Where(l => l.Length > 0);
+
+        return string.Join("\n", items);
+
+    }
+
+
+
+    /// <summary>
+
+    /// Extracts multiplayer setup instructions (Connecting / Hosting) and notes (Примечания:)
+
+    /// from online-fix.me article HTML.
+
+    /// </summary>
+
+    public static List<string> ExtractNotesFromArticleHtml(string html)
+
+    {
+
+        var rawNotes = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(html)) return rawNotes;
+
+
+
+        // 1. Connection (Подключение) instructions
+
+        var connMatch = Regex.Match(html, @"<u>\s*Подключение:?\s*</u>([\s\S]*?)(?:<u>|<!--colorstart|<!--sizestart|<hr|<div class=['""]quote['""]|$)", RegexOptions.IgnoreCase);
+
+        if (connMatch.Success)
+
+        {
+
+            string clean = CleanGuideText(connMatch.Groups[1].Value);
+
+            if (clean.Length > 3)
+
+            {
+
+                rawNotes.Add("Подключение:\n" + clean);
+
+            }
+
+        }
+
+
+
+        // 2. Server creation (Создание сервера) instructions
+
+        var hostMatch = Regex.Match(html, @"<u>\s*Создание сервера:?\s*</u>([\s\S]*?)(?:<u>|<!--colorstart|<!--sizestart|<hr|<div class=['""]quote['""]|$)", RegexOptions.IgnoreCase);
+
+        if (hostMatch.Success)
+
+        {
+
+            string clean = CleanGuideText(hostMatch.Groups[1].Value);
+
+            if (clean.Length > 3)
+
+            {
+
+                rawNotes.Add("Создание сервера:\n" + clean);
+
+            }
+
+        }
+
+
+
+        // 3. Special notes (Примечания:)
+
+        int notesIdx = html.IndexOf("Примечания", StringComparison.OrdinalIgnoreCase);
+
+        if (notesIdx >= 0)
+
+        {
+
+            string searchScope = html.Substring(notesIdx, Math.Min(3500, html.Length - notesIdx));
+
+            var specialNotes = new List<string>();
+
+
+
+            foreach (Match ul in Regex.Matches(searchScope, @"<ul>([\s\S]*?)</ul>", RegexOptions.IgnoreCase))
+
+            {
+
+                foreach (Match li in Regex.Matches(ul.Groups[1].Value, @"<li>([\s\S]*?)</li>", RegexOptions.IgnoreCase))
+
+                {
+
+                    string textLi = li.Groups[1].Value;
+
+                    if (Regex.IsMatch(textLi, @"kak-zastavit-kontroller-rabotat|How to make your controller work|reshenie-oshibok|необходимые для запуска игр|Скачайте и распакуйте|Download the game.*and unzip|распаковать архивы", RegexOptions.IgnoreCase))
+
+                        continue;
+
+
+
+                    string clean = Regex.Replace(textLi, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Trim();
+
+                    if (clean.Length > 5)
+
+                    {
+
+                        specialNotes.Add("• " + clean);
+
+                    }
+
+                }
+
+            }
+
+
+
+            if (specialNotes.Count == 0)
+
+            {
+
+                int colonIdx = searchScope.IndexOf(':');
+
+                if (colonIdx >= 0 && colonIdx + 1 < searchScope.Length)
+
+                {
+
+                    string after = searchScope.Substring(colonIdx + 1);
+
+                    int endCut = after.IndexOf("<div", StringComparison.OrdinalIgnoreCase);
+
+                    if (endCut >= 0) after = after.Substring(0, endCut);
+
+                    string clean = Regex.Replace(after, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Trim();
+
+                    clean = Regex.Replace(clean, @"\s+", " ");
+
+                    clean = Regex.Replace(clean, @"Как заставить контроллер работать.*?(\?|$)", "", RegexOptions.IgnoreCase);
+
+                    clean = Regex.Replace(clean, @"How to make your controller work.*?(\?|$)", "", RegexOptions.IgnoreCase);
+
+                    clean = Regex.Replace(clean, @"Программы необходимые для запуска игр\.?.?", "", RegexOptions.IgnoreCase).Trim();
+
+                    if (clean.Length > 5)
+
+                    {
+
+                        specialNotes.Add(clean);
+
+                    }
+
+                }
+
+            }
+
+
+
+            if (specialNotes.Count > 0)
+
+            {
+
+                rawNotes.Add("Примечания:\n" + string.Join("\n", specialNotes));
+
+            }
+
+        }
+
+
+
+        return rawNotes;
+
+    }
+
+
+
+    /// </summary>
+    public async Task<string?> GetOnlineFixNotesAsync(string articleUrl, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(articleUrl)) return null;
+
+        lock (_ofLock)
+        {
+            if (_ofCache.TryGetValue(articleUrl, out var hit) && hit?.Notes is not null)
+                return hit.Notes;
+        }
+
+        try
+        {
+            string html = await GetOnlineFixHtmlAsync(articleUrl, ct);
+            if (string.IsNullOrWhiteSpace(html)) return null;
+
+            var rawNotes = ExtractNotesFromArticleHtml(html);
+            if (rawNotes.Count == 0) return null;
+
+            string joined = string.Join("\n\n", rawNotes);
+            string? translated = await TranslateRuToEnAsync(joined, ct);
+            string finalNotes = !string.IsNullOrWhiteSpace(translated) ? translated : joined;
+
+            lock (_ofLock)
+            {
+                if (_ofCache.TryGetValue(articleUrl, out var existing) && existing is not null)
+                {
+                    _ofCache[articleUrl] = existing with { Notes = finalNotes };
+                }
+            }
+
+            return finalNotes;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private async Task<OnlineFixScrapeResult?> ScrapeOnlineFixArticleAsync(string articleUrl, string searchName, CancellationToken ct)
     {
         string html = await GetOnlineFixHtmlAsync(articleUrl, ct);
@@ -2308,25 +2537,10 @@ public class DataJackUIApiClient
 
         // Extract notes from article HTML if resolving locally
         string? notes = null;
-        var rawNotes = new List<string>();
-        foreach (Match ul in Regex.Matches(html, @"<ul>([\s\S]*?)</ul>", RegexOptions.IgnoreCase))
-        {
-            foreach (Match li in Regex.Matches(ul.Groups[1].Value, @"<li>([\s\S]*?)</li>", RegexOptions.IgnoreCase))
-            {
-                string textLi = li.Groups[1].Value;
-                if (Regex.IsMatch(textLi, @"kak-zastavit-kontroller-rabotat|How to make your controller work|reshenie-oshibok|необходимые для запуска игр|Скачайте и распакуйте|Download the game.*and unzip|распаковать архивы", RegexOptions.IgnoreCase))
-                    continue;
-
-                string clean = Regex.Replace(textLi, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Trim();
-                if (clean.Length > 5)
-                {
-                    rawNotes.Add(clean);
-                }
-            }
-        }
+        var rawNotes = ExtractNotesFromArticleHtml(html);
         if (rawNotes.Count > 0)
         {
-            notes = await TranslateRuToEnAsync(string.Join("\n", rawNotes), ct);
+            notes = await TranslateRuToEnAsync(string.Join("\n\n", rawNotes), ct);
         }
 
         if (string.IsNullOrEmpty(title))

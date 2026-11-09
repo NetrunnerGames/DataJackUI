@@ -743,6 +743,67 @@ public class ManifestJobFactory(
     /// the view model used to show one on any failure, so every partial revert (the common case, from a
     /// locked file while the game is running) fired two toasts for a single action.
     /// </remarks>
+    /// <summary>Checks whether any fix revert record exists on disk for the given game.</summary>
+    public bool HasAppliedFix(long appId, string? specificFixId = null)
+    {
+        try
+        {
+            string? installDir = library.GetInstallDir(appId);
+            if (string.IsNullOrEmpty(installDir) || !Directory.Exists(installDir)) return false;
+            if (!string.IsNullOrEmpty(specificFixId))
+            {
+                string recordPath = GetFixRecordPath(installDir, specificFixId);
+                return File.Exists(recordPath);
+            }
+            string fixDir = Path.Combine(installDir, FixRecordDir);
+            return Directory.Exists(fixDir) && Directory.EnumerateFiles(fixDir, "*.json").Any();
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Reverts any applied fix found in the game directory if fixId is null/empty, or the specific fix.</summary>
+    public JobResult RevertGameFix(long appId, string? fixId, string gameName)
+    {
+        try
+        {
+            string? installDir = library.GetInstallDir(appId);
+            if (installDir is null)
+            {
+                string err = string.Format(Resources.Strings.Fixes_Toast_GameNotFound_Body, gameName);
+                toast.Show(Resources.Strings.Fixes_Toast_GameNotFound, err, error: true);
+                return new JobResult(false, err);
+            }
+            if (string.IsNullOrEmpty(fixId))
+            {
+                string fixDir = Path.Combine(installDir, FixRecordDir);
+                if (Directory.Exists(fixDir))
+                {
+                    var recordFiles = Directory.GetFiles(fixDir, "*.json");
+                    if (recordFiles.Length > 0)
+                    {
+                        var rec = ReadFixRecord(recordFiles[0]);
+                        if (rec is not null && !string.IsNullOrEmpty(rec.FixId))
+                            fixId = rec.FixId;
+                        else
+                            fixId = Path.GetFileNameWithoutExtension(recordFiles[0]);
+                    }
+                }
+            }
+            if (string.IsNullOrEmpty(fixId))
+            {
+                string err = Resources.Strings.Fixes_Revert_NoRecord;
+                toast.Show(Resources.Strings.Fixes_Revert_Failed, err, error: true);
+                return new JobResult(false, err);
+            }
+            return RevertDenuvoFix(appId, fixId, gameName);
+        }
+        catch (Exception ex)
+        {
+            toast.Show(Resources.Strings.Fixes_Revert_Failed, ex.Message, error: true);
+            return new JobResult(false, ex.Message);
+        }
+    }
+
     public JobResult RevertDenuvoFix(long appId, string fixId, string gameName)
     {
         try

@@ -100,7 +100,7 @@
                 <DataTemplate>
                     <Border
                         Width="248"
-                        Height="180"
+                        Height="186"
                         Margin="0,0,12,12"
                         Background="#0DFFFFFF"
                         BorderBrush="#14FFFFFF"
@@ -134,6 +134,76 @@
                                     Foreground="#e5e7eb"
                                     Text="{Binding Name}"
                                     TextTrimming="CharacterEllipsis" />
+
+                                <!-- Action Buttons: Fix | Revert | Notes (?) -->
+                                <Grid Margin="0,7,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="6" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="6" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Fix button -->
+                                    <ui:Button
+                                        Grid.Column="0"
+                                        Padding="0"
+                                        Height="28"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Center"
+                                        Appearance="Primary"
+                                        Command="{Binding FixCommand}"
+                                        Content="{x:Static res:Strings.Fixes_Fix}"
+                                        FontSize="11.5"
+                                        FontWeight="SemiBold"
+                                        Icon="{ui:SymbolIcon Wrench24}"
+                                        IsEnabled="{Binding CanFix}"
+                                        ToolTip="Apply online multiplayer fix" />
+
+                                    <!-- Revert button -->
+                                    <ui:Button
+                                        Grid.Column="2"
+                                        Padding="0"
+                                        Height="28"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Center"
+                                        Appearance="Secondary"
+                                        Command="{Binding RevertCommand}"
+                                        Content="{x:Static res:Strings.Fixes_Revert}"
+                                        FontSize="11.5"
+                                        FontWeight="SemiBold"
+                                        Icon="{ui:SymbolIcon ArrowClockwise24}"
+                                        IsEnabled="{Binding CanRevert}"
+                                        ToolTip="Revert applied fix files to original" />
+
+                                    <!-- Notes (?) button -->
+                                    <ui:Button
+                                        Grid.Column="4"
+                                        Width="28"
+                                        Height="28"
+                                        Padding="0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        HorizontalContentAlignment="Center"
+                                        Appearance="Secondary"
+                                        Command="{Binding ShowNotesCommand}"
+                                        FontSize="12"
+                                        ToolTip="View setup notes (Примечания)">
+                                        <Grid>
+                                            <ui:SymbolIcon
+                                                Symbol="QuestionCircle24"
+                                                FontSize="14"
+                                                Foreground="#9ca3af"
+                                                Visibility="{Binding IsLoadingNotes, Converter={StaticResource InverseBoolToVis}, FallbackValue=Visible}" />
+                                            <ui:ProgressRing
+                                                Width="14"
+                                                Height="14"
+                                                IsIndeterminate="True"
+                                                Visibility="{Binding IsLoadingNotes, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}" />
+                                        </Grid>
+                                    </ui:Button>
+                                </Grid>
                             </StackPanel>
                         </StackPanel>
                     </Border>
