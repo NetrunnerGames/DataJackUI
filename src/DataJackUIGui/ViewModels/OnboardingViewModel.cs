@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataJackUIGui.Models;
@@ -55,6 +56,9 @@ public partial class OnboardingViewModel : ObservableObject
     [ObservableProperty] private string _waitingMessage = "Waiting for authorization...";
     private CancellationTokenSource? _signInCts;
 
+    [ObservableProperty] private bool _isOtpMode;
+    [ObservableProperty] private string _otpInput = "";
+
     // The two yes/no choices: both default to "yes".
     [ObservableProperty] private bool _applyRecommended = true;
     [ObservableProperty] private bool _installPlugin = true;
@@ -99,18 +103,72 @@ public partial class OnboardingViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task SignInGoogle()
+    private void StartUsernameSignIn()
+    {
+        IsOtpMode = true;
+        OtpInput = "";
+        StatusLine = null;
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "https://auth.netrunnergames.workers.dev/login",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusLine = "Failed to launch browser: " + ex.Message;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelOtpMode()
+    {
+        IsOtpMode = false;
+        OtpInput = "";
+        StatusLine = null;
+    }
+
+    [RelayCommand]
+    private async Task VerifyOtpAsync()
     {
         if (IsSigningIn) return;
+        string code = (OtpInput ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(code) || code.Length != 6)
+        {
+            StatusLine = "Please enter a valid 6-digit OTP code.";
+            return;
+        }
+
         IsSigningIn = true;
         StatusLine = null;
-        WaitingMessage = "Waiting for Google...";
+        WaitingMessage = "Verifying OTP...";
         _signInCts?.Cancel();
         _signInCts = new CancellationTokenSource();
-        try { await _auth.SignInWithGoogleAsync(_signInCts.Token); }
+        try
+        {
+            await _auth.SignInWithOtpAsync(code, _signInCts.Token);
+            IsOtpMode = false;
+            OtpInput = "";
+        }
         catch (OperationCanceledException) { }
-        catch (Exception ex) { StatusLine = ex.Message; }
-        finally { IsSigningIn = false; }
+        catch (Exception ex)
+        {
+            StatusLine = ex.Message;
+        }
+        finally
+        {
+            IsSigningIn = false;
+        }
+    }
+
+    partial void OnOtpInputChanged(string value)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && value.Trim().Length == 6 && !IsSigningIn)
+        {
+            _ = VerifyOtpAsync();
+        }
     }
 
     /// <summary>"Let's go!". Mark onboarding done, close the overlay immediately, then apply the chosen

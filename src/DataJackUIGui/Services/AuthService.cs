@@ -260,6 +260,93 @@ public class AuthService
     // ── Interactive sign-in ─────────────────────────────────────────
 
     /// <summary>
+    /// Sign in using 6-digit OTP generated via Netrunner Web Auth node (auth.netrunnergames.workers.dev).
+    /// </summary>
+    public async Task SignInWithOtpAsync(string otpCode, CancellationToken ct = default)
+    {
+        string cleanOtp = (otpCode ?? "").Trim();
+        if (cleanOtp.Length != 6)
+            throw new AuthException("Please enter all 6 digits of the OTP code.");
+
+        string machineId = GetMachineId();
+
+        var req = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.AuthWorkerUrl}/api/auth/otp/verify")
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(new { otp = cleanOtp, machine_id = machineId }),
+                Encoding.UTF8, "application/json")
+        };
+
+        var res = await _http.SendAsync(req, ct);
+        string body = await res.Content.ReadAsStringAsync(ct);
+
+        if (!res.IsSuccessStatusCode)
+        {
+            try
+            {
+                using var errDoc = JsonDocument.Parse(body);
+                if (errDoc.RootElement.TryGetProperty("error", out var errProp))
+                    throw new AuthException(errProp.GetString() ?? "Invalid OTP code.");
+            }
+            catch (AuthException) { throw; }
+            catch { }
+            throw new AuthException($"Verification failed: {body}");
+        }
+
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+        string accessToken = root.TryGetProperty("access_token", out var atProp) ? atProp.GetString() ?? "" : "";
+        string refreshToken = root.TryGetProperty("refresh_token", out var rtProp) ? rtProp.GetString() ?? "" : accessToken;
+
+        if (string.IsNullOrEmpty(accessToken))
+            throw new AuthException("Invalid token response from Netrunner auth node.");
+
+        string? uName = null;
+        string? uId = null;
+        string tier = "single";
+        bool isBanned = false;
+
+        if (root.TryGetProperty("user", out var uObj) && uObj.ValueKind == JsonValueKind.Object)
+        {
+            if (uObj.TryGetProperty("username", out var unProp)) uName = unProp.GetString();
+            if (uObj.TryGetProperty("id", out var idProp)) uId = idProp.GetString();
+            if (uObj.TryGetProperty("tier", out var tierProp)) tier = tierProp.GetString() ?? "single";
+            if (uObj.TryGetProperty("is_banned", out var banProp)) isBanned = banProp.GetBoolean();
+        }
+
+        _accessToken = accessToken;
+        _refreshToken = refreshToken;
+        _expiresAt = DateTimeOffset.UtcNow.AddDays(30);
+        DisplayName = uName ?? "Netrunner Operator";
+        Username = uName ?? "Netrunner Operator";
+        UserId = uId ?? Guid.NewGuid().ToString("N");
+        DiscordId = null;
+
+        CurrentEntitlement = new UserEntitlement
+        {
+            DiscordId = "",
+            Tier = tier,
+            IsOwner = false,
+            IsBanned = isBanned
+        };
+
+        SaveStored(new StoredAuth
+        {
+            RefreshToken = _refreshToken,
+            AccessToken = _accessToken,
+            ExpiresAt = _expiresAt,
+            Username = Username,
+            UserId = UserId,
+            AvatarUrl = null,
+            DiscordId = null,
+        });
+
+        await RefreshEntitlementsAsync(ct);
+        NotifyAuthStateChanged();
+    }
+
+
+    /// <summary>
     /// Native Discord Desktop IPC sign-in.
     /// </summary>
     public async Task SignInAsync(CancellationToken ct = default)
@@ -807,6 +894,18 @@ public class AuthService
     private const byte PayloadVersion = 0x01;
     private static readonly byte[] AppSalt = "DataJackUI.SecureVault.v1"u8.ToArray();
     private static readonly byte[] DpapiInfo = "DataJackUI.DpapiEntropy.v1"u8.ToArray();
+
+    public static string GetMachineId()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
+            string? guid = key?.GetValue("MachineGuid")?.ToString();
+            if (!string.IsNullOrWhiteSpace(guid)) return guid;
+        }
+        catch { }
+        return Environment.MachineName;
+    }
 
     private static byte[] GetMachineKey()
     {

@@ -80,13 +80,18 @@ public class OnboardingAuthTests : IDisposable
         Assert.Equal("Waiting for Discord...", vm.WaitingMessage);
         Assert.False(vm.IsSigningIn);
 
-        // Start Google sign-in
-        var googleTask = vm.SignInGoogleCommand.ExecuteAsync(null);
-        Assert.Equal("Waiting for Google...", vm.WaitingMessage);
+        // Username / OTP flow
+        vm.StartUsernameSignInCommand.Execute(null);
+        Assert.True(vm.IsOtpMode);
 
-        // Cancel Google sign-in and await task completion
-        vm.CancelSignIn();
-        await googleTask;
-        Assert.False(vm.IsSigningIn);
+        // Set invalid OTP code
+        vm.OtpInput = "123";
+        await vm.VerifyOtpCommand.ExecuteAsync(null);
+        Assert.Equal("Please enter a valid 6-digit OTP code.", vm.StatusLine);
+
+        // Cancel OTP mode
+        vm.CancelOtpModeCommand.Execute(null);
+        Assert.False(vm.IsOtpMode);
+        Assert.Equal("", vm.OtpInput);
     }
 }

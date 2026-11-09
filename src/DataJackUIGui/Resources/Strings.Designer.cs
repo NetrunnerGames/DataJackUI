@@ -30,6 +30,9 @@ public static class Strings
     public static string Nav_RestartSteam => Get(nameof(Nav_RestartSteam));
     public static string Nav_Settings => Get(nameof(Nav_Settings));
     public static string Nav_SignInDiscord => Get(nameof(Nav_SignInDiscord));
+    public static string Nav_SignInUsername => Get(nameof(Nav_SignInUsername));
+    public static string Onboarding_WaitingOtp => Get(nameof(Onboarding_WaitingOtp));
+    public static string Onboarding_EnterOtp => Get(nameof(Onboarding_EnterOtp));
     public static string Nav_SignInGoogle => Get(nameof(Nav_SignInGoogle));
     public static string Nav_WaitingForBrowser => Get(nameof(Nav_WaitingForBrowser));
     public static string Nav_Footer_Guest => Get(nameof(Nav_Footer_Guest));
