@@ -17,6 +17,7 @@ When DataJackUI starts up, [`AnalyticsService.cs`](src/DataJackUIGui/Services/An
 
 * **Trigger**: Executed once during application startup.
 * **Client Payload**:
+
   ```json
   {
     "event_name": "App Launch",
