@@ -8,9 +8,10 @@
   - App: `src/DataJackUIGui/DataJackUIGui.csproj`.
   - Jack-in: `NetrunnerGames/Jack-in` (only if `plugin/` code changes).
   - IceBreaker: `NetrunnerGames/IceBreaker` (only if C++ proxy DLL changes).
-- **Trigger**:
+- **Trigger & Version Resolution**:
   - Do NOT publish on every commit.
-  - Execute release ONLY on explicit request (e.g. "publish release", "release build", "release X.Y.Z datajack").
+  - Execute release ONLY on explicit request (e.g. "publish release", "release datajack", "release X.Y.Z datajack").
+  - **Implicit Versioning**: If the user does not specify an explicit version number (e.g., just says "release datajack"), automatically increment based on the previous highest version (`-Bump patch` default). The build script automatically cross-checks Git tags, `Releases/*.nupkg`, and `csproj` to find the true latest version and increments from there.
 - **Release Execution**:
   1. Write `[+]` / `[-]` lines to `changelog.txt`.
   2. Write bullet points to `highlights.txt`.

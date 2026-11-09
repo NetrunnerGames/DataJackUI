@@ -23,8 +23,38 @@ if ($Bump -ne "none") {
     if (Test-Path $csprojPath) {
         [xml]$xml = Get-Content $csprojPath
         $currentVer = $xml.Project.PropertyGroup.Version
-        if (-not [string]::IsNullOrWhiteSpace($currentVer)) {
-            $parts = $currentVer.Split('.')
+
+        # Determine the true highest previous version across csproj, git tags, and existing Releases
+        $highestVer = $currentVer
+        try {
+            $gitTags = git tag -l --sort=-v:refname
+            foreach ($tag in $gitTags) {
+                $cleanTag = ($tag -replace '^v','').Trim()
+                if ($cleanTag -match '^\d+\.\d+\.\d+') {
+                    if ([System.Version]$cleanTag -gt [System.Version]$highestVer) {
+                        $highestVer = $cleanTag
+                    }
+                    break # tags sorted desc, first match is highest
+                }
+            }
+        } catch { }
+
+        $releasesDir = Join-Path $PSScriptRoot "Releases"
+        if (Test-Path $releasesDir) {
+            Get-ChildItem -Path $releasesDir -Filter "DataJackUI-*-full.nupkg" | ForEach-Object {
+                if ($_.Name -match 'DataJackUI-(\d+\.\d+\.\d+)-full\.nupkg') {
+                    $pkgVer = $Matches[1]
+                    try {
+                        if ([System.Version]$pkgVer -gt [System.Version]$highestVer) {
+                            $highestVer = $pkgVer
+                        }
+                    } catch { }
+                }
+            }
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($highestVer)) {
+            $parts = $highestVer.Split('.')
             if ($parts.Length -ge 3) {
                 [int]$major = [int]$parts[0]
                 [int]$minor = [int]$parts[1]
@@ -38,7 +68,7 @@ if ($Bump -ne "none") {
                 $DataJackVersion = "$major.$minor.$patch"
                 $xml.Project.PropertyGroup.Version = $DataJackVersion
                 $xml.Save($csprojPath)
-                Write-Host "Bumped DataJackUI version from v$currentVer to v$DataJackVersion in DataJackUIGui.csproj" -ForegroundColor Green
+                Write-Host "Bumped DataJackUI version from v$highestVer to v$DataJackVersion in DataJackUIGui.csproj" -ForegroundColor Green
             }
         }
     }
