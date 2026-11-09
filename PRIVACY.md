@@ -16,8 +16,8 @@ We believe in complete transparency regarding network traffic, telemetry, authen
 When DataJackUI starts up, [`AnalyticsService.cs`](src/DataJackUIGui/Services/AnalyticsService.cs) fires an asynchronous, fire-and-forget HTTP POST request to our Cloudflare Worker proxy.
 
 * **Trigger**: Executed once during application startup.
-* **Client Payload**:
 
+* **Client Payload**:
   ```json
   {
     "event_name": "App Launch",
