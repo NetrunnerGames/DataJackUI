@@ -1,16 +1,16 @@
-# DataJackUI Privacy & Telemetry Policy
+# DataJackUI Privacy & Security Policy
 
-We believe in complete transparency regarding network traffic, telemetry, cloud storage, and user privacy. DataJackUI is open-source software; every network call and data-handling mechanism is auditable directly in the repository code.
+We believe in complete transparency regarding network traffic, telemetry, authentication, cloud storage, and user privacy. DataJackUI is open-source software; every network call and data-handling mechanism is auditable directly in the repository code.
 
 ---
 
 ## 1. Executive Summary
 
-* **No Personal Data**: We do not collect names, email addresses, Steam credentials, or personal identifiers.
-* **Zero Hardware Fingerprinting**: We do not collect MAC addresses, UUIDs, CPU/GPU serial numbers, or hardware IDs.
-* **Zero Local Storage of OAuth Tokens**: Google Drive and OneDrive authentication tokens exist strictly in-memory during identity verification and are **never written to disk or configuration files**.
-* **Minimal Anonymous Telemetry**: The application transmits a single anonymous ping on launch solely to count aggregate active installations and app version distribution.
-* **Privacy Proxy Shield**: Telemetry pings are proxied through an open Cloudflare Worker to protect user IP addresses from third-party analytics endpoints.
+* **Zero Hardware Fingerprinting**: We do not collect MAC addresses, UUIDs, CPU/GPU serial numbers, or hardware identifiers.
+* **No Secret Keystrokes or Password Logging**: We never access, capture, or log Steam passwords, Steam Guard codes, or payment credentials.
+* **Encrypted Local Storage (DPAPI + AES-256-GCM)**: Stored user authentication sessions on Windows are secured locally using machine-entropy DPAPI combined with authenticated AES-256-GCM encryption.
+* **Minimal Anonymous Telemetry**: The desktop client transmits a single anonymous ping on application startup solely to count aggregate active installations and application version distribution.
+* **Privacy Proxy Shield**: Telemetry pings and entitlement checks are proxied through an open Cloudflare Worker to protect client IP addresses from third-party analytics endpoints.
 
 ---
 
@@ -24,28 +24,15 @@ When DataJackUI starts up, [`AnalyticsService.cs`](src/DataJackUIGui/Services/An
   ```json
   {
     "event_name": "App Launch",
-    "version": "2.13.0"
+    "version": "<app_version>"
   }
   ```
 
 ### How It Is Processed
-The Cloudflare Worker proxy (`https://analytics.netrunnergames.workers.dev/api/launch`) receives the payload and relays it to **PostHog EU Cloud** (`https://eu.i.posthog.com/capture/`):
+The Cloudflare Worker proxy (`https://analytics.netrunnergames.workers.dev/api/launch`) receives the payload and relays it to an analytics collector:
 
-```json
-{
-  "api_key": "<server_side_key>",
-  "event": "App Launch",
-  "distinct_id": "anonymous_desktop_user",
-  "properties": {
-    "app_version": "2.13.0",
-    "project_id": "281781",
-    "$lib": "DataJackUI-Desktop"
-  }
-}
-```
-
-* **Static Identifier**: The `distinct_id` is a hardcoded constant string (`"anonymous_desktop_user"`). It is identical across all users and installations worldwide.
-* **IP Address Protection**: The Cloudflare Worker functions as a privacy shield between your desktop client and PostHog. Client IP addresses are not logged, retained, or forwarded to PostHog.
+* **Static Identifier**: The client transmits no user identifier; any downstream aggregation uses a generic static identifier identical across all installations worldwide.
+* **IP Address Protection**: The Cloudflare Worker functions as a privacy shield between your desktop client and analytics ingestion. Client IP addresses are not logged, retained, or forwarded.
 
 ### Purpose of Telemetry
 This anonymous launch counter exists exclusively to:
@@ -56,45 +43,55 @@ This anonymous launch counter exists exclusively to:
 
 ## 3. What We DO NOT Collect
 
-* **No Steam Credentials**: We never collect, transmit, or log Steam usernames, passwords, Steam Guard codes, or Steam Web API keys.
-* **No Game Library Tracking**: We never monitor, scan, or report what games you have installed, purchase history, or gameplay sessions.
-* **No File System Surveillance**: Outside of the explicit game save directories designated for backups, DataJackUI does not scan or upload user files.
-* **No Location Data**: We do not collect GPS, country, or location coordinates.
+* **No Steam Passwords or Auth Secrets**: We never collect, transmit, or log Steam passwords, Steam Guard codes, or session cookies.
+* **No Game Library Surveillance**: We do not monitor, scan, or report what games you have installed, purchase history, or gameplay sessions.
+* **No Arbitrary File System Surveillance**: Outside of the explicit game save directories designated for cloud backups and Steam directory configuration, DataJackUI does not scan or upload user files.
+* **No Precise Location Tracking**: We do not collect GPS, country, or location coordinates.
 
 ---
 
-## 4. Cloud Saves & OAuth Security
+## 4. User Accounts, Authentication & Local Storage
+
+DataJackUI supports signing in via **Discord** (using local Discord desktop IPC or OAuth) or **Google** (using OAuth 2.0 PKCE flow) to verify software entitlement and synchronize preferences.
+
+### Session Encryption at Rest
+To protect user sessions against unauthorized file extraction or cross-device cloning:
+* **Dual-Layer Machine Cryptography**: Stored sessions are encrypted using **AES-256-GCM** with a cryptographic key bound to the local machine, and further wrapped with Windows **Data Protection API (DPAPI)** using machine entropy (`ProtectedData.Protect` under `DataProtectionScope.CurrentUser`).
+* **Non-Transferable**: Even if the encrypted credentials file is copied to another machine or user account, it cannot be decrypted.
+* **Graceful Revocation**: Signing out immediately clears and deletes the encrypted local session file.
+
+---
+
+## 5. Cloud Saves & OAuth Security
 
 DataJackUI features a Cloud Saves manager that allows users to back up game save files to local storage or cloud providers (Google Drive, Microsoft OneDrive, Rclone).
 
-### Ephemeral In-Memory Token Handling
-To safeguard user security against token compromise or malicious extraction:
-* **Zero Disk Persistence**: OAuth 2.0 access tokens and refresh tokens are **never written to disk, settings files (`settings.json`), registry keys, or configuration files (`rclone.conf`)**.
-* **Identity Verification Only**: When you authorize Google Drive or OneDrive via the browser (OAuth 2.0 PKCE flow), the ephemeral access token is used strictly in-memory to fetch your display email/username (e.g., `user@gmail.com` or `user@outlook.com`).
-* **Immediate Discard**: Once the account label is confirmed, the tokens are immediately released from memory. The application only persists the display name for your UI indicator.
+### Ephemeral In-Memory Verification
+* **Restricted Scopes**: Cloud save integrations request only application-specific scopes (e.g. `drive.file` for Google Drive) rather than broad account access.
+* **User Control**: Cloud save backups and restorations are executed solely upon user action or explicitly configured backup schedules. Save data remains entirely inside your own cloud account.
 
 ---
 
-## 5. Other Network Interactions
+## 6. Other Network Interactions
 
 DataJackUI performs network requests strictly to support its advertised features:
 
 1. **Steam Storefront & CDN** (`store.steampowered.com`, `steamcdn-a.akamaihd.net`):
    - Used for public store search queries, game metadata, and header banner images.
 2. **GitHub API & Velopack** (`api.github.com`):
-   - Checks for software updates every 6 hours and on startup to download delta update packages.
-3. **Manifest API Endpoints** (DepotBox, `generator.ryuu.lol`):
+   - Checks for software updates periodically and on startup to download delta update packages.
+3. **Manifest & API Endpoints** (DepotBox, `generator.ryuu.lol`, Cloudflare Auth Edge):
    - Queries metadata, manifests, and fixes when explicitly requested by the user.
 4. **Cloudflare DNS-over-HTTPS** (`https://1.1.1.1/dns-query`):
    - Optional fallback DNS resolver for environments with restricted or poisoned DNS.
 
 ---
 
-## 6. Open Source Verification
+## 7. Open Source Verification
 
 The entire source code of DataJackUI is publicly available on GitHub under the MIT License. Anyone can inspect, build, and verify the networking and telemetry behaviors directly:
 
 - **Analytics Service**: [`src/DataJackUIGui/Services/AnalyticsService.cs`](src/DataJackUIGui/Services/AnalyticsService.cs)
-- **Cloudflare Worker Proxy**: [`worker/index.js`](worker/index.js)
+- **Auth & Session Service**: [`src/DataJackUIGui/Services/AuthService.cs`](src/DataJackUIGui/Services/AuthService.cs)
 - **Cloud Saves Service**: [`src/DataJackUIGui/Services/CloudSavesService.cs`](src/DataJackUIGui/Services/CloudSavesService.cs)
 - **Settings Storage**: [`src/DataJackUIGui/Services/SettingsService.cs`](src/DataJackUIGui/Services/SettingsService.cs)
