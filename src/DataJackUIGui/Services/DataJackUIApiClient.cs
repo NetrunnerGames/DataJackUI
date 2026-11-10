@@ -2223,8 +2223,10 @@ public class DataJackUIApiClient
             }
 
             translated = Regex.Replace(translated, @"^(?:Примечания|Remarks):?", "Notes:", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            translated = Regex.Replace(translated, @"^(?:Как запускать|How to run):?", "How to Launch:", RegexOptions.IgnoreCase | RegexOptions.Multiline);
             translated = Regex.Replace(translated, @"^Подключение:?", "Connecting:", RegexOptions.IgnoreCase | RegexOptions.Multiline);
             translated = Regex.Replace(translated, @"^Создание сервера:?", "Hosting:", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            translated = Regex.Replace(translated, @":::\s*spoiler", ":::spoiler", RegexOptions.IgnoreCase);
 
             return translated;
         }
@@ -2320,8 +2322,15 @@ public class DataJackUIApiClient
 
     private static string CleanGuideText(string raw)
     {
-        // Unfold spoiler titles into bold subheadings
-        string val = Regex.Replace(raw, @"<!--spoiler_title-->([\s\S]*?)<!--spoiler_title_end-->", "\n\n**$1**\n\n", RegexOptions.IgnoreCase);
+        // Preserve DLE spoilers as structured blocks: :::spoiler Title \n Content :::
+        string val = Regex.Replace(raw, @"<!--dle_spoiler\s*([^>]*?)-->[\s\S]*?<!--spoiler_title-->([\s\S]*?)<!--spoiler_title_end-->[\s\S]*?<!--spoiler_text-->([\s\S]*?)<!--spoiler_text_end-->[\s\S]*?<!--/dle_spoiler-->", m =>
+        {
+            string title = m.Groups[2].Value.Trim();
+            if (string.IsNullOrWhiteSpace(title)) title = m.Groups[1].Value.Trim();
+            string content = m.Groups[3].Value.Trim();
+            return $"\n\n:::spoiler {title}\n{content}\n:::\n\n";
+        }, RegexOptions.IgnoreCase);
+
         val = Regex.Replace(val, @"<span class=['""]fa fa-arrow-right['""]></span>", " -> ", RegexOptions.IgnoreCase);
         val = Regex.Replace(val, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase);
         val = Regex.Replace(val, @"<p[^>]*>", "\n", RegexOptions.IgnoreCase);
