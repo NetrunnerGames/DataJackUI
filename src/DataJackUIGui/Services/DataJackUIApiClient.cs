@@ -2145,128 +2145,88 @@ public class DataJackUIApiClient
     /// to search/scrape online-fix.me and translate Russian notes using Workers AI.
     /// If direct_fix_url is not returned but hoster_url is present, resolves direct candidate links from hoster.
     /// </summary>
-    /// <summary>Translates Russian notes to English using line-by-line translation and link preservation.</summary>
+    /// <summary>Translates Russian notes to English using Google Translate Single-RPC (dict-chrome-ex / gtx) with link preservation.</summary>
     public async Task<string?> TranslateRuToEnAsync(string text, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
 
         try
         {
-            var lines = text.Split('\n');
-            var outLines = new List<string>();
-
-            foreach (var line in lines)
+            var linkMap = new Dictionary<string, string>();
+            int linkIdx = 0;
+            string protectedText = Regex.Replace(text, @"\[([^\]]+)\]\(([^)]+)\)", m =>
             {
-                if (string.IsNullOrWhiteSpace(line))
+                string label = m.Groups[1].Value;
+                string url = m.Groups[2].Value;
+                string transLabel = label.ToLowerInvariant() switch
                 {
-                    outLines.Add("");
-                    continue;
-                }
+                    "дискорд" => "Discord",
+                    "сайт" => "Website",
+                    "инструкция" => "Guide",
+                    "скачать" => "Download",
+                    _ => label
+                };
+                string ph = $"PHLNK{linkIdx++}PH";
+                linkMap[ph] = $"[{transLabel}]({url})";
+                return ph;
+            });
 
-                string processedLine = line.Trim();
+            // Single-RPC clients: "dict-chrome-ex" (unlimited Chrome extension rpc), fallback to "gtx"
+            string[] rpcClients = new[] { "dict-chrome-ex", "gtx" };
+            string translated = "";
 
-                // Extract and preserve markdown links [label](url)
-                var links = new List<(string placeholder, string rendered)>();
-                int idx = 0;
-                processedLine = Regex.Replace(processedLine, @"\[([^\]]+)\]\(([^)]+)\)", m =>
+            foreach (var clientName in rpcClients)
+            {
+                try
                 {
-                    string ph = $"PHLINK{idx++}PH";
-                    string label = m.Groups[1].Value;
-                    string url = m.Groups[2].Value;
-                    string transLabel = label.ToLowerInvariant() switch
+                    using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+
+                    string url = $"https://translate.googleapis.com/translate_a/single?client={clientName}&sl=ru&tl=en&dt=t&q={Uri.EscapeDataString(protectedText.Trim())}";
+                    using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                    req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+
+                    using var res = await _http.SendAsync(req, timeoutCts.Token);
+                    if (res.IsSuccessStatusCode)
                     {
-                        "дискорд" => "Discord",
-                        "сайт" => "Website",
-                        "инструкция" => "Guide",
-                        "скачать" => "Download",
-                        _ => label
-                    };
-                    links.Add((ph, $"[{transLabel}]({url})"));
-                    return ph;
-                });
-
-                // If line contains Cyrillic characters, translate
-                if (Regex.IsMatch(processedLine, @"[\u0400-\u04FF]"))
-                {
-                    bool translated = false;
-                    try
-                    {
-                        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                        timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
-
-                        string gUrl = $"https://translate.googleapis.com/translate_a/single?client=gtx&sl=ru&tl=en&dt=t&q={Uri.EscapeDataString(processedLine)}";
-                        using var req = new HttpRequestMessage(HttpMethod.Get, gUrl);
-                        req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-                        using var res = await _http.SendAsync(req, timeoutCts.Token);
-                        if (res.IsSuccessStatusCode)
+                        var json = await res.Content.ReadAsStringAsync(timeoutCts.Token);
+                        using var doc = JsonDocument.Parse(json);
+                        var rootArray = doc.RootElement[0];
+                        var sb = new StringBuilder();
+                        foreach (var element in rootArray.EnumerateArray())
                         {
-                            var json = await res.Content.ReadAsStringAsync(timeoutCts.Token);
-                            using var doc = JsonDocument.Parse(json);
-                            var root = doc.RootElement;
-                            if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0 && root[0].ValueKind == JsonValueKind.Array)
+                            if (element.ValueKind == JsonValueKind.Array && element.GetArrayLength() > 0 && element[0].ValueKind == JsonValueKind.String)
                             {
-                                var sb = new StringBuilder();
-                                foreach (var s in root[0].EnumerateArray())
-                                {
-                                    if (s.ValueKind == JsonValueKind.Array && s.GetArrayLength() > 0 && s[0].ValueKind == JsonValueKind.String)
-                                        sb.Append(s[0].GetString());
-                                }
-                                string r = sb.ToString().Trim();
-                                if (!string.IsNullOrWhiteSpace(r))
-                                {
-                                    processedLine = r;
-                                    translated = true;
-                                }
+                                sb.Append(element[0].GetString());
                             }
                         }
-                    }
-                    catch { }
-
-                    if (!translated)
-                    {
-                        try
+                        string candidate = sb.ToString().Trim();
+                        if (!string.IsNullOrWhiteSpace(candidate))
                         {
-                            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                            timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
-
-                            string mUrl = $"https://api.mymemory.translated.net/get?q={Uri.EscapeDataString(processedLine)}&langpair=ru|en";
-                            using var req = new HttpRequestMessage(HttpMethod.Get, mUrl);
-                            req.Headers.UserAgent.ParseAdd("Mozilla/5.0");
-                            using var res = await _http.SendAsync(req, timeoutCts.Token);
-                            if (res.IsSuccessStatusCode)
-                            {
-                                var json = await res.Content.ReadAsStringAsync(timeoutCts.Token);
-                                using var doc = JsonDocument.Parse(json);
-                                if (doc.RootElement.TryGetProperty("responseData", out var rd) &&
-                                    rd.TryGetProperty("translatedText", out var tt))
-                                {
-                                    string t = tt.GetString() ?? "";
-                                    if (!string.IsNullOrWhiteSpace(t) && !t.Contains("MYMEMORY WARNING"))
-                                    {
-                                        processedLine = t;
-                                    }
-                                }
-                            }
+                            translated = candidate;
+                            break;
                         }
-                        catch { }
                     }
                 }
-
-                // Restore markdown links
-                foreach (var l in links)
-                {
-                    processedLine = Regex.Replace(processedLine, Regex.Escape(l.placeholder), l.rendered, RegexOptions.IgnoreCase);
-                }
-
-                processedLine = Regex.Replace(processedLine, @"<[^>]+>", "");
-                processedLine = Regex.Replace(processedLine, @"^(?:Примечания|Remarks):?", "Notes:", RegexOptions.IgnoreCase);
-                processedLine = Regex.Replace(processedLine, @"^Подключение:?", "Connecting:", RegexOptions.IgnoreCase);
-                processedLine = Regex.Replace(processedLine, @"^Создание сервера:?", "Hosting:", RegexOptions.IgnoreCase);
-
-                outLines.Add(processedLine);
+                catch { }
             }
 
-            return string.Join("\n\n", outLines);
+            if (string.IsNullOrWhiteSpace(translated))
+            {
+                translated = text;
+            }
+
+            // Restore links
+            foreach (var kvp in linkMap)
+            {
+                translated = translated.Replace(kvp.Key, kvp.Value);
+            }
+
+            translated = Regex.Replace(translated, @"^(?:Примечания|Remarks):?", "Notes:", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            translated = Regex.Replace(translated, @"^Подключение:?", "Connecting:", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            translated = Regex.Replace(translated, @"^Создание сервера:?", "Hosting:", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+            return translated;
         }
         catch
         {
