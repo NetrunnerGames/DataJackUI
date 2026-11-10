@@ -13,14 +13,6 @@ public partial class OnlineFixGameCardVm : FixGameCardVm
     private readonly OnlineFixesViewModel _parent;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanFix), nameof(CanRevert))]
-    private bool _isApplied;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanFix), nameof(CanRevert))]
-    private bool _isBusy;
-
-    [ObservableProperty]
     private string? _notes;
 
     [ObservableProperty]
@@ -29,25 +21,10 @@ public partial class OnlineFixGameCardVm : FixGameCardVm
     [ObservableProperty]
     private DownloadItem? _downloadItem;
 
-    public bool CanFix => !IsApplied && !IsBusy;
-    public bool CanRevert => IsApplied && !IsBusy;
-
     public OnlineFixGameCardVm(DenuvoGameListing g, CoverCache? covers, OnlineFixesViewModel parent)
-        : base(g, covers)
+        : base(g, covers, parent)
     {
         _parent = parent;
-    }
-
-    [RelayCommand]
-    private async Task Fix()
-    {
-        await _parent.ApplyCardFixAsync(this);
-    }
-
-    [RelayCommand]
-    private async Task Revert()
-    {
-        await _parent.RevertCardFixAsync(this);
     }
 
     [RelayCommand]
@@ -158,28 +135,9 @@ public partial class OnlineFixesViewModel : FixesViewModel
         });
     }
 
-    public long ResolveAppId(FixGameCardVm card)
+    public new long ResolveAppId(FixGameCardVm card)
     {
-        if (long.TryParse(card.AppId, out long numericId))
-            return numericId;
-        if (long.TryParse(card.DisplayAppId, out long displayId))
-            return displayId;
-
-        if (_appList is not null && !string.IsNullOrWhiteSpace(card.Name))
-        {
-            var matches = _appList.Search(card.Name, 1);
-            if (matches.Count > 0)
-            {
-                var dispatcher = System.Windows.Application.Current?.Dispatcher;
-                if (dispatcher is not null && !dispatcher.CheckAccess())
-                    dispatcher.Invoke(() => card.DisplayAppId = matches[0].AppId.ToString());
-                else
-                    card.DisplayAppId = matches[0].AppId.ToString();
-                return matches[0].AppId;
-            }
-        }
-
-        return 0;
+        return base.ResolveAppId(card);
     }
 
     public async Task ShowCardNotesAsync(OnlineFixGameCardVm card)

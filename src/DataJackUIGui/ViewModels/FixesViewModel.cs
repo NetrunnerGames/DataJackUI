@@ -12,6 +12,8 @@ namespace DataJackUIGui.ViewModels;
 /// <summary>A game card in the Fixes grid.</summary>
 public partial class FixGameCardVm : ObservableObject
 {
+    private readonly FixesViewModel? _parent;
+
     public string AppId { get; }
     [ObservableProperty] private string _name;
     [ObservableProperty] private string _displayAppId;
@@ -20,6 +22,17 @@ public partial class FixGameCardVm : ObservableObject
     public IReadOnlyList<string> TagIds { get; }
     public string FixCountLabel => FixTypeLabel;
     public string? OnlineUrl => g.OnlineUrl;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanFix), nameof(CanRevert))]
+    private bool _isApplied;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanFix), nameof(CanRevert))]
+    private bool _isBusy;
+
+    public bool CanFix => !IsApplied && !IsBusy;
+    public bool CanRevert => IsApplied && !IsBusy;
 
     public bool HasPlaceholderName =>
         string.IsNullOrWhiteSpace(Name) ||
@@ -49,9 +62,10 @@ public partial class FixGameCardVm : ObservableObject
     private readonly DenuvoGameListing g;
     private int _resolving;
 
-    public FixGameCardVm(DenuvoGameListing g, CoverCache? covers = null)
+    public FixGameCardVm(DenuvoGameListing g, CoverCache? covers = null, FixesViewModel? parent = null)
     {
         this.g = g;
+        _parent = parent;
         AppId = g.AppId;
         _displayAppId = g.AppId;
         _name = g.Name;
@@ -61,6 +75,24 @@ public partial class FixGameCardVm : ObservableObject
         if (covers is not null && long.TryParse(AppId, out long appid))
         {
             _cover = covers.GetLocalPath(appid);
+        }
+    }
+
+    [RelayCommand]
+    private async Task Fix()
+    {
+        if (_parent is not null)
+        {
+            await _parent.ApplyCardFixAsync(this);
+        }
+    }
+
+    [RelayCommand]
+    private async Task Revert()
+    {
+        if (_parent is not null)
+        {
+            await _parent.RevertCardFixAsync(this);
         }
     }
 
@@ -340,6 +372,28 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     protected override void OnPageSliced(IReadOnlyList<FixGameCardVm> slice)
     {
         foreach (var g in slice) _ = g.EnsureCoverAsync(covers, appInfo, appList);
+
+        // Check applied fix status for currently visible slice
+        Task.Run(() =>
+        {
+            foreach (var card in slice)
+            {
+                long appId = ResolveAppId(card);
+                if (appId > 0)
+                {
+                    bool applied = jobs.HasAppliedFix(appId, card.AppId);
+                    var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                    if (dispatcher is not null && !dispatcher.CheckAccess())
+                    {
+                        dispatcher.Invoke(() => card.IsApplied = applied);
+                    }
+                    else
+                    {
+                        card.IsApplied = applied;
+                    }
+                }
+            }
+        });
     }
 
     [ObservableProperty] private string _searchText = "";
@@ -444,7 +498,7 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
                 return;
             }
 
-            var all = data.Games.Select(g => new FixGameCardVm(g, covers)).ToList();
+            var all = data.Games.Select(g => new FixGameCardVm(g, covers, this)).ToList();
             _allGames = FilterLoadedGames(all);
 
             PopulateTags();
@@ -546,6 +600,165 @@ public partial class FixesViewModel : PagedListViewModel<FixGameCardVm>
     /// The cost of that is the action being offered for games that aren't installed, so it reports the
     /// same "game not found" toast the fix flow already uses rather than failing silently.
     /// </remarks>
+    public long ResolveAppId(FixGameCardVm card)
+    {
+        if (long.TryParse(card.AppId, out long numericId))
+            return numericId;
+        if (long.TryParse(card.DisplayAppId, out long displayId))
+            return displayId;
+
+        if (appList is not null && !string.IsNullOrWhiteSpace(card.Name))
+        {
+            var matches = appList.Search(card.Name, 1);
+            if (matches.Count > 0)
+            {
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher is not null && !dispatcher.CheckAccess())
+                    dispatcher.Invoke(() => card.DisplayAppId = matches[0].AppId.ToString());
+                else
+                    card.DisplayAppId = matches[0].AppId.ToString();
+                return matches[0].AppId;
+            }
+        }
+
+        return 0;
+    }
+
+    public async Task ApplyCardFixAsync(FixGameCardVm card)
+    {
+        if (card.IsBusy) return;
+
+        long appId = ResolveAppId(card);
+        string? installDir = appId > 0 ? library.GetInstallDir(appId) : null;
+        if (string.IsNullOrEmpty(installDir) || !Directory.Exists(installDir))
+        {
+            toast.Show(
+                Resources.Strings.Fixes_Toast_GameNotFound,
+                string.Format(Resources.Strings.Fixes_Toast_GameNotFound_Body, card.Name),
+                error: true);
+            return;
+        }
+
+        card.IsBusy = true;
+        try
+        {
+            // Fetch fixes for the game
+            var data = await api.GetDenuvoFixesAsync(card.AppId);
+            if (appId > 0 && appId.ToString() != card.AppId)
+            {
+                var steamData = await api.GetDenuvoFixesAsync(appId.ToString());
+                if (steamData?.Fixes is { Count: > 0 })
+                {
+                    data ??= steamData;
+                    foreach (var sf in steamData.Fixes)
+                    {
+                        if (!data.Fixes.Any(f => f.Id == sf.Id))
+                            data.Fixes.Add(sf);
+                    }
+                }
+            }
+
+            if (data is null && card.TagIds.Any(t => t.Equals("bypass", StringComparison.OrdinalIgnoreCase)))
+            {
+                data = DataJackUIApiClient.CreateFallbackFixesResponse(card.AppId, card.Name);
+            }
+
+            // Also check online fix scrape if available
+            string searchKey = appId > 0 ? appId.ToString() : card.AppId;
+            if (!string.IsNullOrWhiteSpace(card.OnlineUrl))
+            {
+                var scrape = await api.ScrapeOnlineFixArticleUrlAsync(searchKey, card.OnlineUrl, card.Name);
+                if (scrape?.DirectFixUrl is not null)
+                {
+                    data ??= new DenuvoFixesResponse { AppId = card.AppId, Name = card.Name, Fixes = [] };
+                    data.Fixes.RemoveAll(f => f.Tags.Any(t => string.Equals(t.Id, "online", StringComparison.OrdinalIgnoreCase)));
+                    data.Fixes.Add(new DenuvoFix
+                    {
+                        Id = appId > 0 ? $"{appId}_ofme_0" : $"{card.AppId}_ofme_0",
+                        Title = scrape.Title,
+                        Description = scrape.VersionStr,
+                        Notes = scrape.Notes,
+                        FixFilename = scrape.FixFileName,
+                        Tags = [new DenuvoTag { Id = "online", Name = "Online Fix", Slug = "online" }]
+                    });
+                }
+            }
+
+            var chosenFix = data?.Fixes.FirstOrDefault(f => f.HasFix) ?? data?.Fixes.FirstOrDefault();
+            if (chosenFix is null)
+            {
+                card.IsBusy = false;
+                toast.Show(Resources.Strings.Fixes_Toast_DownloadFailed, "No compatible fix files found for this game.", error: true);
+                return;
+            }
+
+            string fallbackName = chosenFix.FixFilename ?? $"{card.AppId}_fix.zip";
+            string fixTitle = chosenFix.Title ?? $"{card.Name} Fix";
+
+            var job = jobs.CreateDenuvoJob(
+                chosenFix.Id,
+                "fix",
+                fallbackName,
+                appId,
+                card.Name,
+                fixTitle,
+                onFinished: (item, result) =>
+                {
+                    card.IsBusy = false;
+                    if (result is null && item.Status == DownloadStatus.Failed)
+                    {
+                        toast.Show(
+                            Resources.Strings.Fixes_Toast_DownloadFailed,
+                            item.Message ?? Resources.Strings.Fixes_Toast_DownloadFailed_Body,
+                            error: true);
+                        return;
+                    }
+
+                    if (result?.Ok == true)
+                    {
+                        card.IsApplied = true;
+                    }
+                });
+
+            queue.Enqueue(job);
+        }
+        catch (Exception ex)
+        {
+            card.IsBusy = false;
+            toast.Show(Resources.Strings.Fixes_Toast_DownloadFailed, ex.Message, error: true);
+        }
+    }
+
+    public async Task RevertCardFixAsync(FixGameCardVm card)
+    {
+        if (card.IsBusy) return;
+
+        long appId = ResolveAppId(card);
+        if (appId == 0) return;
+
+        bool confirm = await UiMessageBox.ShowConfirmAsync(
+            string.Format(Resources.Strings.Fixes_Revert_Confirm_Title, card.Name),
+            string.Format(Resources.Strings.Fixes_Revert_Confirm_Body, card.Name),
+            Resources.Strings.Fixes_Revert,
+            Resources.Strings.Fixes_Revert_Cancel);
+
+        if (!confirm) return;
+
+        card.IsBusy = true;
+        try
+        {
+            var result = await Task.Run(() => jobs.RevertGameFix(appId, card.AppId, card.Name));
+            if (result.Ok)
+            {
+                card.IsApplied = false;
+            }
+        }
+        finally
+        {
+            card.IsBusy = false;
+        }
+    }
+
     [RelayCommand]
     private void ShowInFolder(FixGameCardVm game)
     {
