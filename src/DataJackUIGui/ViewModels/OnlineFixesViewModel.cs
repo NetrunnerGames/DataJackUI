@@ -198,17 +198,35 @@ public partial class OnlineFixesViewModel : FixesViewModel
         try
         {
             string? notes = null;
-            if (!string.IsNullOrWhiteSpace(card.OnlineUrl))
+            string? targetUrl = !string.IsNullOrWhiteSpace(card.OnlineUrl) ? card.OnlineUrl : null;
+
+            // If target URL is missing, try matching by catalog of_ id (e.g. of_17320)
+            if (string.IsNullOrWhiteSpace(targetUrl) && !string.IsNullOrWhiteSpace(card.AppId) && card.AppId.StartsWith("of_", StringComparison.OrdinalIgnoreCase))
             {
-                notes = await _api.GetOnlineFixNotesAsync(card.OnlineUrl);
+                string idNum = card.AppId.Substring(3);
+                targetUrl = $"https://online-fix.me/games/survival/{idNum}-po-seti.html";
+            }
+
+            if (!string.IsNullOrWhiteSpace(targetUrl))
+            {
+                notes = await _api.GetOnlineFixNotesAsync(targetUrl);
             }
 
             if (string.IsNullOrWhiteSpace(notes))
             {
                 long appId = ResolveAppId(card);
                 string searchKey = appId > 0 ? appId.ToString() : card.AppId;
-                var scrape = await _api.ScrapeOnlineFixArticleUrlAsync(searchKey, card.OnlineUrl ?? "", card.Name);
-                notes = scrape?.Notes;
+                if (!string.IsNullOrWhiteSpace(targetUrl))
+                {
+                    var scrape = await _api.ScrapeOnlineFixArticleUrlAsync(searchKey, targetUrl, card.Name);
+                    notes = scrape?.Notes;
+                }
+
+                if (string.IsNullOrWhiteSpace(notes))
+                {
+                    var scrape = await _api.ScrapeOnlineFixForGameAsync(searchKey, card.Name);
+                    notes = scrape?.Notes;
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(notes))
