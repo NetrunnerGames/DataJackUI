@@ -2320,25 +2320,35 @@ public class DataJackUIApiClient
 
     private static string CleanGuideText(string raw)
     {
-        string val = Regex.Replace(raw, @"<span class=['""]fa fa-arrow-right['""]></span>", " -> ", RegexOptions.IgnoreCase);
-
+        // Unfold spoiler titles into bold subheadings
+        string val = Regex.Replace(raw, @"<!--spoiler_title-->([\s\S]*?)<!--spoiler_title_end-->", "\n\n**$1**\n\n", RegexOptions.IgnoreCase);
+        val = Regex.Replace(val, @"<span class=['""]fa fa-arrow-right['""]></span>", " -> ", RegexOptions.IgnoreCase);
         val = Regex.Replace(val, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase);
-
+        val = Regex.Replace(val, @"<p[^>]*>", "\n", RegexOptions.IgnoreCase);
+        val = Regex.Replace(val, @"<a\s+[^>]*href=[""']([^""']+)[""'][^>]*>([\s\S]*?)</a>", m =>
+        {
+            string href = m.Groups[1].Value;
+            if (href.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase)) return m.Groups[2].Value;
+            return $"[{m.Groups[2].Value}]({href})";
+        }, RegexOptions.IgnoreCase);
         val = Regex.Replace(val, @"<[^>]+>", "");
-
         val = val.Replace("&quot;", "\"").Replace("&amp;", "&").Replace("&nbsp;", " ");
 
-        var items = val.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-
-                       .Select(l => l.Trim())
-
-                       .Where(l => l.Length > 0);
-
-        return string.Join("\n", items);
+        var items = new List<string>();
+        foreach (var line in val.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string t = line.Trim();
+            // Filter out unwanted network stats / player count info
+            if (t.Length > 0 && !Regex.IsMatch(t, @"Информация о сетевых режимах|КООПЕРАТИВ:|МУЛЬТИПЛЕЕР:", RegexOptions.IgnoreCase))
+            {
+                items.Add(t);
+            }
+        }
+        return string.Join("\n\n", items);
     }
 
     /// <summary>
-    /// Extracts multiplayer setup instructions (Connecting / Hosting) and notes (Примечания:)
+    /// Extracts multiplayer setup instructions (How to launch / Connecting / Hosting) and notes (Примечания:)
     /// from online-fix.me article HTML.
     /// </summary>
     public static List<string> ExtractNotesFromArticleHtml(string html)
@@ -2347,42 +2357,44 @@ public class DataJackUIApiClient
 
         if (string.IsNullOrWhiteSpace(html)) return rawNotes;
 
-        // 1. Connection (Подключение) instructions
+        // 1. Launch instructions (Как запускать:)
+        var launchMatch = Regex.Match(html, @"(?:<b>|<u>)?\s*Как запускать:?\s*(?:</b>|</u>)?([\s\S]*?)(?:(?:<b>|<u>)?\s*(?:Информация о сетевых режимах|Подключение|Создание сервера|Примечания)|<!--dle_list-->|$)", RegexOptions.IgnoreCase);
+        if (launchMatch.Success)
+        {
+            string clean = CleanGuideText(launchMatch.Groups[1].Value);
+            if (clean.Length > 10)
+            {
+                rawNotes.Add("Как запускать:\n\n" + clean);
+            }
+        }
 
-        var connMatch = Regex.Match(html, @"<u>\s*Подключение:?\s*</u>([\s\S]*?)(?:<u>|<!--colorstart|<!--sizestart|<hr|<div class=['""]quote['""]|$)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
-
+        // 2. Connection (Подключение) instructions
+        var connMatch = Regex.Match(html, @"<u>\s*Подключение:?\s*</u>([\s\S]*?)(?:<u>|<!--colorstart|<!--sizestart|<hr|<div class=['""]quote['""]|Примечания|$)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
         if (connMatch.Success)
         {
             string clean = CleanGuideText(connMatch.Groups[1].Value);
-
             if (clean.Length > 3)
             {
-                rawNotes.Add("Подключение:\n" + clean);
+                rawNotes.Add("Подключение:\n\n" + clean);
             }
         }
 
-        // 2. Server creation (Создание сервера) instructions
-
-        var hostMatch = Regex.Match(html, @"<u>\s*Создание сервера:?\s*</u>([\s\S]*?)(?:<u>|<!--colorstart|<!--sizestart|<hr|<div class=['""]quote['""]|$)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
-
+        // 3. Server creation (Создание сервера) instructions
+        var hostMatch = Regex.Match(html, @"<u>\s*Создание сервера:?\s*</u>([\s\S]*?)(?:<u>|<!--colorstart|<!--sizestart|<hr|<div class=['""]quote['""]|Примечания|$)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
         if (hostMatch.Success)
         {
             string clean = CleanGuideText(hostMatch.Groups[1].Value);
-
             if (clean.Length > 3)
             {
-                rawNotes.Add("Создание сервера:\n" + clean);
+                rawNotes.Add("Создание сервера:\n\n" + clean);
             }
         }
 
-        // 3. Special notes (Примечания:)
-
+        // 4. Special notes (Примечания:)
         int notesIdx = html.IndexOf("Примечания", StringComparison.OrdinalIgnoreCase);
-
         if (notesIdx >= 0)
         {
             string searchScope = html.Substring(notesIdx, Math.Min(3500, html.Length - notesIdx));
-
             var specialNotes = new List<string>();
 
             foreach (Match ul in Regex.Matches(searchScope, @"<ul>([\s\S]*?)</ul>", RegexOptions.IgnoreCase))
@@ -2392,7 +2404,6 @@ public class DataJackUIApiClient
                     string textLi = li.Groups[1].Value;
 
                     if (Regex.IsMatch(textLi, @"kak-zastavit-kontroller-rabotat|How to make your controller work|reshenie-oshibok|необходимые для запуска игр|Скачайте и распакуйте|Download the game.*and unzip|распаковать архивы", RegexOptions.IgnoreCase))
-
                         continue;
 
                     // Preserve Markdown links [text](url) before stripping HTML tags
@@ -2409,24 +2420,17 @@ public class DataJackUIApiClient
             if (specialNotes.Count == 0)
             {
                 int colonIdx = searchScope.IndexOf(':');
-
                 if (colonIdx >= 0 && colonIdx + 1 < searchScope.Length)
                 {
                     string after = searchScope.Substring(colonIdx + 1);
-
                     int endCut = after.IndexOf("<div", StringComparison.OrdinalIgnoreCase);
-
                     if (endCut >= 0) after = after.Substring(0, endCut);
 
                     string afterWithLinks = Regex.Replace(after, @"<a\s+[^>]*href=[""']([^""']+)[""'][^>]*>([\s\S]*?)</a>", "[$2]($1)", RegexOptions.IgnoreCase);
                     string clean = Regex.Replace(afterWithLinks, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Replace("&nbsp;", " ").Trim();
-
                     clean = Regex.Replace(clean, @"\s+", " ");
-
                     clean = Regex.Replace(clean, @"Как заставить контроллер работать.*?(\?|$)", "", RegexOptions.IgnoreCase);
-
                     clean = Regex.Replace(clean, @"How to make your controller work.*?(\?|$)", "", RegexOptions.IgnoreCase);
-
                     clean = Regex.Replace(clean, @"Программы необходимые для запуска игр\.?.?", "", RegexOptions.IgnoreCase).Trim();
 
                     if (clean.Length > 5)
@@ -2438,7 +2442,7 @@ public class DataJackUIApiClient
 
             if (specialNotes.Count > 0)
             {
-                rawNotes.Add("Примечания:\n" + string.Join("\n", specialNotes));
+                rawNotes.Add("Примечания:\n\n" + string.Join("\n\n", specialNotes));
             }
         }
 
