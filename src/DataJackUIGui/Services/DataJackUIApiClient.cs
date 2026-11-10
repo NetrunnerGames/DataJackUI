@@ -2145,40 +2145,133 @@ public class DataJackUIApiClient
     /// to search/scrape online-fix.me and translate Russian notes using Workers AI.
     /// If direct_fix_url is not returned but hoster_url is present, resolves direct candidate links from hoster.
     /// </summary>
-    /// <summary>Translates Russian notes to English using Google Translate GTX API locally if worker AI is exhausted/missing.</summary>
+    /// <summary>Translates Russian notes to English using line-by-line translation and link preservation.</summary>
     public async Task<string?> TranslateRuToEnAsync(string text, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
+
         try
         {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+            var lines = text.Split('\n');
+            var outLines = new List<string>();
 
-            string url = $"https://translate.googleapis.com/translate_a/single?client=gtx&sl=ru&tl=en&dt=t&q={Uri.EscapeDataString(text.Trim())}";
-            using var req = new HttpRequestMessage(HttpMethod.Get, url);
-            req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-
-            using var res = await _http.SendAsync(req, timeoutCts.Token);
-            if (!res.IsSuccessStatusCode) return text;
-
-            using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(timeoutCts.Token), cancellationToken: timeoutCts.Token);
-            var root = doc.RootElement;
-            if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0 && root[0].ValueKind == JsonValueKind.Array)
+            foreach (var line in lines)
             {
-                var sb = new StringBuilder();
-                foreach (var seg in root[0].EnumerateArray())
+                if (string.IsNullOrWhiteSpace(line))
                 {
-                    if (seg.ValueKind == JsonValueKind.Array && seg.GetArrayLength() > 0 && seg[0].ValueKind == JsonValueKind.String)
+                    outLines.Add("");
+                    continue;
+                }
+
+                string processedLine = line.Trim();
+
+                // Extract and preserve markdown links [label](url)
+                var links = new List<(string placeholder, string rendered)>();
+                int idx = 0;
+                processedLine = Regex.Replace(processedLine, @"\[([^\]]+)\]\(([^)]+)\)", m =>
+                {
+                    string ph = $"PHLINK{idx++}PH";
+                    string label = m.Groups[1].Value;
+                    string url = m.Groups[2].Value;
+                    string transLabel = label.ToLowerInvariant() switch
                     {
-                        sb.Append(seg[0].GetString());
+                        "дискорд" => "Discord",
+                        "сайт" => "Website",
+                        "инструкция" => "Guide",
+                        "скачать" => "Download",
+                        _ => label
+                    };
+                    links.Add((ph, $"[{transLabel}]({url})"));
+                    return ph;
+                });
+
+                // If line contains Cyrillic characters, translate
+                if (Regex.IsMatch(processedLine, @"[\u0400-\u04FF]"))
+                {
+                    bool translated = false;
+                    try
+                    {
+                        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                        timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
+
+                        string gUrl = $"https://translate.googleapis.com/translate_a/single?client=gtx&sl=ru&tl=en&dt=t&q={Uri.EscapeDataString(processedLine)}";
+                        using var req = new HttpRequestMessage(HttpMethod.Get, gUrl);
+                        req.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                        using var res = await _http.SendAsync(req, timeoutCts.Token);
+                        if (res.IsSuccessStatusCode)
+                        {
+                            var json = await res.Content.ReadAsStringAsync(timeoutCts.Token);
+                            using var doc = JsonDocument.Parse(json);
+                            var root = doc.RootElement;
+                            if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0 && root[0].ValueKind == JsonValueKind.Array)
+                            {
+                                var sb = new StringBuilder();
+                                foreach (var s in root[0].EnumerateArray())
+                                {
+                                    if (s.ValueKind == JsonValueKind.Array && s.GetArrayLength() > 0 && s[0].ValueKind == JsonValueKind.String)
+                                        sb.Append(s[0].GetString());
+                                }
+                                string r = sb.ToString().Trim();
+                                if (!string.IsNullOrWhiteSpace(r))
+                                {
+                                    processedLine = r;
+                                    translated = true;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+
+                    if (!translated)
+                    {
+                        try
+                        {
+                            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                            timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
+
+                            string mUrl = $"https://api.mymemory.translated.net/get?q={Uri.EscapeDataString(processedLine)}&langpair=ru|en";
+                            using var req = new HttpRequestMessage(HttpMethod.Get, mUrl);
+                            req.Headers.UserAgent.ParseAdd("Mozilla/5.0");
+                            using var res = await _http.SendAsync(req, timeoutCts.Token);
+                            if (res.IsSuccessStatusCode)
+                            {
+                                var json = await res.Content.ReadAsStringAsync(timeoutCts.Token);
+                                using var doc = JsonDocument.Parse(json);
+                                if (doc.RootElement.TryGetProperty("responseData", out var rd) &&
+                                    rd.TryGetProperty("translatedText", out var tt))
+                                {
+                                    string t = tt.GetString() ?? "";
+                                    if (!string.IsNullOrWhiteSpace(t) && !t.Contains("MYMEMORY WARNING"))
+                                    {
+                                        processedLine = t;
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
                     }
                 }
-                string translated = sb.ToString().Trim();
-                if (!string.IsNullOrWhiteSpace(translated)) return translated;
+
+                // Restore markdown links
+                foreach (var l in links)
+                {
+                    processedLine = Regex.Replace(processedLine, Regex.Escape(l.placeholder), l.rendered, RegexOptions.IgnoreCase);
+                }
+
+                processedLine = Regex.Replace(processedLine, @"<[^>]+>", "");
+                processedLine = Regex.Replace(processedLine, @"^(?:Примечания|Remarks):?", "Notes:", RegexOptions.IgnoreCase);
+                processedLine = Regex.Replace(processedLine, @"^Подключение:?", "Connecting:", RegexOptions.IgnoreCase);
+                processedLine = Regex.Replace(processedLine, @"^Создание сервера:?", "Hosting:", RegexOptions.IgnoreCase);
+
+                outLines.Add(processedLine);
             }
+
+            return string.Join("\n\n", outLines);
         }
-        catch { }
-        return text;
+        catch
+        {
+            return text;
+        }
     }
 
     private async Task<OnlineFixScrapeResult?> ResolveOnlineFixViaWorkerAsync(
