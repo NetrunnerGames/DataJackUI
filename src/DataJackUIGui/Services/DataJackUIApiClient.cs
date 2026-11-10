@@ -2406,6 +2406,8 @@ public class DataJackUIApiClient
             string searchScope = html.Substring(notesIdx, Math.Min(3500, html.Length - notesIdx));
             var specialNotes = new List<string>();
 
+            bool hasUlList = Regex.IsMatch(searchScope, @"<ul>[\s\S]*?</ul>", RegexOptions.IgnoreCase);
+
             foreach (Match ul in Regex.Matches(searchScope, @"<ul>([\s\S]*?)</ul>", RegexOptions.IgnoreCase))
             {
                 foreach (Match li in Regex.Matches(ul.Groups[1].Value, @"<li>([\s\S]*?)</li>", RegexOptions.IgnoreCase))
@@ -2426,7 +2428,9 @@ public class DataJackUIApiClient
                 }
             }
 
-            if (specialNotes.Count == 0)
+            // Only inspect unlisted paragraphs if the notes section did NOT contain an HTML <ul> list.
+            // If an <ul> list existed, all non-boilerplate items were already handled above.
+            if (specialNotes.Count == 0 && !hasUlList)
             {
                 int colonIdx = searchScope.IndexOf(':');
                 if (colonIdx >= 0 && colonIdx + 1 < searchScope.Length)
@@ -2435,16 +2439,17 @@ public class DataJackUIApiClient
                     int endCut = after.IndexOf("<div", StringComparison.OrdinalIgnoreCase);
                     if (endCut >= 0) after = after.Substring(0, endCut);
 
-                    string afterWithLinks = Regex.Replace(after, @"<a\s+[^>]*href=[""']([^""']+)[""'][^>]*>([\s\S]*?)</a>", "[$2]($1)", RegexOptions.IgnoreCase);
-                    string clean = Regex.Replace(afterWithLinks, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Replace("&nbsp;", " ").Trim();
-                    clean = Regex.Replace(clean, @"\s+", " ");
-                    clean = Regex.Replace(clean, @"Как заставить контроллер работать.*?(\?|$)", "", RegexOptions.IgnoreCase);
-                    clean = Regex.Replace(clean, @"How to make your controller work.*?(\?|$)", "", RegexOptions.IgnoreCase);
-                    clean = Regex.Replace(clean, @"Программы необходимые для запуска игр\.?.?", "", RegexOptions.IgnoreCase).Trim();
-
-                    if (clean.Length > 5)
+                    // Skip if boilerplate links are present in paragraph
+                    if (!Regex.IsMatch(after, @"kak-zastavit-kontroller-rabotat|reshenie-oshibok|необходимые для запуска игр", RegexOptions.IgnoreCase))
                     {
-                        specialNotes.Add(clean);
+                        string afterWithLinks = Regex.Replace(after, @"<a\s+[^>]*href=[""']([^""']+)[""'][^>]*>([\s\S]*?)</a>", "[$2]($1)", RegexOptions.IgnoreCase);
+                        string clean = Regex.Replace(afterWithLinks, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Replace("&nbsp;", " ").Trim();
+                        clean = Regex.Replace(clean, @"\s+", " ");
+
+                        if (clean.Length > 5)
+                        {
+                            specialNotes.Add(clean);
+                        }
                     }
                 }
             }
