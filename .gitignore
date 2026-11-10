@@ -1,0 +1,81 @@
+# Build and output directories
+bin/
+obj/
+publish/
+Releases/
+DataJackUI-*.zip
+DataJackUI-*.exe
+TestResults/
+[B|b]uild/
+[D|d]ebug/
+[R|r]elease/
+
+# Dynamic release notes text files
+changelog.txt
+highlights.txt
+
+# WPF temporary project files (generated during builds)
+*_wpftmp.csproj
+*_wpftmp.*
+
+# Visual Studio / IDE / User configuration
+.vs/
+*.user
+*.suo
+*.userosv
+*.userosv.*
+.idea/
+.vscode/
+*.cache
+*.userprefs
+
+# Local AI agent / IDE configuration
+.claude/
+CLAUDE.md
+AGENTS.md
+.cursor/
+.cursorrules
+.gemini/
+.github/copilot-instructions.md
+
+# Third-party binary reference material
+OpenSteamTool-releases/
+SteamTools-releases/
+
+# Plugin frontend source (managed in separate Jack-in repository)
+src/DataJackUIPlugin/
+
+
+# Maintainer-only scratch scripts, docs, and workflows
+tools/
+docs/
+scratch/
+build-release.ps1
+build_plugin_release.ps1
+deploy_workers.ps1
+run_local.ps1
+.wrangler/
+convert_antigravity_to_kilo.py
+antigravity_conversation_kilo.json
+skills_for_kilo_code.md
+
+# Temporary files and logs
+*.lnk
+*.log
+*.tmp
+*.bak
+*.swp
+
+# Environment, keys, and security certificates
+.env
+.env.*
+*.pfx
+*.p12
+*.pem
+*.snk
+*.key
+
+# Operating System system files
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,12 @@
+Welcome to DataJackUI
+======================
+
+Thank you for choosing DataJackUI.
+
+This setup wizard will guide you through installing DataJackUI on your system.
+
+System Requirements:
+- Windows 10 (64-bit) or Windows 11
+- Microsoft .NET 8.0 Desktop Runtime (x64)
+
+Click Next to continue, or Cancel to exit Setup.

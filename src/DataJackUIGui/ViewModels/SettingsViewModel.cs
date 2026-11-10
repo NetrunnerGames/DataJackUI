@@ -1,0 +1,657 @@
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using DataJackUIGui.Services;
+using DataJackUIGui.Models;
+using Microsoft.Win32;
+
+namespace DataJackUIGui.ViewModels;
+
+/// <summary>A selectable UI language. <see cref="Tag"/> is the BCP-47 tag ("en", "zh-Hans") or null for
+/// "follow the system display language".</summary>
+public record LanguageOption(string Display, string? Tag);
+
+public record DnsModeOption(string Display, string Tag);
+
+public partial class SettingsViewModel : ObservableObject
+{
+    private readonly SettingsService _settings;
+    private readonly AuthService _auth;
+    private readonly SteamService _steam;
+    private readonly HubcapService _hubcap;
+    private readonly UpdateService _updateService;
+
+    [ObservableProperty] private bool _isCheckingForUpdates;
+    [ObservableProperty] private string? _updateStatusText;
+    [ObservableProperty] private string _updateStatusColor = "#9ca3af";
+
+    [ObservableProperty] private string? _displayName;
+    [ObservableProperty] private string _username = "anonymous";
+
+    partial void OnUsernameChanged(string value)
+    {
+        _settings.CustomUsername = value;
+    }
+
+    [ObservableProperty] private string? _userId;
+    [ObservableProperty] private string? _email;
+    [ObservableProperty] private string? _avatarUrl;
+    [ObservableProperty] private ImageSource? _avatarImage;
+
+    [ObservableProperty] private bool _isAvatarDialogOpen;
+    [ObservableProperty] private string _avatarUrlInput = "";
+    [ObservableProperty] private bool _isEditingProfile;
+
+    public bool HasCustomAvatar => !string.IsNullOrWhiteSpace(_settings.CustomAvatarPath);
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsRealUser))]
+    private bool _isGuest = true;
+
+    public bool IsRealUser => !IsGuest;
+
+    // ── Login-required redirect banner ─────────────────────────────
+    /// <summary>Set by App when navigating here from a protected action. Null = banner hidden.</summary>
+    [ObservableProperty] private string? _loginRequiredMessage;
+
+    [RelayCommand]
+    private void DismissLoginRequired() => LoginRequiredMessage = null;
+
+    // ── Steam location ──────────────────────────────────────────────
+    [ObservableProperty] private string _steamPath = "";
+    [ObservableProperty] private bool _isSteamOverridden;
+    [ObservableProperty] private string _steamSource = "";
+    [ObservableProperty] private string? _steamWarning;
+
+    // ── Install behavior ────────────────────────────────────────────
+    /// <summary>Auto Update Apps (Don't Lock Manifests). Persisted via SettingsService.</summary>
+    [ObservableProperty] private bool _autoUpdateApps;
+
+    partial void OnAutoUpdateAppsChanged(bool value) => _settings.AutoUpdateApps = value;
+
+    /// <summary>FastFetch: auto-download from the first available source. Same persisted setting the Add
+    /// screen's toggle drives (both read/write SettingsService.FastFetch).</summary>
+    [ObservableProperty] private bool _fastFetch;
+
+    partial void OnFastFetchChanged(bool value) => _settings.FastFetch = value;
+
+    /// <summary>Donate spare Steam decryption keys to the community pool. Persisted via SettingsService.</summary>
+    [ObservableProperty] private bool _donateKeys;
+
+    partial void OnDonateKeysChanged(bool value) => _settings.DonateKeys = value;
+
+    // ── DNS resolution ────────────────────────────────────────────────
+    public ObservableCollection<DnsModeOption> DnsModeOptions { get; } =
+    [
+        new DnsModeOption("Automatic (fallback on failure)", "Auto"),
+        new DnsModeOption("Always use Cloudflare", "Always"),
+        new DnsModeOption("Use system DNS only", "Never")
+    ];
+
+    [ObservableProperty] private DnsModeOption _selectedDnsMode;
+
+    partial void OnSelectedDnsModeChanged(DnsModeOption value)
+    {
+        if (value != null)
+            _settings.DnsMode = value.Tag;
+    }
+
+    // ── Startup behavior ────────────────────────────────────────────
+    private const string RunKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+    private const string RunValueName = "DataJackUI";
+
+    /// <summary>Launch the app on Windows sign-in (writes HKCU …\Run). Persisted via SettingsService.</summary>
+    [ObservableProperty] private bool _startWithWindows;
+
+    partial void OnStartWithWindowsChanged(bool value)
+    {
+        _settings.StartWithWindows = value;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
+            if (key is null) return;
+            if (value)
+                // --minimized: start silently in the tray on sign-in so it just serves the
+                // local backend (127.0.0.1:6767) for the Steam plugin without stealing focus.
+                key.SetValue(RunValueName, $"\"{Environment.ProcessPath}\" --minimized");
+            else
+                key.DeleteValue(RunValueName, throwOnMissingValue: false);
+        }
+        catch { /* registry write blocked. Setting is still saved, just not applied this run */ }
+    }
+
+    /// <summary>Minimize to the system tray instead of the taskbar. Persisted via SettingsService.</summary>
+    [ObservableProperty] private bool _minimizeToTray;
+
+    partial void OnMinimizeToTrayChanged(bool value)
+    {
+        _settings.MinimizeToTray = value;
+        if (!value) RequestShowWindow?.Invoke(); // turning it off restores the window if it's hidden in the tray
+    }
+
+    /// <summary>Set by App: restore the main window from the tray (used when Minimize-to-tray is turned off).</summary>
+    public Action? RequestShowWindow { get; set; }
+
+    // ── Steam Web API Key & Helper Tools ──────────────────────────
+    [ObservableProperty] private string _steamWebApiKey = "";
+    partial void OnSteamWebApiKeyChanged(string value) => _settings.SteamWebApiKey = value;
+
+    [ObservableProperty] private string _toolsPath = "";
+    partial void OnToolsPathChanged(string value) => _settings.ToolsPath = value;
+
+    // ── Language ────────────────────────────────────────────────────
+    /// <summary>Available UI languages (native endonyms, matching Steam's list). "System default"
+    /// (null tag) follows Windows. Languages whose .resx isn't present fall back to English.</summary>
+    public ObservableCollection<LanguageOption> LanguageOptions { get; } =
+    [
+        new(Resources.Strings.Settings_Language_SystemDefault, null),
+        new("English", "en"),
+    ];
+
+    [ObservableProperty] private LanguageOption _selectedLanguage = null!;
+
+    private bool _suppressLanguagePrompt; // true during ctor init so we don't prompt on first bind
+
+    partial void OnSelectedLanguageChanged(LanguageOption value)
+    {
+        if (value is null || _suppressLanguagePrompt) return;
+        _settings.Language = value.Tag; // null = follow system
+        // The whole UI is built with parse-time x:Static resources, so a relaunch is needed to re-read it.
+        RequestRestartPrompt?.Invoke();
+    }
+
+    // ── Hubcap API key ──────────────────────────────────────────────
+    /// <summary>The key the user is typing/pasting. Starts blank. The saved key is never shown back.</summary>
+    [ObservableProperty] private string _hubcapKeyInput = "";
+
+    /// <summary>Status line under the key box (usage/expiry on success, or an error). Null = hidden.</summary>
+    [ObservableProperty] private string? _hubcapKeyStatus;
+
+    /// <summary>Color for the status line: red on error, green on success.</summary>
+    [ObservableProperty] private string _hubcapKeyStatusColor = "#22c55e";
+    /// <summary>True when a key is saved in settings (drives the "Clear" button + "configured" label).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowHubcapStats))]
+    [NotifyPropertyChangedFor(nameof(HubcapStatsPending))]
+    [NotifyPropertyChangedFor(nameof(HubcapStatsText))]
+    private bool _hubcapIsKeyConfigured;
+
+    /// <summary>True while validating (disables the buttons via <see cref="CanEditHubcapKey"/>).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanEditHubcapKey))]
+    private bool _isValidatingHubcapKey;
+
+    public bool CanEditHubcapKey => !IsValidatingHubcapKey;
+
+    [ObservableProperty] private bool _isRefreshingHubcapStats;
+
+    /// <summary>Latest stats for the saved key. Null = not loaded / no key / error.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HubcapStatsDisplay))]
+    [NotifyPropertyChangedFor(nameof(HubcapStatsText))]
+    [NotifyPropertyChangedFor(nameof(HubcapStatsPending))]
+    [NotifyPropertyChangedFor(nameof(HubcapUsagePercent))]
+    [NotifyPropertyChangedFor(nameof(ShowHubcapStats))]
+    private HubcapStats? _hubcapStats;
+
+    /// <summary>"12 / 25 requests today" or "12 / 25 requests today · expires 2026-08-15".</summary>
+    public string? HubcapStatsDisplay =>
+        HubcapStats is not null ? FormatHubcapStats(HubcapStats) : null;
+
+    /// <summary>Progress bar fill 0.0–1.0.</summary>
+    public double HubcapUsagePercent =>
+        HubcapStats is { DailyLimit: > 0 } ? (double)HubcapStats.DailyUsage / HubcapStats.DailyLimit : 0;
+
+    /// <summary>Show the usage card whenever a key is configured. It renders a loading state until stats
+    /// arrive (never blank), so the section can't look broken while the fetch is in flight or after a
+    /// transient failure (the key input is collapsed once configured, so this card is the only content).</summary>
+    public bool ShowHubcapStats => HubcapIsKeyConfigured;
+
+    /// <summary>Stats not yet loaded for a configured key → show the "Loading…" placeholder + indeterminate bar.</summary>
+    public bool HubcapStatsPending => HubcapIsKeyConfigured && HubcapStats is null;
+
+    /// <summary>Placeholder text shown until real stats load.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HubcapSingleUsageText))]
+    private HubcapGenerationUsage? _hubcapGenUsage;
+
+    /// <summary>Single manifest generation quota display (e.g. "Single Manifests: 15 / 20 remaining").</summary>
+    public string? HubcapSingleUsageText =>
+        HubcapGenUsage?.Single is { } s ? $"Single Manifests: {s.Remaining} / {s.Limit} remaining" : null;
+
+    /// <summary>Placeholder text shown until real stats load.</summary>
+    public string HubcapStatsText => HubcapStatsDisplay ?? Resources.Strings.Common_Loading;
+
+    /// <summary>Set by App so the guest "Sign in" button can run the Discord flow.</summary>
+    public Func<Task>? RequestSignIn { get; set; }
+
+    /// <summary>Set by App: actually relaunch the app (used after a language change).</summary>
+    public Action? RequestRestart { get; set; }
+
+    /// <summary>Show the "language changed. Restart now?" toast. Wired here so the VM stays UI-agnostic;
+    /// App provides the toast + restart action.</summary>
+    public Action? RequestRestartPrompt { get; set; }
+
+    public SettingsViewModel(SettingsService settings, AuthService auth, SteamService steam,
+        HubcapService hubcap, UpdateService updateService)
+    {
+        _settings = settings;
+        _auth = auth;
+        _steam = steam;
+        _hubcap = hubcap;
+        _updateService = updateService;
+        _auth.AuthStateChanged += RefreshAccount;
+        RefreshAccount();
+        RefreshSteam();
+        _autoUpdateApps = settings.AutoUpdateApps; // init from saved value (default ON) without triggering Save
+        _fastFetch = settings.FastFetch;
+        _donateKeys = settings.DonateKeys;
+        _startWithWindows = settings.StartWithWindows; // default OFF. Init without triggering the registry write
+        _minimizeToTray = settings.MinimizeToTray;
+        _steamWebApiKey = settings.SteamWebApiKey ?? "";
+        _toolsPath = settings.ToolsPath ?? "";
+        _hubcapIsKeyConfigured = !string.IsNullOrEmpty(settings.HubcapApiKey);
+
+        // Select the saved language (or "System default") without firing the restart prompt.
+        _suppressLanguagePrompt = true;
+        _selectedLanguage = LanguageOptions.FirstOrDefault(o => o.Tag == settings.Language) ?? LanguageOptions[0];
+        _suppressLanguagePrompt = false;
+
+        _selectedDnsMode = DnsModeOptions.FirstOrDefault(o => o.Tag == settings.DnsMode) ?? DnsModeOptions[0];
+    }
+
+    private void RefreshSteam()
+    {
+        string? path = _steam.EffectivePath;
+        IsSteamOverridden = _steam.IsOverridden;
+        SteamPath = path ?? Resources.Strings.Settings_SteamNotFound;
+        SteamSource = IsSteamOverridden ? Resources.Strings.Settings_SteamSource_Custom
+            : path is null ? Resources.Strings.Settings_SteamSource_NotFound
+            : Resources.Strings.Settings_SteamSource_Auto;
+        SteamWarning = path is not null && !_steam.IsValid ? Resources.Strings.Settings_SteamWarning_NoExe : null;
+    }
+
+    public void RefreshAccount()
+    {
+        void Update()
+        {
+            IsGuest = _auth.IsGuest;
+            DisplayName = _auth.DisplayName;
+            Username = _settings.CustomUsername ?? "anonymous";
+            UserId = _auth.UserId ?? _auth.DiscordId;
+            Email = _auth.Email;
+            AvatarUrl = _auth.AvatarUrl;
+            UpdateAvatarImage();
+            OnPropertyChanged(nameof(HasCustomAvatar));
+            if (!IsGuest) LoginRequiredMessage = null;
+        }
+
+        if (System.Windows.Application.Current?.Dispatcher is { } dispatcher && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(Update);
+        }
+        else
+        {
+            Update();
+        }
+    }
+
+    [RelayCommand]
+    private void StartEditProfile() => IsEditingProfile = true;
+
+    [RelayCommand]
+    private void FinishEditProfile()
+    {
+        if (string.IsNullOrWhiteSpace(Username))
+        {
+            Username = "anonymous";
+        }
+        else
+        {
+            Username = Username.Trim();
+        }
+        IsEditingProfile = false;
+    }
+
+    [RelayCommand]
+    private void ToggleEditProfile()
+    {
+        if (IsEditingProfile)
+        {
+            FinishEditProfile();
+        }
+        else
+        {
+            StartEditProfile();
+        }
+    }
+
+    [RelayCommand]
+    private void OpenAvatarDialog()
+    {
+        AvatarUrlInput = _settings.CustomAvatarPath?.StartsWith("http", StringComparison.OrdinalIgnoreCase) == true
+            ? _settings.CustomAvatarPath
+            : "";
+        IsAvatarDialogOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseAvatarDialog()
+    {
+        IsAvatarDialogOpen = false;
+    }
+
+    [RelayCommand]
+    private void PickLocalAvatar()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose Profile Picture",
+            Filter = "Image Files (*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif|All Files (*.*)|*.*",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                string source = dialog.FileName;
+                string ext = Path.GetExtension(source);
+                string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui");
+                Directory.CreateDirectory(dir);
+                string dest = Path.Combine(dir, $"avatar{ext}");
+                File.Copy(source, dest, overwrite: true);
+                _settings.CustomAvatarPath = dest;
+            }
+            catch
+            {
+                _settings.CustomAvatarPath = dialog.FileName;
+            }
+
+            UpdateAvatarImage();
+            OnPropertyChanged(nameof(HasCustomAvatar));
+            IsAvatarDialogOpen = false;
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyAvatarUrl()
+    {
+        if (!string.IsNullOrWhiteSpace(AvatarUrlInput))
+        {
+            string url = AvatarUrlInput.Trim();
+            if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                url = "https://" + url;
+            }
+            _settings.CustomAvatarPath = url;
+            UpdateAvatarImage();
+            OnPropertyChanged(nameof(HasCustomAvatar));
+            IsAvatarDialogOpen = false;
+        }
+    }
+
+    [RelayCommand]
+    private void ResetAvatar()
+    {
+        _settings.CustomAvatarPath = null;
+        UpdateAvatarImage();
+        OnPropertyChanged(nameof(HasCustomAvatar));
+        IsAvatarDialogOpen = false;
+    }
+
+    private void UpdateAvatarImage()
+    {
+        string? pathOrUrl = _settings.CustomAvatarPath ?? _auth.AvatarUrl;
+        if (string.IsNullOrWhiteSpace(pathOrUrl))
+        {
+            AvatarImage = null;
+            return;
+        }
+
+        try
+        {
+            if (pathOrUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                var bi = new BitmapImage();
+                bi.BeginInit();
+                bi.UriSource = new Uri(pathOrUrl, UriKind.Absolute);
+                bi.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+                bi.CacheOption = BitmapCacheOption.OnLoad;
+                bi.EndInit();
+                AvatarImage = bi;
+            }
+            else if (File.Exists(pathOrUrl))
+            {
+                var bi = new BitmapImage();
+                bi.BeginInit();
+                bi.UriSource = new Uri(pathOrUrl, UriKind.Absolute);
+                bi.CacheOption = BitmapCacheOption.OnLoad;
+                bi.EndInit();
+                bi.Freeze();
+                AvatarImage = bi;
+            }
+            else
+            {
+                AvatarImage = null;
+            }
+        }
+        catch
+        {
+            AvatarImage = null;
+        }
+    }
+
+    [RelayCommand]
+    private async Task SignInAsync()
+    {
+        if (RequestSignIn is not null) await RequestSignIn();
+    }
+
+    [RelayCommand]
+    private void OverrideSteamFolder()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = Resources.Strings.Settings_ChooseSteamFolder,
+            InitialDirectory = _steam.EffectivePath ?? "",
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            _settings.SteamPathOverride = dialog.FolderName;
+            RefreshSteam();
+        }
+    }
+
+    [RelayCommand]
+    private void ClearSteamOverride()
+    {
+        _settings.SteamPathOverride = null;
+        RefreshSteam();
+    }
+
+    [RelayCommand]
+    private void OpenSteamFolder()
+    {
+        string? path = _steam.EffectivePath;
+        if (path is not null && System.IO.Directory.Exists(path))
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+    }
+
+    [RelayCommand]
+    private void OpenWebsite() =>
+        Process.Start(new ProcessStartInfo(AppConfig.ApiBaseUrl) { UseShellExecute = true });
+
+    [RelayCommand]
+    private void OpenHubcap() =>
+        Process.Start(new ProcessStartInfo(AppConfig.HubcapBaseUrl) { UseShellExecute = true });
+
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        IsCheckingForUpdates = true;
+        UpdateStatusText = "Checking for DataJackUI updates…";
+        UpdateStatusColor = "#9ca3af";
+
+        try
+        {
+            var info = await _updateService.CheckAndAutoUpdateAsync();
+
+            if (info != null)
+            {
+                string ver = info.TargetFullRelease.Version.ToString();
+                UpdateStatusText = $"Update v{ver} downloaded! It will apply automatically when DataJackUI closes.";
+                UpdateStatusColor = "#22c55e";
+                OnPropertyChanged(nameof(HasStagedUpdate));
+            }
+            else if (_updateService.HasStagedUpdate)
+            {
+                string? ver = _updateService.StagedUpdate?.TargetFullRelease?.Version?.ToString();
+                UpdateStatusText = $"Update {(ver != null ? $"v{ver} " : "")}is downloaded and ready to apply on exit.";
+                UpdateStatusColor = "#22c55e";
+                OnPropertyChanged(nameof(HasStagedUpdate));
+            }
+            else
+            {
+                UpdateStatusText = "DataJackUI is up to date.";
+                UpdateStatusColor = "#38bdf8";
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText = $"Update check failed: {ex.Message}";
+            UpdateStatusColor = "#f87171";
+        }
+        finally
+        {
+            IsCheckingForUpdates = false;
+        }
+    }
+
+    public bool HasStagedUpdate => _updateService.HasStagedUpdate;
+
+    [RelayCommand]
+    private void ApplyUpdate()
+    {
+        if (_updateService.HasStagedUpdate)
+        {
+            _updateService.ApplyAndRestart();
+        }
+    }
+
+    [RelayCommand]
+    private void SignOut() => _auth.SignOut();
+
+    // ── Hubcap key management ───────────────────────────────────────
+
+    /// <summary>Called by the View when loaded. Auto-refreshes stats if a key is saved.</summary>
+    public void OnViewLoaded()
+    {
+        RefreshAccount();
+        if (HubcapIsKeyConfigured)
+            RefreshHubcapStatsCommand.Execute(null);
+        // Re-sync FastFetch in case the Add screen's toggle changed it this session (both are singletons
+        // that only read the setting at construction). No-op if unchanged; a real change writes back the
+        // same value, so no feedback loop.
+        FastFetch = _settings.FastFetch;
+    }
+
+    /// <summary>Re-fetch usage stats for the saved key. Silent no-op if no key is saved.</summary>
+    [RelayCommand]
+    private async Task RefreshHubcapStatsAsync()
+    {
+        string? key = _settings.HubcapApiKey;
+        if (string.IsNullOrEmpty(key)) return;
+
+        IsRefreshingHubcapStats = true;
+        try
+        {
+            HubcapStats = await _hubcap.GetStatsAsync(key);
+            HubcapGenUsage = await _hubcap.GetGenerationUsageAsync(key);
+        }
+        catch
+        {
+            HubcapStats = null;
+            HubcapGenUsage = null;
+        }
+        finally
+        {
+            IsRefreshingHubcapStats = false;
+        }
+    }
+
+    /// <summary>Open Hubcap's API key stats/generation page.</summary>
+    [RelayCommand]
+    private static void OpenHubcapKeyPage() =>
+        SteamService.OpenUrl("https://hubcapmanifest.com/api-keys/stats");
+
+    /// <summary>Validate the typed key (format first, then a live stats call) and, if good, save it.</summary>
+    [RelayCommand]
+    private async Task ValidateAndSaveHubcapKeyAsync()
+    {
+        string key = HubcapKeyInput.Trim();
+
+        if (!HubcapService.IsValidKeyFormat(key))
+        {
+            ShowHubcapStatus(Resources.Strings.Settings_HubcapKeyBad, isError: true);
+            return;
+        }
+
+        IsValidatingHubcapKey = true;
+        try
+        {
+            var stats = await _hubcap.GetStatsAsync(key);
+            var genUsage = await _hubcap.GetGenerationUsageAsync(key);
+            if (stats is null && genUsage is null)
+            {
+                // Could be a bad/expired key (401), or a network problem. Both surface as null.
+                ShowHubcapStatus(Resources.Strings.Settings_HubcapKeyError, isError: true);
+                return;
+            }
+
+            _settings.HubcapApiKey = key;
+            HubcapIsKeyConfigured = true;
+            HubcapKeyInput = "";
+            HubcapKeyStatus = null;
+            HubcapStats = stats;
+            HubcapGenUsage = genUsage;
+        }
+        finally
+        {
+            IsValidatingHubcapKey = false;
+        }
+    }
+
+    /// <summary>Forget the saved key and reset the status line.</summary>
+    [RelayCommand]
+    private void ClearHubcapKey()
+    {
+        _settings.HubcapApiKey = null;
+        HubcapIsKeyConfigured = false;
+        HubcapKeyInput = "";
+        HubcapKeyStatus = null;
+        HubcapStats = null;
+        HubcapGenUsage = null;
+    }
+
+    private void ShowHubcapStatus(string text, bool isError)
+    {
+        HubcapKeyStatus = text;
+        HubcapKeyStatusColor = isError ? "#f87171" : "#22c55e";
+    }
+
+    /// <summary>"4/10 today". Appends "· expires yyyy-MM-dd" when the key has an expiry.</summary>
+    private static string FormatHubcapStats(HubcapStats stats)
+    {
+        string usage = string.Format(Resources.Strings.Settings_HubcapKeyOk, stats.DailyUsage, stats.DailyLimit);
+        if (DateTimeOffset.TryParse(stats.ApiKeyExpiresAt, out var expiry))
+            return string.Format(Resources.Strings.Settings_HubcapKeyOkExpiry, stats.DailyUsage, stats.DailyLimit,
+                expiry.ToString("yyyy-MM-dd"));
+        return usage;
+    }
+}

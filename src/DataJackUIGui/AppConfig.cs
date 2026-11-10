@@ -1,0 +1,138 @@
+namespace DataJackUIGui;
+
+/// <summary>
+/// Compiled-in client configuration.
+/// </summary>
+public static class AppConfig
+{
+    public const string AuthWorkerUrl = "https://auth.netrunnergames.workers.dev";
+    public const string AuthAnonKey = "";
+
+    public const string ApiBaseUrl = "https://auth.netrunnergames.workers.dev";
+
+    // Bot-provisioned placeholder accounts use this email domain.
+    public const string BotAccountEmailDomain = "@auth.netrunnergames.workers.dev";
+
+    // Hubcap (hubcapmanifest.com): the app talks to this directly with the user's own API key.
+    // Key + stats are managed in Settings; key-gated source downloads hit it.
+    public const string HubcapBaseUrl = "https://hubcapmanifest.com";
+
+    /// <summary>Must be registered in Auth Worker → Redirect URLs.</summary>
+    public const int OAuthCallbackPort = 53789;
+    public const string OAuthCallbackUrl = "http://localhost:53789/callback";
+
+    public const string DiscordClientId = "1553794813411721216"; // Fallback client ID (overridden dynamically via /api/config if online)
+    public const string DiscordAuthWorkerUrl = "https://auth.netrunnergames.workers.dev/api/login";
+    public const string DiscordOAuthScopes = "identify guilds";
+    public const string RequiredDiscordServerId = ""; // Enforced server-side at Cloudflare Auth Worker Edge (/api/verify)
+    public const string OwnerDiscordId = "1017703425263280198";
+    public static readonly string[] OwnerDiscordIds = ["1017703425263280198"];
+    public static bool IsOwnerDiscordId(string? id) =>
+        !string.IsNullOrEmpty(id) && OwnerDiscordIds.Contains(id);
+
+    // The standard daily download cap (Hubcap-keyed downloads are exempt).
+    public const int DailyDownloadLimit = 25;
+
+    // Public upstream APIs the app calls directly (no proxy needed for guest browsing).
+    public const string SteamStoreSearchUrl = "https://store.steampowered.com/api/storesearch/";
+    // Steam's storefront "featured categories" (top sellers, new releases, etc.). Drives the Add page's
+    // featured strips. Public, no auth.
+    public const string SteamFeaturedUrl = "https://store.steampowered.com/api/featuredcategories";
+
+    // Community list of Steam "hardware" appids (Steam Deck, Index, controllers, VR headsets). Fetched
+    // via GithubProxy (raw.githubusercontent.com → mirror fallback) and cached ~14 days, to filter
+    // hardware out of featured/search. Array of { "appid": <long>, "name": ... } objects.
+    public const string HardwareAppIdListUrl =
+        "https://raw.githubusercontent.com/jsnli/steamappidlist/master/data/hardware_appid.json";
+
+    // Steamless (atom0s): strips SteamStub DRM from a game's .exe. Downloaded via GithubProxy and
+    // cached locally; the "Remove Steam DRM" Manage action runs Steamless.CLI.exe against the game's exe.
+    public const string SteamlessRepo = "atom0s/Steamless";
+
+    // SteamAutoCrack: the Downloads page button fetches this release and launches its GUI.
+    //
+    // Three facts about the shipped asset drive how SteamAutoCrackService handles it:
+    //   * GUI ONLY. The release contains a single exe and no SteamAutoCrack.CLI.exe, and that GUI parses
+    //     no command-line arguments, so we can open it and nothing more. There is no way to drive a
+    //     crack from here; the user does everything in their own window.
+    //   * FRAMEWORK-DEPENDENT net10.0-windows. It is a single-file bundle but the runtime is NOT inside
+    //     it (no hostpolicy/coreclr/System.Private.CoreLib, no includedFrameworks), so the .NET 10
+    //     DESKTOP runtime must be present. We install it on demand via Velopack's Runtimes API.
+    //   * Its zip has a real directory TREE (Goldberg/, TEMP/ beside the exe), unlike the flat zip
+    //     DepotDownloaderService expects. Their exe resolves those paths from its own base directory,
+    //     so extract without flattening.
+    public const string SteamAutoCrackRepo = "SteamAutoCracks/Steam-auto-crack";
+
+    // DepotDownloaderMod: downloads raw depot content from Steam's CDN using depot keys + a local manifest.
+    // Powers the Depots page "Download" action.
+    //
+    // This is a RE-PACK we host ourselves, NOT the upstream SteamAutoCracks/DepotDownloaderMod repo, for two
+    // reasons: upstream ships its assets as `Release.rar` (System.IO.Compression cannot read RAR), and its
+    // build is framework-dependent net9.0 while this app is net8.0-windows, so users without the .NET 9
+    // runtime couldn't run it. Note that adding a RAR reader would fix only the FIRST of those.
+    //
+    // The re-pack is produced automatically by the `repack.yml` workflow in that repo: on each upstream
+    // release it rebuilds their source at that tag as a SELF-CONTAINED win-x64 publish and uploads a FLAT
+    // zip. Both properties are load-bearing for DepotDownloaderService.EnsureToolAsync, which takes the
+    // first `.zip` asset, extracts it straight into ToolDir, and then expects DepotDownloaderMod.exe at the
+    // archive ROOT (unlike PluginInstallerService, it has no single-top-level-folder hoisting).
+    public const string DepotDownloaderRepo = "SteamAutoCracks/DepotDownloaderMod";
+    public const string ManifestBackendUrl = "https://generator.ryuu.lol";
+    public const string ManifestBackendUserAgent = DefaultUserAgent;
+    public const string DefaultUserAgent = "DataJackUI/2.0";
+
+    // The donate-keys endpoint gates on a DIFFERENT User-Agent than the manifest backend (it 403s
+    // otherwise). This matches the DataJackUI plugin's config.USER_AGENT.
+    public const string DonateKeysUserAgent = "https://discord.gg/SadzcAwdjW";
+
+    // ── Analytics Endpoint (Cloudflare Worker -> PostHog) ──────────────
+    public const string AnalyticsEndpoint = "https://analytics.netrunnergames.workers.dev/api/launch";
+
+    /// <summary>
+    /// Direct Velopack release assets feed URL.
+    /// Hosts releases.win.json, full packages, and delta diff packages.
+    /// Uses static CDN distribution without requiring GitHub REST API calls or HTML scraping.
+    /// </summary>
+    public const string VelopackReleaseFeedUrl = "https://proxy.netrunnergames.workers.dev/DataJackUI";
+
+    /// <summary>
+    /// Public GitHub repo hosting Velopack release assets.
+    /// </summary>
+    public static readonly string[] GithubReleasesRepos =
+    [
+        "https://github.com/NetrunnerGames/DataJackUI",   // primary
+    ];
+
+    /// <summary>The primary releases repo (first in <see cref="GithubReleasesRepos"/>).</summary>
+    public static string GithubReleasesRepo => GithubReleasesRepos[0];
+
+    // ── Plugin releases (the store-page plugin manager fetches these) ──────────────
+    // Separate from the app's own Velopack self-update repo above. Each release of this repo carries
+    // `plugin.zip` (the frontend) + `winmm.dll` (the loader); the tag is the version (e.g. "v1.2").
+    // Fetched + verified (by asset sha256 digest) through GithubProxy like everything else.
+    public const string PluginReleasesOwner = "NetrunnerGames";
+    public const string PluginReleasesRepo = "Jack-in";
+
+    // ── GitHub proxy mirrors (for blocked/throttled regions, e.g. China) ──────────────
+    // github.com / api.github.com are often unreachable in some countries. Any GitHub request is tried
+    // DIRECT first, then prefixed onto the MATCHING mirrors ("<mirror>https://<github-url>") until one works.
+    // Two capability classes: GithubProxy.Candidates picks by URL so we never make a guaranteed-wasted hop
+    // (an API mirror 400s a download; a download mirror 403s the API):
+    //   • API metadata (api.github.com): ONLY our self-hosted lua.tools/gh proxy can serve it. Server-side
+    //     PAT (60→5000/hr) + cache. No PUBLIC proxy serves the REST API (they all 403 it), so there's no
+    //     public backup here. Fixes the plugin release-metadata lookup in China / under rate-limit. 404s
+    //     harmlessly until the /api/gh route is deployed, then lights up automatically.
+    //   • Downloads (github.com releases / raw / objects): the public download proxies. lua.tools/gh is
+    //     API-only (its route 400s downloads) so it is deliberately NOT in this list.
+    public static readonly string[] GithubApiMirrors =
+    [
+        "https://proxy.netrunnergames.workers.dev/gh/",
+    ];
+    public static readonly string[] GithubDownloadMirrors =
+    [
+        "https://proxy.netrunnergames.workers.dev/gh/",
+        "https://ghproxy.net/",    // download-only (verified live 2026-07)
+        "https://ghfast.top/",     // download-only
+        "https://gh.ddlc.top/",    // download-only
+    ];
+}

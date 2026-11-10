@@ -1,0 +1,10 @@
+title = "Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Historical commit key allowlist"
+commits = [
+  "67358ce2a8c65071f271725c982b80d0a34314a9"
+]

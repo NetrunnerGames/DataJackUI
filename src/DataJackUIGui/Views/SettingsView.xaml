@@ -1,0 +1,997 @@
+﻿<UserControl
+    x:Class="DataJackUIGui.Views.SettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:res="clr-namespace:DataJackUIGui.Resources"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:vm="clr-namespace:DataJackUIGui.ViewModels"
+    d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
+    TextElement.Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <!--  Section card: one bordered container that groups a section's rows.  -->
+        <Style x:Key="SettingsCard" TargetType="Border">
+            <Setter Property="Background" Value="#08FFFFFF" />
+            <Setter Property="BorderBrush" Value="#12FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <!--  Section header (small grey uppercase label above each card).  -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,24,0,8" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#9ca3af" />
+        </Style>
+        <!--  Thin divider between rows inside a card.  -->
+        <Style x:Key="RowDivider" TargetType="Border">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Background" Value="#10FFFFFF" />
+            <Setter Property="Margin" Value="14,0" />
+        </Style>
+
+        <!--  Round Camera Button Template (clean dark slate with accent border)  -->
+        <ControlTemplate x:Key="RoundCameraButtonTemplate" TargetType="Button">
+            <Border
+                x:Name="CamBorder"
+                Width="26"
+                Height="26"
+                Background="#1E293B"
+                BorderBrush="#38BDF8"
+                BorderThickness="1.5"
+                CornerRadius="13">
+                <Border.Effect>
+                    <DropShadowEffect
+                        BlurRadius="6"
+                        Direction="270"
+                        Opacity="0.45"
+                        ShadowDepth="1"
+                        Color="#000000" />
+                </Border.Effect>
+                <ui:SymbolIcon
+                    x:Name="CamIcon"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    FontSize="13"
+                    Foreground="#38BDF8"
+                    Symbol="Camera20" />
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="CamBorder" Property="Background" Value="#0284C7" />
+                    <Setter TargetName="CamBorder" Property="BorderBrush" Value="#7DD3FC" />
+                    <Setter TargetName="CamIcon" Property="Foreground" Value="#FFFFFF" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter TargetName="CamBorder" Property="Background" Value="#0369A1" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="640" Margin="8,16,8,24">
+                <TextBlock
+                    FontSize="22"
+                    FontWeight="Bold"
+                    Text="{x:Static res:Strings.Settings_Title}" />
+
+                <!--  Account  -->
+                <TextBlock
+                    Margin="0,20,0,8"
+                    Style="{StaticResource SectionHeader}"
+                    Text="{x:Static res:Strings.Settings_Section_Account}" />
+                <!--  One card holds the account row(s).  -->
+                <Border Style="{StaticResource SettingsCard}">
+                    <StackPanel>
+                        <!--  Signed-in account  -->
+                        <StackPanel Margin="14,12" Visibility="{Binding IsRealUser, Converter={StaticResource BoolToVis}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!--  Profile Picture with round Camera button on bottom-right border (visible in edit mode)  -->
+                                <Grid
+                                    x:Name="SignedInPfpContainer"
+                                    Width="54"
+                                    Height="54"
+                                    Background="Transparent">
+                                    <Border
+                                        Width="48"
+                                        Height="48"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Top"
+                                        Background="#1F2937"
+                                        BorderBrush="#25FFFFFF"
+                                        BorderThickness="1"
+                                        CornerRadius="24">
+                                        <Grid>
+                                            <ui:SymbolIcon
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                FontSize="22"
+                                                Foreground="#9CA3AF"
+                                                Symbol="Person24" />
+                                            <Border CornerRadius="24">
+                                                <Border.Background>
+                                                    <ImageBrush ImageSource="{Binding AvatarImage}" Stretch="UniformToFill" />
+                                                </Border.Background>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <Button
+                                        Width="26"
+                                        Height="26"
+                                        Padding="0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Bottom"
+                                        Command="{Binding OpenAvatarDialogCommand}"
+                                        Cursor="Hand"
+                                        Template="{StaticResource RoundCameraButtonTemplate}"
+                                        ToolTip="{x:Static res:Strings.Settings_ProfilePicture_ChangeTooltip}"
+                                        Visibility="{Binding IsEditingProfile, Converter={StaticResource BoolToVis}}" />
+                                </Grid>
+
+                                <!--  Custom Username input + UserId  -->
+                                <StackPanel
+                                    Grid.Column="1"
+                                    Margin="14,0"
+                                    VerticalAlignment="Center">
+                                    <!--  Read-only View Mode  -->
+                                    <StackPanel
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal"
+                                        Visibility="{Binding IsEditingProfile, Converter={StaticResource InverseBoolToVis}}">
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            FontSize="15"
+                                            FontWeight="SemiBold"
+                                            Text="{Binding Username}" />
+                                        <ui:Button
+                                            Margin="8,0,0,0"
+                                            Padding="6,4"
+                                            VerticalAlignment="Center"
+                                            Appearance="Secondary"
+                                            Command="{Binding StartEditProfileCommand}"
+                                            ToolTip="{x:Static res:Strings.Settings_EditProfile}">
+                                            <ui:SymbolIcon FontSize="14" Symbol="Edit20" />
+                                        </ui:Button>
+                                    </StackPanel>
+
+                                    <!--  Edit Mode  -->
+                                    <StackPanel
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal"
+                                        Visibility="{Binding IsEditingProfile, Converter={StaticResource BoolToVis}}">
+                                        <ui:TextBox
+                                            Height="32"
+                                            MinWidth="160"
+                                            MaxWidth="240"
+                                            Padding="8,4"
+                                            VerticalContentAlignment="Center"
+                                            FontSize="14"
+                                            FontWeight="SemiBold"
+                                            PlaceholderText="anonymous"
+                                            Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <ui:Button
+                                            Margin="8,0,0,0"
+                                            Padding="10,5"
+                                            VerticalAlignment="Center"
+                                            Appearance="Primary"
+                                            Command="{Binding FinishEditProfileCommand}"
+                                            ToolTip="{x:Static res:Strings.Settings_DoneEditing}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:SymbolIcon
+                                                    Margin="0,0,4,0"
+                                                    FontSize="14"
+                                                    Symbol="Checkmark20" />
+                                                <TextBlock
+                                                    VerticalAlignment="Center"
+                                                    FontWeight="SemiBold"
+                                                    Text="{x:Static res:Strings.Settings_DoneEditing}" />
+                                            </StackPanel>
+                                        </ui:Button>
+                                    </StackPanel>
+
+                                    <TextBlock
+                                        Margin="2,4,0,0"
+                                        FontSize="12"
+                                        Foreground="#6b7280"
+                                        Text="{Binding UserId}" />
+                                </StackPanel>
+
+                                <ui:Button
+                                    Grid.Column="2"
+                                    Command="{Binding SignOutCommand}"
+                                    Content="{x:Static res:Strings.Settings_SignOut}"
+                                    Icon="{ui:SymbolIcon SignOut24}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!--  Guest  -->
+                        <StackPanel Margin="14,12" Visibility="{Binding IsGuest, Converter={StaticResource BoolToVis}}">
+
+                            <!--  Login-required banner: shown when redirected from a protected action.  -->
+                            <Border
+                                Margin="0,0,0,10"
+                                Padding="12"
+                                Background="#1A3b82f6"
+                                BorderBrush="#333b82f6"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Visibility="{Binding LoginRequiredMessage, Converter={StaticResource NullToCollapsed}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                                        <ui:SymbolIcon
+                                            Margin="0,0,8,0"
+                                            FontSize="16"
+                                            Foreground="#60a5fa"
+                                            Symbol="Info24" />
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            FontSize="13"
+                                            Text="{Binding LoginRequiredMessage}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <ui:Button
+                                        Grid.Column="1"
+                                        Margin="8,0,0,0"
+                                        Appearance="Secondary"
+                                        Command="{Binding DismissLoginRequiredCommand}"
+                                        Content="✕" />
+                                </Grid>
+                            </Border>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!--  Profile Picture with round Camera button on bottom-right border (visible in edit mode)  -->
+                                <Grid
+                                    x:Name="GuestPfpContainer"
+                                    Width="54"
+                                    Height="54"
+                                    Background="Transparent">
+                                    <Border
+                                        Width="48"
+                                        Height="48"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Top"
+                                        Background="#1F2937"
+                                        BorderBrush="#25FFFFFF"
+                                        BorderThickness="1"
+                                        CornerRadius="24">
+                                        <Grid>
+                                            <ui:SymbolIcon
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                FontSize="22"
+                                                Foreground="#9CA3AF"
+                                                Symbol="Person24" />
+                                            <Border CornerRadius="24">
+                                                <Border.Background>
+                                                    <ImageBrush ImageSource="{Binding AvatarImage}" Stretch="UniformToFill" />
+                                                </Border.Background>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <Button
+                                        Width="26"
+                                        Height="26"
+                                        Padding="0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Bottom"
+                                        Command="{Binding OpenAvatarDialogCommand}"
+                                        Cursor="Hand"
+                                        Template="{StaticResource RoundCameraButtonTemplate}"
+                                        ToolTip="{x:Static res:Strings.Settings_ProfilePicture_ChangeTooltip}"
+                                        Visibility="{Binding IsEditingProfile, Converter={StaticResource BoolToVis}}" />
+                                </Grid>
+
+                                <!--  Custom Username input + Guest hint  -->
+                                <StackPanel
+                                    Grid.Column="1"
+                                    Margin="14,0"
+                                    VerticalAlignment="Center">
+                                    <!--  Read-only View Mode  -->
+                                    <StackPanel
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal"
+                                        Visibility="{Binding IsEditingProfile, Converter={StaticResource InverseBoolToVis}}">
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            FontSize="15"
+                                            FontWeight="SemiBold"
+                                            Text="{Binding Username}" />
+                                        <ui:Button
+                                            Margin="8,0,0,0"
+                                            Padding="6,4"
+                                            VerticalAlignment="Center"
+                                            Appearance="Secondary"
+                                            Command="{Binding StartEditProfileCommand}"
+                                            ToolTip="{x:Static res:Strings.Settings_EditProfile}">
+                                            <ui:SymbolIcon FontSize="14" Symbol="Edit20" />
+                                        </ui:Button>
+                                    </StackPanel>
+
+                                    <!--  Edit Mode  -->
+                                    <StackPanel
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal"
+                                        Visibility="{Binding IsEditingProfile, Converter={StaticResource BoolToVis}}">
+                                        <ui:TextBox
+                                            Height="32"
+                                            MinWidth="160"
+                                            MaxWidth="240"
+                                            Padding="8,4"
+                                            VerticalContentAlignment="Center"
+                                            FontSize="14"
+                                            FontWeight="SemiBold"
+                                            PlaceholderText="anonymous"
+                                            Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <ui:Button
+                                            Margin="8,0,0,0"
+                                            Padding="10,5"
+                                            VerticalAlignment="Center"
+                                            Appearance="Primary"
+                                            Command="{Binding FinishEditProfileCommand}"
+                                            ToolTip="{x:Static res:Strings.Settings_DoneEditing}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:SymbolIcon
+                                                    Margin="0,0,4,0"
+                                                    FontSize="14"
+                                                    Symbol="Checkmark20" />
+                                                <TextBlock
+                                                    VerticalAlignment="Center"
+                                                    FontWeight="SemiBold"
+                                                    Text="{x:Static res:Strings.Settings_DoneEditing}" />
+                                            </StackPanel>
+                                        </ui:Button>
+                                    </StackPanel>
+
+                                    <TextBlock
+                                        Margin="2,4,0,0"
+                                        FontSize="12"
+                                        Foreground="#6b7280"
+                                        Text="{x:Static res:Strings.Settings_GuestHint}" />
+                                </StackPanel>
+
+                                <ui:Button
+                                    Grid.Column="2"
+                                    Appearance="Primary"
+                                    Command="{Binding SignInCommand}"
+                                    Content="{x:Static res:Strings.Settings_SignInDiscord}"
+                                    Icon="{ui:SymbolIcon Person24}" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!--  Hubcap API key  -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_Hubcap}" />
+                <Border Style="{StaticResource SettingsCard}">
+                    <StackPanel Margin="14,12">
+                        <!--  Active key: stats card  -->
+                        <StackPanel Visibility="{Binding HubcapIsKeyConfigured, Converter={StaticResource BoolToVis}}">
+                            <!--  Active badge + Refresh  -->
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:Button
+                                    HorizontalAlignment="Left"
+                                    Appearance="Secondary"
+                                    Command="{Binding RefreshHubcapStatsCommand}"
+                                    Content="{x:Static res:Strings.Settings_HubcapRefresh}"
+                                    Icon="{ui:SymbolIcon ArrowSync24}" />
+                                <ui:Button
+                                    Grid.Column="1"
+                                    Command="{Binding ClearHubcapKeyCommand}"
+                                    Content="{x:Static res:Strings.Settings_HubcapClear}"
+                                    Icon="{ui:SymbolIcon Dismiss24}" />
+                            </Grid>
+                            <!--  Usage progress card  -->
+                            <Border
+                                Margin="0,0,0,10"
+                                Padding="12"
+                                Background="#08FFFFFF"
+                                BorderBrush="#12FFFFFF"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="{Binding ShowHubcapStats, Converter={StaticResource BoolToVis}}">
+                                <StackPanel>
+                                    <!--
+                                        Real ProgressBar (Fluent-styled, same as PluginView/ModeView/FixesView).
+                                        HubcapUsagePercent is 0.0–1.0, so Maximum="1"; ProgressBar clamps past it.
+                                        Indeterminate (animated) until stats load, so the card is never blank.
+                                    -->
+                                    <ProgressBar
+                                        Height="6"
+                                        IsIndeterminate="{Binding HubcapStatsPending}"
+                                        Maximum="1"
+                                        Minimum="0"
+                                        Value="{Binding HubcapUsagePercent, Mode=OneWay}" />
+                                    <TextBlock
+                                        Margin="0,8,0,0"
+                                        FontSize="13"
+                                        Text="{Binding HubcapStatsText}"
+                                        TextWrapping="Wrap" />
+                                    <TextBlock
+                                        Margin="0,4,0,0"
+                                        FontSize="12"
+                                        Foreground="#8b96f0"
+                                        Text="{Binding HubcapSingleUsageText}"
+                                        TextWrapping="Wrap"
+                                        Visibility="{Binding HubcapSingleUsageText, Converter={StaticResource NullToCollapsed}}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!--
+                            Key input: only while NO key is saved. Once configured, the Refresh/Clear buttons +
+                            usage card above are the whole story; "Clear" is how you swap keys (it resets
+                            HubcapIsKeyConfigured, bringing this block back). The onboarding copy below reads
+                            wrong when a key already exists, hence the collapse.
+                        -->
+                        <StackPanel Visibility="{Binding HubcapIsKeyConfigured, Converter={StaticResource InverseBoolToVis}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,12,0">
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="Medium"
+                                        Text="{x:Static res:Strings.Settings_HubcapKey}" />
+                                    <TextBlock
+                                        Margin="0,4,0,0"
+                                        FontSize="12"
+                                        Foreground="#6b7280"
+                                        Text="{x:Static res:Strings.Settings_HubcapKey_Hint}"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:Button
+                                    Grid.Column="1"
+                                    VerticalAlignment="Top"
+                                    Command="{Binding OpenHubcapKeyPageCommand}"
+                                    Content="Get API Key"
+                                    Icon="{ui:SymbolIcon Open24}" />
+                            </Grid>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBox
+                                    FontFamily="Consolas"
+                                    PlaceholderText="{x:Static res:Strings.Settings_HubcapKeyPlaceholder}"
+                                    Text="{Binding HubcapKeyInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:Button
+                                    Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    Appearance="Primary"
+                                    Command="{Binding ValidateAndSaveHubcapKeyCommand}"
+                                    Content="{x:Static res:Strings.Settings_HubcapValidate}"
+                                    IsEnabled="{Binding CanEditHubcapKey}" />
+                            </Grid>
+                            <!--
+                                Error text (only ever set by the two ValidateAndSaveHubcapKeyAsync failure paths,
+                                so it can never be orphaned by this collapse).
+                            -->
+                            <TextBlock
+                                Margin="0,8,0,0"
+                                FontSize="12"
+                                Foreground="{Binding HubcapKeyStatusColor}"
+                                Text="{Binding HubcapKeyStatus}"
+                                TextWrapping="Wrap"
+                                Visibility="{Binding HubcapKeyStatus, Converter={StaticResource NullToCollapsed}}" />
+                            <!--  "Get a key" link  -->
+                            <TextBlock
+                                Margin="0,8,0,0"
+                                FontSize="12"
+                                Foreground="#6b7280">
+                                <Run Text="{x:Static res:Strings.Settings_HubcapGetKey}" />
+                                <Hyperlink Command="{Binding OpenHubcapCommand}" Foreground="#a78bfa">hubcapmanifest.com</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!--  Install behavior (Auto Update Apps + CyberJack)  -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_Install}" />
+                <Border Style="{StaticResource SettingsCard}">
+                    <StackPanel>
+                        <!--  Auto Update Apps  -->
+                        <Grid Margin="14,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Text="{x:Static res:Strings.Settings_AutoUpdateApps}" />
+                                <TextBlock
+                                    Margin="0,4,0,0"
+                                    FontSize="12"
+                                    Foreground="#6b7280"
+                                    Text="{x:Static res:Strings.Settings_AutoUpdateApps_Hint}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ui:ToggleSwitch
+                                Grid.Column="1"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Center"
+                                IsChecked="{Binding AutoUpdateApps, Mode=TwoWay}" />
+                        </Grid>
+                        <Border Style="{StaticResource RowDivider}" />
+                        <!--  CyberJack (same persisted setting as the Add screen's toggle)  -->
+                        <Grid Margin="14,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Text="{x:Static res:Strings.Add_FastFetch}" />
+                                <TextBlock
+                                    Margin="0,4,0,0"
+                                    FontSize="12"
+                                    Foreground="#6b7280"
+                                    Text="{x:Static res:Strings.Add_FastFetch_Hint}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ui:ToggleSwitch
+                                Grid.Column="1"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Center"
+                                IsChecked="{Binding FastFetch, Mode=TwoWay}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!--  General (language & updates)  -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_General}" />
+                <Border Style="{StaticResource SettingsCard}">
+                    <StackPanel Margin="14,12">
+                        <TextBlock
+                            FontSize="13"
+                            FontWeight="Medium"
+                            Text="{x:Static res:Strings.Settings_Language}" />
+                        <ComboBox
+                            MinWidth="220"
+                            Margin="0,8,0,0"
+                            HorizontalAlignment="Left"
+                            DisplayMemberPath="Display"
+                            ItemsSource="{Binding LanguageOptions}"
+                            SelectedItem="{Binding SelectedLanguage}" />
+                        <TextBlock
+                            Margin="0,8,0,0"
+                            FontSize="12"
+                            Foreground="#6b7280"
+                            Text="{x:Static res:Strings.Settings_Language_Hint}"
+                            TextWrapping="Wrap" />
+
+                        <Border Margin="0,14" Style="{StaticResource RowDivider}" />
+                        <!--  Check for Application Updates  -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Text="Check for Application Updates" />
+                                <TextBlock
+                                    Margin="0,4,0,0"
+                                    FontSize="12"
+                                    Foreground="#6b7280"
+                                    Text="Check for new releases of DataJackUI directly from GitHub and install background delta updates."
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    Margin="0,4,0,0"
+                                    FontSize="12"
+                                    Foreground="{Binding UpdateStatusColor}"
+                                    Text="{Binding UpdateStatusText}"
+                                    TextWrapping="Wrap"
+                                    Visibility="{Binding UpdateStatusText, Converter={StaticResource NullToCollapsed}}" />
+                            </StackPanel>
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                                <ui:Button
+                                    Margin="12,0,0,0"
+                                    Appearance="Primary"
+                                    Command="{Binding CheckForUpdatesCommand}"
+                                    Content="Check for Updates"
+                                    Icon="{ui:SymbolIcon ArrowSync24}"
+                                    IsEnabled="{Binding IsCheckingForUpdates, Converter={StaticResource InverseBool}}" />
+                                <ui:Button
+                                    Margin="8,0,0,0"
+                                    Appearance="Secondary"
+                                    Command="{Binding ApplyUpdateCommand}"
+                                    Content="Restart Now"
+                                    Icon="{ui:SymbolIcon Play24}"
+                                    ToolTip="Restart DataJackUI immediately to apply the staged update"
+                                    Visibility="{Binding HasStagedUpdate, Converter={StaticResource BoolToVis}}" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!--  Network & DNS Resolution  -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="Network &amp; DNS Resolution" />
+                <Border Style="{StaticResource SettingsCard}">
+                    <StackPanel Margin="14,12">
+                        <TextBlock
+                            FontSize="13"
+                            FontWeight="Medium"
+                            Text="DNS Resolution Mode" />
+                        <ComboBox
+                            MinWidth="280"
+                            Margin="0,8,0,0"
+                            HorizontalAlignment="Left"
+                            DisplayMemberPath="Display"
+                            ItemsSource="{Binding DnsModeOptions}"
+                            SelectedItem="{Binding SelectedDnsMode}" />
+                        <TextBlock
+                            Margin="0,8,0,0"
+                            FontSize="12"
+                            Foreground="#6b7280"
+                            Text="If your provider blocks backend services, the app can look up addresses through Cloudflare (1.1.1.1) instead of your system resolver. Automatic only switches over after your normal DNS fails."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <!--  Steam  -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_Steam}" />
+                <Border Style="{StaticResource SettingsCard}">
+                    <StackPanel Margin="14,12">
+                        <TextBlock
+                            FontSize="13"
+                            FontWeight="Medium"
+                            Text="{x:Static res:Strings.Settings_SteamLocation}" />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox IsReadOnly="True" Text="{Binding SteamPath, Mode=OneWay}" />
+                            <ui:Button
+                                Grid.Column="1"
+                                Margin="8,0,0,0"
+                                Command="{Binding OverrideSteamFolderCommand}"
+                                Content="{x:Static res:Strings.Settings_Change}" />
+                            <ui:Button
+                                Grid.Column="2"
+                                Margin="8,0,0,0"
+                                Command="{Binding OpenSteamFolderCommand}"
+                                Content="{x:Static res:Strings.Settings_Open}"
+                                Icon="{ui:SymbolIcon FolderOpen24}" />
+                            <ui:Button
+                                Grid.Column="3"
+                                Margin="8,0,0,0"
+                                Command="{Binding ClearSteamOverrideCommand}"
+                                Content="{x:Static res:Strings.Settings_ResetToAuto}"
+                                Visibility="{Binding IsSteamOverridden, Converter={StaticResource BoolToVis}}" />
+                        </Grid>
+                        <TextBlock
+                            Margin="0,8,0,0"
+                            FontSize="12"
+                            Foreground="#6b7280"
+                            Text="{Binding SteamSource}" />
+                        <TextBlock
+                            Margin="0,6,0,0"
+                            FontSize="12"
+                            Foreground="#f87171"
+                            Text="{Binding SteamWarning}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding SteamWarning, Converter={StaticResource NullToCollapsed}}" />
+
+                        <!--  Steam Web API Key  -->
+                        <Border Margin="0,14" Style="{StaticResource RowDivider}" />
+                        <TextBlock
+                            FontSize="13"
+                            FontWeight="Medium"
+                            Text="Steam Web API Key" />
+                        <ui:TextBox
+                            Margin="0,6,0,0"
+                            PlaceholderText="Paste your Steam Web API Key (for app list &amp; artwork)"
+                            Text="{Binding SteamWebApiKey, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock
+                            Margin="0,4,0,0"
+                            FontSize="11.5"
+                            Foreground="#6b7280"
+                            Text="Used to fetch official Steam App info and cover art directly from https://api.steampowered.com." />
+                        <!--  Helper Tools Folder Location  -->
+                        <Border Margin="0,14" Style="{StaticResource RowDivider}" />
+                        <TextBlock
+                            FontSize="13"
+                            FontWeight="Medium"
+                            Text="Helper Tools Folder Location" />
+                        <ui:TextBox
+                            Margin="0,6,0,0"
+                            PlaceholderText="Custom tools folder path (e.g. C:\Tools)"
+                            Text="{Binding ToolsPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock
+                            Margin="0,4,0,0"
+                            FontSize="11.5"
+                            Foreground="#6b7280"
+                            Text="Custom directory for helper executables like DepotDownloader, Steamless, and SteamAutoCrack." />
+                    </StackPanel>
+                </Border>
+
+                <!--  Startup  -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_Startup}" />
+                <Border Style="{StaticResource SettingsCard}">
+                    <StackPanel>
+                        <!--  Start with Windows  -->
+                        <Grid Margin="14,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Text="{x:Static res:Strings.Settings_StartWithWindows}" />
+                                <TextBlock
+                                    Margin="0,4,0,0"
+                                    FontSize="12"
+                                    Foreground="#6b7280"
+                                    Text="{x:Static res:Strings.Settings_StartWithWindows_Hint}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ui:ToggleSwitch
+                                Grid.Column="1"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Center"
+                                IsChecked="{Binding StartWithWindows, Mode=TwoWay}" />
+                        </Grid>
+                        <Border Style="{StaticResource RowDivider}" />
+                        <!--  Minimize to System Tray  -->
+                        <Grid Margin="14,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Text="{x:Static res:Strings.Settings_MinimizeToTray}" />
+                                <TextBlock
+                                    Margin="0,4,0,0"
+                                    FontSize="12"
+                                    Foreground="#6b7280"
+                                    Text="{x:Static res:Strings.Settings_MinimizeToTray_Hint}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ui:ToggleSwitch
+                                Grid.Column="1"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Center"
+                                IsChecked="{Binding MinimizeToTray, Mode=TwoWay}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!--  Community  -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_Community}" />
+                <Border Style="{StaticResource SettingsCard}">
+                    <Grid Margin="14,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock
+                                FontSize="13"
+                                FontWeight="Medium"
+                                Text="{x:Static res:Strings.Settings_DonateKeys}" />
+                            <TextBlock
+                                Margin="0,4,0,0"
+                                FontSize="12"
+                                Foreground="#6b7280"
+                                Text="{x:Static res:Strings.Settings_DonateKeys_Hint}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ui:ToggleSwitch
+                            Grid.Column="1"
+                            Margin="12,0,0,0"
+                            VerticalAlignment="Center"
+                            IsChecked="{Binding DonateKeys, Mode=TwoWay}" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!--  Avatar Picker Modal Dialog Overlay  -->
+        <Grid
+            x:Name="AvatarDialogOverlay"
+            Panel.ZIndex="100"
+            Visibility="{Binding IsAvatarDialogOpen, Converter={StaticResource BoolToVis}}">
+            <!--  Semi-transparent dimmed backdrop  -->
+            <Border Background="#99000000" />
+
+            <!--  Dialog Floating Card  -->
+            <Border
+                Width="440"
+                Margin="24"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="#E6141622"
+                BorderThickness="1"
+                CornerRadius="12">
+                <!--  WinUI 3 Elevation Border Stroke  -->
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Offset="0.0" Color="#4AFFFFFF" />
+                        <GradientStop Offset="0.3" Color="#2EFFFFFF" />
+                        <GradientStop Offset="1.0" Color="#0DFFFFFF" />
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+                <Border.Effect>
+                    <DropShadowEffect
+                        BlurRadius="36"
+                        Direction="270"
+                        Opacity="0.65"
+                        ShadowDepth="8"
+                        Color="#000000" />
+                </Border.Effect>
+
+                <Grid>
+                    <!--  Top specular highlight  -->
+                    <Border
+                        Height="1"
+                        VerticalAlignment="Top"
+                        Background="#2EFFFFFF"
+                        CornerRadius="12,12,0,0"
+                        IsHitTestVisible="False" />
+
+                    <StackPanel Margin="24">
+                        <!--  Header: Title + Close '✕' Button  -->
+                        <Grid Margin="0,0,0,18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                                <ui:SymbolIcon
+                                    Margin="0,0,10,0"
+                                    FontSize="20"
+                                    Foreground="#38BDF8"
+                                    Symbol="Camera24" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Text="{x:Static res:Strings.Settings_ProfilePicture_Title}" />
+                            </StackPanel>
+                            <ui:Button
+                                Grid.Column="1"
+                                Width="28"
+                                Height="28"
+                                Padding="0"
+                                Appearance="Secondary"
+                                Command="{Binding CloseAvatarDialogCommand}"
+                                Content="✕" />
+                        </Grid>
+
+                        <!--  Choice 1: Local Image File  -->
+                        <Border
+                            Margin="0,0,0,12"
+                            Padding="14,12"
+                            Background="#08FFFFFF"
+                            BorderBrush="#15FFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <StackPanel>
+                                <TextBlock
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Text="{x:Static res:Strings.Settings_ProfilePicture_Local}" />
+                                <TextBlock
+                                    Margin="0,2,0,10"
+                                    FontSize="11"
+                                    Foreground="#9CA3AF"
+                                    Text="PNG, JPG, WEBP, BMP, or GIF" />
+                                <ui:Button
+                                    HorizontalAlignment="Stretch"
+                                    Appearance="Secondary"
+                                    Command="{Binding PickLocalAvatarCommand}"
+                                    Content="{x:Static res:Strings.Settings_ProfilePicture_LocalButton}"
+                                    Icon="{ui:SymbolIcon FolderOpen24}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!--  Choice 2: Image URL  -->
+                        <Border
+                            Margin="0,0,0,12"
+                            Padding="14,12"
+                            Background="#08FFFFFF"
+                            BorderBrush="#15FFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <StackPanel>
+                                <TextBlock
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Text="{x:Static res:Strings.Settings_ProfilePicture_Url}" />
+                                <TextBlock
+                                    Margin="0,2,0,10"
+                                    FontSize="11"
+                                    Foreground="#9CA3AF"
+                                    Text="Direct image link (e.g. HTTPS URL)" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:TextBox
+                                        Height="34"
+                                        Padding="8,4"
+                                        VerticalContentAlignment="Center"
+                                        PlaceholderText="{x:Static res:Strings.Settings_ProfilePicture_UrlPlaceholder}"
+                                        Text="{Binding AvatarUrlInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <ui:Button
+                                        Grid.Column="1"
+                                        Height="34"
+                                        Margin="8,0,0,0"
+                                        Appearance="Primary"
+                                        Command="{Binding ApplyAvatarUrlCommand}"
+                                        Content="{x:Static res:Strings.Settings_ProfilePicture_ApplyUrl}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!--  Revert to Default (visible when custom avatar is active)  -->
+                        <ui:Button
+                            Margin="0,0,0,14"
+                            HorizontalAlignment="Stretch"
+                            Appearance="Secondary"
+                            Command="{Binding ResetAvatarCommand}"
+                            Content="{x:Static res:Strings.Settings_ProfilePicture_Reset}"
+                            Icon="{ui:SymbolIcon ArrowReset24}"
+                            Visibility="{Binding HasCustomAvatar, Converter={StaticResource BoolToVis}}" />
+
+                        <!--  Cancel Button  -->
+                        <ui:Button
+                            MinWidth="90"
+                            HorizontalAlignment="Right"
+                            Appearance="Secondary"
+                            Command="{Binding CloseAvatarDialogCommand}"
+                            Content="{x:Static res:Strings.Settings_ProfilePicture_Cancel}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

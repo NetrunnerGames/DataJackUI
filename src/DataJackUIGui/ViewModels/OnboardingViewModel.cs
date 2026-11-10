@@ -1,0 +1,243 @@
+using System.Diagnostics;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using DataJackUIGui.Models;
+using DataJackUIGui.Services;
+
+namespace DataJackUIGui.ViewModels;
+
+/// <summary>
+/// First-run welcome overlay. Shown once (gated by <see cref="CacheService.OnboardingComplete"/>) over the
+/// whole app: offers Discord sign-in, "apply recommended settings" (Default mode + FastFetch) and
+/// "install the plugin", then applies the chosen actions on "Let's go!" and dismisses.
+/// </summary>
+public partial class OnboardingViewModel : ObservableObject
+{
+    private readonly AuthService _auth;
+    private readonly CacheService _cache;
+    private readonly SettingsService _settings;
+    private readonly UnlockerService _unlocker;
+    private readonly SteamService _steam;
+    private readonly PluginInstallerService _installer;
+    private readonly ToastService _toast;
+
+    public OnboardingViewModel(AuthService auth, CacheService cache, SettingsService settings,
+        UnlockerService unlocker, SteamService steam, PluginInstallerService installer, ToastService toast)
+    {
+        _auth = auth;
+        _cache = cache;
+        _settings = settings;
+        _unlocker = unlocker;
+        _steam = steam;
+        _installer = installer;
+        _toast = toast;
+        _auth.AuthStateChanged += () =>
+        {
+            IsSignedIn = _auth.IsSignedIn;
+            if (!_auth.IsSignedIn && !_cache.OnboardingComplete) IsOpen = true;
+        };
+        IsSignedIn = _auth.IsSignedIn;
+    }
+
+    /// <summary>Whether the overlay is visible. Set true by App on a fresh first launch or when not signed in.</summary>
+    [ObservableProperty] private bool _isOpen;
+
+    /// <summary>Set by App: refresh the Home dashboard after onboarding applies its actions (so the mode
+    /// and plugin status tiles reflect the fresh install).</summary>
+    public Func<Task>? RefreshHome { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsGuest))]
+    [NotifyPropertyChangedFor(nameof(CanFinish))]
+    private bool _isSignedIn;
+    public bool IsGuest => !IsSignedIn;
+
+    [ObservableProperty] private bool _isSigningIn;
+    [ObservableProperty] private string _waitingMessage = "Waiting for authorization...";
+    private CancellationTokenSource? _signInCts;
+
+    [ObservableProperty] private bool _isOtpMode;
+    [ObservableProperty] private string _otpInput = "";
+
+    // The two yes/no choices: both default to "yes".
+    [ObservableProperty] private bool _applyRecommended = true;
+    [ObservableProperty] private bool _installPlugin = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NotBusy))]
+    [NotifyPropertyChangedFor(nameof(CanFinish))]
+    private bool _isBusy;
+    public bool NotBusy => !IsBusy;
+
+    public bool CanFinish => IsSignedIn && NotBusy;
+
+    /// <summary>Sign-in error text (shown under the sign-in button); null when none.</summary>
+    [ObservableProperty] private string? _statusLine;
+
+    [RelayCommand]
+    private void SetApplyRecommended(bool value) => ApplyRecommended = value;
+
+    [RelayCommand]
+    private void SetInstallPlugin(bool value) => InstallPlugin = value;
+
+    [RelayCommand]
+    public void CancelSignIn()
+    {
+        _signInCts?.Cancel();
+        IsSigningIn = false;
+    }
+
+    [RelayCommand]
+    private async Task SignIn()
+    {
+        if (IsSigningIn) return;
+        IsSigningIn = true;
+        StatusLine = null;
+        WaitingMessage = "Waiting for Discord...";
+        _signInCts?.Cancel();
+        _signInCts?.Dispose();
+        _signInCts = new CancellationTokenSource();
+        try { await _auth.SignInAsync(_signInCts.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { StatusLine = ex.Message; }
+        finally { IsSigningIn = false; }
+    }
+
+    [RelayCommand]
+    private void StartUsernameSignIn()
+    {
+        IsOtpMode = true;
+        OtpInput = "";
+        StatusLine = null;
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "https://auth.netrunnergames.workers.dev/login",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusLine = "Failed to launch browser: " + ex.Message;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelOtpMode()
+    {
+        IsOtpMode = false;
+        OtpInput = "";
+        StatusLine = null;
+    }
+
+    [RelayCommand]
+    private async Task VerifyOtpAsync()
+    {
+        if (IsSigningIn) return;
+        string code = (OtpInput ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(code) || code.Length != 6)
+        {
+            StatusLine = "Please enter a valid 6-digit OTP code.";
+            return;
+        }
+
+        IsSigningIn = true;
+        StatusLine = null;
+        WaitingMessage = "Verifying OTP...";
+        _signInCts?.Cancel();
+        _signInCts?.Dispose();
+        _signInCts = new CancellationTokenSource();
+        try
+        {
+            await _auth.SignInWithOtpAsync(code, _signInCts.Token);
+            IsOtpMode = false;
+            OtpInput = "";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            StatusLine = ex.Message;
+        }
+        finally
+        {
+            IsSigningIn = false;
+        }
+    }
+
+    partial void OnOtpInputChanged(string value)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && value.Trim().Length == 6 && !IsSigningIn)
+        {
+            _ = VerifyOtpAsync();
+        }
+    }
+
+    /// <summary>"Let's go!". Mark onboarding done, close the overlay immediately, then apply the chosen
+    /// actions in the background. Closing first means a long-running (Steam-restarting) install can never
+    /// leave the welcome dialog stuck.</summary>
+    [RelayCommand]
+    private void Finish()
+    {
+        if (IsBusy) return;
+
+        if (!IsSignedIn)
+        {
+            StatusLine = "You must sign in to continue.";
+            return;
+        }
+
+        bool applyRecommended = ApplyRecommended;
+        bool installPlugin = InstallPlugin;
+
+        _cache.OnboardingComplete = true; // seen, never show again
+        IsOpen = false;                    // dismiss now, before any slow work
+
+        if (applyRecommended || installPlugin)
+            _ = ApplyChoicesAsync(applyRecommended, installPlugin);
+    }
+
+    /// <summary>Applies the recommended-settings / plugin choices in the background (best-effort, with
+    /// toasts). Runs after the overlay is already closed.</summary>
+    private async Task ApplyChoicesAsync(bool applyRecommended, bool installPlugin)
+    {
+        IsBusy = true;
+        _toast.Show(Resources.Strings.Onboarding_Title, Resources.Strings.Onboarding_Applying);
+        try
+        {
+            // Close Steam ONCE up front so both installs run against a stopped Steam, then relaunch it once
+            // at the end. Avoids the double restart of letting each installer manage Steam separately.
+            // (The plugin installer only relaunches Steam if it was up when it ran; since we pre-stopped it,
+            // it won't, and our StartSteam below is the single relaunch.)
+            await Task.Run(_steam.StopSteam);
+
+            if (applyRecommended)
+            {
+                _settings.FastFetch = true;
+                var result = await _unlocker.InstallAsync(UnlockerMode.IceBreaker); // the Recommended mode
+                if (!result.Success)
+                    _toast.Show(Resources.Strings.Onboarding_Title, result.Error ?? "", error: true);
+            }
+
+            if (installPlugin)
+            {
+                var (ok, error) = await _installer.InstallAsync(null);
+                if (!ok)
+                    _toast.Show(Resources.Strings.Onboarding_Title, error ?? "", error: true);
+            }
+
+            await Task.Run(_steam.StartSteam);
+        }
+        catch (Exception ex)
+        {
+            _toast.Show(Resources.Strings.Onboarding_Title, ex.Message, error: true);
+        }
+        finally
+        {
+            IsBusy = false;
+            // Refresh the Home dashboard so the mode + plugin status tiles reflect what we just installed.
+            if (RefreshHome is not null)
+                try { await RefreshHome(); } catch { /* best effort */ }
+        }
+    }
+}

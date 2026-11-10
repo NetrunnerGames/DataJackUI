@@ -1,0 +1,331 @@
+﻿<UserControl
+    x:Class="DataJackUIGui.Views.OnboardingView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:res="clr-namespace:DataJackUIGui.Resources"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:vm="clr-namespace:DataJackUIGui.ViewModels"
+    d:DataContext="{d:DesignInstance Type=vm:OnboardingViewModel}"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <!--  Segmented Yes/No button: Primary when its bound bool matches this button's value.  -->
+        <Style
+            x:Key="ChoiceButton"
+            BasedOn="{StaticResource {x:Type ui:Button}}"
+            TargetType="ui:Button">
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
+    <!--
+        Dim scrim + centered welcome card (in-window overlay, not a Popup). Visibility is controlled by
+        the host in MainWindow via Onboarding.IsOpen.
+    -->
+    <Grid Background="#66000000">
+        <Border
+            MaxWidth="640"
+            Margin="16"
+            Padding="30,32"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Background="#1c1c22"
+            BorderBrush="#33FFFFFF"
+            BorderThickness="1"
+            CornerRadius="14">
+            <StackPanel>
+                <!--  Title  -->
+                <TextBlock
+                    FontSize="21"
+                    FontWeight="Bold"
+                    Text="{x:Static res:Strings.Onboarding_Title}"
+                    TextWrapping="Wrap" />
+
+                <!--  Sign in (guest only)  -->
+                <StackPanel Visibility="{Binding IsGuest, Converter={StaticResource BoolToVis}}">
+                    <TextBlock
+                        Margin="0,16,0,0"
+                        FontSize="13"
+                        Foreground="#9ca3af"
+                        Text="{x:Static res:Strings.Onboarding_SignIn_Blurb}"
+                        TextWrapping="Wrap" />
+                    <!--  Action buttons (Discord & Username)  -->
+                    <StackPanel
+                        Margin="0,12,0,0"
+                        Orientation="Horizontal"
+                        Visibility="{Binding IsOtpMode, Converter={StaticResource InverseBoolToVis}}">
+                        <!--  Sign in with Discord  -->
+                        <ui:Button
+                            Padding="14,7"
+                            Appearance="Primary"
+                            Background="#5865F2"
+                            BorderBrush="#4752C4"
+                            Command="{Binding SignInCommand}"
+                            Cursor="Hand"
+                            Foreground="White">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox
+                                    Width="16"
+                                    Height="16"
+                                    Margin="0,0,8,0">
+                                    <Path
+                                        Data="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037c-1.687.29-3.33.8-4.885 1.515a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.793 8.18 1.793 12.061 0a.075.075 0 0 1 .079.009c.12.098.245.195.372.288a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"
+                                        Fill="White"
+                                        Stretch="Uniform" />
+                                </Viewbox>
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Foreground="White"
+                                    Text="{x:Static res:Strings.Nav_SignInDiscord}" />
+                            </StackPanel>
+                        </ui:Button>
+
+                        <!--  Sign in with Username  -->
+                        <ui:Button
+                            Margin="10,0,0,0"
+                            Padding="14,7"
+                            Appearance="Secondary"
+                            Background="#14202c"
+                            BorderBrush="#00ffff"
+                            BorderThickness="1"
+                            Command="{Binding StartUsernameSignInCommand}"
+                            Cursor="Hand"
+                            Foreground="#00ffff">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon
+                                    Margin="0,0,8,0"
+                                    FontSize="15"
+                                    Foreground="#00ffff"
+                                    Symbol="PersonKey20" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Foreground="#00ffff"
+                                    Text="{x:Static res:Strings.Nav_SignInUsername}" />
+                            </StackPanel>
+                        </ui:Button>
+                    </StackPanel>
+
+                    <!--  OTP Input in place of button  -->
+                    <Border
+                        Margin="0,12,0,0"
+                        Padding="12,10"
+                        HorizontalAlignment="Left"
+                        Background="#121824"
+                        BorderBrush="#3300ffff"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Visibility="{Binding IsOtpMode, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock
+                                Margin="0,0,0,6"
+                                FontSize="11"
+                                FontWeight="SemiBold"
+                                Foreground="#38bdf8"
+                                Text="{x:Static res:Strings.Onboarding_WaitingOtp}" />
+                            <StackPanel Orientation="Horizontal">
+                                <ui:TextBox
+                                    Width="140"
+                                    Height="34"
+                                    VerticalContentAlignment="Center"
+                                    Background="#090d14"
+                                    BorderBrush="#00ffff"
+                                    BorderThickness="1"
+                                    FontFamily="Consolas, JetBrains Mono, monospace"
+                                    FontSize="16"
+                                    FontWeight="Bold"
+                                    Foreground="#00ffff"
+                                    MaxLength="6"
+                                    PlaceholderText="••••••"
+                                    Text="{Binding OtpInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    TextAlignment="Center" />
+                                <ui:Button
+                                    Margin="8,0,0,0"
+                                    Padding="12,6"
+                                    Appearance="Primary"
+                                    Background="#00ffff"
+                                    BorderBrush="#00ffff"
+                                    Command="{Binding VerifyOtpCommand}"
+                                    Content="Verify"
+                                    Cursor="Hand"
+                                    FontWeight="Bold"
+                                    Foreground="#050a10" />
+                                <ui:Button
+                                    Margin="6,0,0,0"
+                                    Padding="10,6"
+                                    Appearance="Secondary"
+                                    Command="{Binding CancelOtpModeCommand}"
+                                    Content="Cancel"
+                                    Cursor="Hand"
+                                    Foreground="#9ca3af" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <!--  Signing-in spinner  -->
+                    <StackPanel
+                        Margin="0,10,0,0"
+                        Orientation="Horizontal"
+                        Visibility="{Binding IsSigningIn, Converter={StaticResource BoolToVis}}">
+                        <ui:ProgressRing
+                            Width="16"
+                            Height="16"
+                            IsIndeterminate="True" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="#9ca3af"
+                            Text="{Binding WaitingMessage}" />
+                    </StackPanel>
+                    <!--  Sign-in error  -->
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        FontSize="11.5"
+                        Foreground="#f87171"
+                        Text="{Binding StatusLine}"
+                        TextWrapping="Wrap"
+                        Visibility="{Binding StatusLine, Converter={StaticResource NullToCollapsed}}" />
+                </StackPanel>
+                <!--  Signed-in confirmation  -->
+                <TextBlock
+                    Margin="0,16,0,0"
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    Foreground="#4ade80"
+                    Text="{x:Static res:Strings.Onboarding_SignedIn}"
+                    Visibility="{Binding IsSignedIn, Converter={StaticResource BoolToVis}}" />
+
+                <Border
+                    Height="1"
+                    Margin="0,24,0,0"
+                    Background="#1FFFFFFF" />
+
+                <!--  Apply recommended settings  -->
+                <Grid Margin="0,24,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,28,0" VerticalAlignment="Center">
+                        <TextBlock
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Text="{x:Static res:Strings.Onboarding_Recommended_Title}" />
+                        <TextBlock
+                            Margin="0,2,0,0"
+                            FontSize="12"
+                            Foreground="#7c8593"
+                            Text="{x:Static res:Strings.Onboarding_Recommended_Detail}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                        <ui:Button Command="{Binding SetApplyRecommendedCommand}" Content="{x:Static res:Strings.Onboarding_Yes}">
+                            <ui:Button.CommandParameter>
+                                <sys:Boolean>True</sys:Boolean>
+                            </ui:Button.CommandParameter>
+                            <ui:Button.Style>
+                                <Style BasedOn="{StaticResource ChoiceButton}" TargetType="ui:Button">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ApplyRecommended}" Value="True">
+                                            <Setter Property="Appearance" Value="Primary" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Button.Style>
+                        </ui:Button>
+                        <ui:Button Command="{Binding SetApplyRecommendedCommand}" Content="{x:Static res:Strings.Onboarding_No}">
+                            <ui:Button.CommandParameter>
+                                <sys:Boolean>False</sys:Boolean>
+                            </ui:Button.CommandParameter>
+                            <ui:Button.Style>
+                                <Style BasedOn="{StaticResource ChoiceButton}" TargetType="ui:Button">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ApplyRecommended}" Value="False">
+                                            <Setter Property="Appearance" Value="Primary" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Button.Style>
+                        </ui:Button>
+                    </StackPanel>
+                </Grid>
+
+                <!--  Install plugin  -->
+                <Grid Margin="0,22,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,28,0" VerticalAlignment="Center">
+                        <TextBlock
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Text="{x:Static res:Strings.Onboarding_Plugin_Title}" />
+                        <TextBlock
+                            Margin="0,2,0,0"
+                            FontSize="12"
+                            Foreground="#7c8593"
+                            Text="{x:Static res:Strings.Onboarding_Plugin_Detail}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                        <ui:Button Command="{Binding SetInstallPluginCommand}" Content="{x:Static res:Strings.Onboarding_Yes}">
+                            <ui:Button.CommandParameter>
+                                <sys:Boolean>True</sys:Boolean>
+                            </ui:Button.CommandParameter>
+                            <ui:Button.Style>
+                                <Style BasedOn="{StaticResource ChoiceButton}" TargetType="ui:Button">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding InstallPlugin}" Value="True">
+                                            <Setter Property="Appearance" Value="Primary" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Button.Style>
+                        </ui:Button>
+                        <ui:Button Command="{Binding SetInstallPluginCommand}" Content="{x:Static res:Strings.Onboarding_No}">
+                            <ui:Button.CommandParameter>
+                                <sys:Boolean>False</sys:Boolean>
+                            </ui:Button.CommandParameter>
+                            <ui:Button.Style>
+                                <Style BasedOn="{StaticResource ChoiceButton}" TargetType="ui:Button">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding InstallPlugin}" Value="False">
+                                            <Setter Property="Appearance" Value="Primary" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Button.Style>
+                        </ui:Button>
+                    </StackPanel>
+                </Grid>
+
+                <!--  Let's go!  -->
+                <ui:Button
+                    Margin="0,28,0,0"
+                    Padding="0,10"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Appearance="Primary"
+                    Command="{Binding FinishCommand}"
+                    Content="{x:Static res:Strings.Onboarding_Go}"
+                    FontSize="14"
+                    IsEnabled="{Binding CanFinish}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

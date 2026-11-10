@@ -1,0 +1,644 @@
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
+using System.Net.Http;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
+using DataJackUIGui.Models;
+
+namespace DataJackUIGui.Services;
+
+/// <summary>Queried state of the installed plugin vs. the latest GitHub release.</summary>
+public sealed record PluginStatus(
+    bool FrontendInstalled,
+    bool DllInstalled,
+    bool DllMatches,       // every loader slot's sha256 == its latest release asset digest
+    string? InstalledTag,  // from the on-disk manifest (null if never installed / no manifest)
+    string? LatestTag,
+    bool UpdateAvailable,
+    bool MillenniumPresent,
+    bool Offline,          // couldn't reach GitHub
+    bool Port8080Busy);    // something other than Steam's own CDP server is listening on CDP's fixed port. Warn only, see IsPort8080BusyAsync
+
+/// <summary>
+/// Installs / updates / removes the DataJackUI store-page plugin from GitHub releases (the app is the plugin
+/// MANAGER: it doesn't bundle the frontend). Each release of <c>madoiscool/LTSP</c> carries
+/// <c>plugin.zip</c> (the frontend, extracted to %AppData%\DataJackUIGui\plugin, where CefInjectorService
+/// reads it) plus one loader DLL per <see cref="Slots"/> entry, dropped into the Steam install root
+/// (steam.exe loads it). Modeled on <see cref="UnlockerService"/>: fetch release JSON, download assets
+/// via <see cref="GithubProxy"/> (mirror fallback), verify each by its sha256 digest, then place. The DLL
+/// is locked while Steam runs, so DLL install/uninstall stops Steam first (via <see cref="SteamService"/>)
+/// and relaunches it if it was up.
+///
+/// CDP itself (the debug bridge <see cref="CefInjectorService"/> connects through) is NOT opened by the
+/// DLL anymore: install/uninstall also manages a `.cef-enable-remote-debugging` NTFS junction next to
+/// Steam's exe, which makes Steam self-enable CDP on its own (fixed port 8080, confirmed not
+/// configurable; verified on both Windows 10 and 11). That leaves the DLL with one remaining job:
+/// "launch DataJackUI.exe when Steam opens", with no CDP hook, no load-timing race, and no dual-slot
+/// redundancy needed anymore.
+/// </summary>
+public class PluginInstallerService(SteamService steam, GithubProxy gh, CefInjectorService injector, UnlockerService unlocker)
+{
+    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
+
+    private const string PluginZipAsset = "plugin.zip";
+
+    /// <summary>The one DLL-proxy slot the loader ships as. <c>winmm.dll</c> is loaded dynamically (audio)
+    /// by steam.exe, is never a KnownDLL on Win10 or Win11, and isn't claimed by Millennium (wsock32/
+    /// version), or OpenSteamTool (dwmapi/xinput). Its old weakness (load timing isn't guaranteed relative
+    /// to steamwebhelper's launch) no longer matters now that CDP is opened by the junction instead of a
+    /// hook this DLL installs: there's no launch to catch a deadline for anymore, just "eventually load
+    /// while Steam is running." Other slots were each dead ends: bcrypt is KnownDLLs-forced on Win10,
+    /// and psapi and dbghelp don't load reliably enough.</summary>
+    private sealed record LoaderSlot(string DllAsset, string RealName, string SystemSourceName)
+    {
+        public string SystemSourcePath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.System), SystemSourceName);
+    }
+
+    private static readonly LoaderSlot[] Slots = Array.Empty<LoaderSlot>();
+
+    private static readonly string[] LegacyDllNames =
+        { "winmm.dll", "winmm_real.dll", "bcrypt.dll", "bcrypt_real.dll", "psapi.dll", "dbghelp.dll", "dbghelp_real.dll" };
+
+    // ── CDP marker junction ──────────────────────────────────────────────────
+    // `.cef-enable-remote-debugging` next to Steam's exe, created as an NTFS JUNCTION (not a plain file)
+    // pointing at a target that's deliberately chosen to never exist. Steam's own internal logic treats
+    // its mere presence as "self-enable CDP debugging" (fixed port 8080) without needing to resolve the
+    // target, but Millennium's cleanup code (health_check.cc) calls `std::filesystem::exists()` first,
+    // which DOES try to resolve the junction, fails since the target is nonexistent, and reports false,
+    // so Millennium's removal code never even runs. A plain file does not survive that cleanup; the
+    // junction does. Verified live this session on both Windows 10 and 11, including with a real
+    // Millennium instance loaded. `mklink /j` is shelled out to because directory junctions (unlike
+    // symlinks) have no native .NET creation API; `rmdir` (not Directory.Delete) is used to remove it,
+    // avoiding historical .NET/junction-deletion quirks that can recurse into a junction's target instead
+    // of just severing the link.
+    private const string CdpMarkerName = ".cef-enable-remote-debugging";
+    private const string CdpMarkerJunctionTarget = @"C:\fuckass\folder\that\shall\never\exist\die\millennium";
+    private const int CdpPort = 8080; // Steam's own fixed default: confirmed not configurable via the marker's content.
+    private string? CdpMarkerPath => SteamDir is { } s ? Path.Combine(s, CdpMarkerName) : null;
+
+    /// <summary>True only if <paramref name="path"/> is already a real reparse point (junction/symlink).
+    /// NOT just "something exists there". A bare Exists check used to treat a stale plain file (from before
+    /// this session's junction fix) or a leftover plain directory (e.g. a partially-failed rmdir) as
+    /// "already present" and permanently skip creating a real junction, silently leaving CDP broken for
+    /// that install forever (nothing else ever re-touches the marker once the plugin's up to date; see
+    /// CreateCdpMarkerJunction's own doc comment).</summary>
+    private static bool IsReparsePoint(string path)
+    {
+        try
+        {
+            return (Directory.Exists(path) || File.Exists(path))
+                && File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint);
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Idempotent, self-healing: safe to call on every status check, not just on install. If a
+    /// REAL junction is already there, no-op. If something else is there (a stale plain marker file from
+    /// before this session's junction fix, or any other leftover cruft that isn't actually a reparse
+    /// point), it's cleared first, since a plain file at this path doesn't survive Millennium's cleanup and
+    /// silently breaks CDP forever otherwise.</summary>
+    private static void CreateCdpMarkerJunction(string path)
+    {
+        if (IsReparsePoint(path)) return;
+        try
+        {
+            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+            else if (File.Exists(path)) File.Delete(path);
+        }
+        catch { /* best effort; mklink below just no-ops/fails harmlessly if this didn't clear it */ }
+
+        var psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /j \"{path}\" \"{CdpMarkerJunctionTarget}\"")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        using var p = System.Diagnostics.Process.Start(psi);
+        p?.WaitForExit(5000);
+    }
+
+    private static void RemoveCdpMarkerJunction(string path)
+    {
+        if (!Directory.Exists(path)) return;
+        var psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c rmdir \"{path}\"")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        using var p = System.Diagnostics.Process.Start(psi);
+        p?.WaitForExit(5000);
+    }
+
+    private static readonly HttpClient PortProbeHttp = new() { Timeout = TimeSpan.FromMilliseconds(800) };
+
+    /// <summary>Best-effort check for whether CDP's fixed port is occupied by something OTHER than Steam's
+    /// own CDP server. A bare bind-test can't make that distinction: once the junction is doing its job and
+    /// CDP is actually up, Steam itself is the one holding the port, so a bind fails for the exact same
+    /// reason a hostile squatter would cause it to fail. The two are indistinguishable to
+    /// <see cref="System.Net.Sockets.TcpListener"/>. This produced a live false positive (warning fired
+    /// against Steam's own working CDP server). Fixed by, on a bind failure, asking whatever's on the port
+    /// for <c>/json</c>. CDP answers with a JSON array of debug targets; only treat it as "busy" in the
+    /// user-facing sense if that probe does NOT look like CDP. The port can't be changed regardless
+    /// (confirmed: file content has no effect on it), so this stays detection-only. A false
+    /// positive/negative here never blocks install/uninstall.</summary>
+    private static async Task<bool> IsPort8080BusyAsync()
+    {
+        try
+        {
+            using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, CdpPort);
+            listener.Start();
+            listener.Stop();
+            return false; // nothing bound there
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            try
+            {
+                var body = await PortProbeHttp.GetStringAsync($"http://127.0.0.1:{CdpPort}/json");
+                return !body.TrimStart().StartsWith('['); // CDP's /json answers with a JSON array of targets
+            }
+            catch { return true; } // bound, but not answering like CDP -> genuinely something else
+        }
+        catch { return false; }
+    }
+
+    private static string FrontendDir => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUIGui", "plugin");
+    private static string DataJackUIJsPath => Path.Combine(FrontendDir, "public", "datajackui.js");
+    private static string ManifestPath => Path.Combine(FrontendDir, "installed.json");
+
+    private string? SteamDir => steam.EffectivePath;
+    private string? SlotPath(LoaderSlot slot) => SteamDir is { } s ? Path.Combine(s, slot.DllAsset) : null;
+    private string? SlotRealPath(LoaderSlot slot) => SteamDir is { } s ? Path.Combine(s, slot.RealName) : null;
+    private IEnumerable<string> LegacyDllPaths =>
+        SteamDir is { } s ? LegacyDllNames.Select(n => Path.Combine(s, n)) : Enumerable.Empty<string>();
+
+    // ── DLL-update testing switch ──
+    // Drop `.datajackui-dll-update-disabled` in the Steam root to stop the app from replacing any installed
+    // loader slot (auto OR manual), so hand-placed test builds survive updates. Delete the file to resume
+    // normal DLL updates. Frontend updates are unaffected. Re-read on every update, so toggling needs no
+    // restart. Mirrors the DLL's own `.datajackui-cdp-hook-disabled` marker idiom.
+    private const string DllUpdateDisabledMarker = ".datajackui-dll-update-disabled";
+    private bool DllUpdateDisabled =>
+        SteamDir is { } s && File.Exists(Path.Combine(s, DllUpdateDisabledMarker));
+
+    private GithubRelease? _cachedLatest;
+
+    public bool MillenniumPresent =>
+        SteamDir is { } s && File.Exists(Path.Combine(s, "millennium", "lib", "millennium.dll"));
+
+    // ── manifest (records the installed tag + asset hashes, for status/update detection) ──
+    private sealed class Manifest
+    {
+        public string? Tag { get; set; }
+        public Dictionary<string, string>? DllShas { get; set; } // DllAsset name -> sha256, one per slot
+        public string? ZipSha { get; set; }
+        /// <summary>Millennium config path → the exact enabledPlugins entries we removed there on install,
+        /// so uninstall can restore Millennium's datajackui plugin verbatim.</summary>
+        public Dictionary<string, List<string>>? DisabledMillenniumEntries { get; set; }
+    }
+
+    private static Manifest? ReadManifest()
+    {
+        try
+        {
+            return File.Exists(ManifestPath)
+                ? JsonSerializer.Deserialize<Manifest>(File.ReadAllText(ManifestPath), JsonOpts)
+                : null;
+        }
+        catch { return null; }
+    }
+
+    private static void WriteManifest(Manifest m)
+    {
+        Directory.CreateDirectory(FrontendDir);
+        File.WriteAllText(ManifestPath, JsonSerializer.Serialize(m));
+    }
+
+    // ── GitHub ──
+    public async Task<GithubRelease?> FetchLatestAsync(bool force, CancellationToken ct = default)
+    {
+        if (!force && _cachedLatest is not null) return _cachedLatest;
+        string url = $"https://api.github.com/repos/{AppConfig.PluginReleasesOwner}/{AppConfig.PluginReleasesRepo}/releases/latest";
+        try
+        {
+            using var res = await gh.SendAsync(url, ct);
+            if (res is null || !res.IsSuccessStatusCode) return null;
+            var rel = JsonSerializer.Deserialize<GithubRelease>(await res.Content.ReadAsStringAsync(ct), JsonOpts);
+            if (rel is not null) _cachedLatest = rel;
+            return rel;
+        }
+        catch { return null; }
+    }
+
+    public string ActiveLoaderFileName =>
+        unlocker.SelectedMode == UnlockerMode.IceBreaker ? "version.dll" : "OpenSteamTool.dll";
+
+    /// <summary>Fast, network-free check: the plugin frontend + active mode's loader are both present. Used by the
+    /// first-run onboarding gate (no GitHub round-trip, unlike <see cref="GetStatusAsync"/>).</summary>
+    public bool IsInstalledLocally()
+    {
+        if (!File.Exists(DataJackUIJsPath)) return false;
+        if (SteamDir is not { } s) return false;
+
+        var mode = unlocker.SelectedMode;
+        if (mode == UnlockerMode.IceBreaker)
+            return File.Exists(Path.Combine(s, "version.dll"));
+
+        return File.Exists(Path.Combine(s, "OpenSteamTool.dll"))
+            || File.Exists(Path.Combine(s, "dwmapi.dll"))
+            || File.Exists(Path.Combine(s, "xinput1_4.dll"));
+    }
+
+    public async Task<PluginStatus> GetStatusAsync(bool force = false, CancellationToken ct = default)
+    {
+        bool frontend = File.Exists(DataJackUIJsPath);
+        var mode = unlocker.SelectedMode;
+        bool dllInstalled = false;
+        if (SteamDir is { } s)
+        {
+            dllInstalled = mode == UnlockerMode.IceBreaker
+                ? File.Exists(Path.Combine(s, "version.dll"))
+                : (File.Exists(Path.Combine(s, "OpenSteamTool.dll"))
+                   || File.Exists(Path.Combine(s, "dwmapi.dll"))
+                   || File.Exists(Path.Combine(s, "xinput1_4.dll")));
+        }
+
+        dllInstalled = dllInstalled
+            || File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "version.dll"))
+            || File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "version.dll"));
+
+        if ((frontend || dllInstalled) && CdpMarkerPath is { } liveMarkerPath)
+            CreateCdpMarkerJunction(liveMarkerPath);
+
+        bool port8080Busy = await IsPort8080BusyAsync();
+        var manifest = ReadManifest();
+        var latest = await FetchLatestAsync(force, ct);
+
+        if (latest is null)
+            return new PluginStatus(frontend, dllInstalled, true, manifest?.Tag, null, UpdateAvailable: false,
+                MillenniumPresent, Offline: true, port8080Busy);
+
+        bool dllMatches = true;
+        bool updateAvailable = frontend && manifest?.Tag != latest.TagName;
+
+        return new PluginStatus(frontend, dllInstalled, dllMatches, manifest?.Tag, latest.TagName, updateAvailable,
+            MillenniumPresent, Offline: false, port8080Busy);
+    }
+
+    // ── Install / update ──
+    public async Task<(bool ok, string? error)> InstallAsync(IProgress<double?>? progress, CancellationToken ct = default)
+    {
+        if (SteamDir is not { } steamDir) return (false, Resources.Strings.Plugin_Err_SteamNotFound);
+
+        var latest = await FetchLatestAsync(force: true, ct);
+        if (latest is null) return (false, Resources.Strings.Plugin_Err_GithubUnreachable);
+
+        var zipAsset = FindAsset(latest, PluginZipAsset);
+        if (zipAsset is null)
+            return (false, string.Format(Resources.Strings.Plugin_Err_MissingAssets, latest.TagName, PluginZipAsset, PluginZipAsset));
+
+        var slotAssets = new Dictionary<LoaderSlot, GithubAsset>();
+        foreach (var slot in Slots)
+        {
+            if (FindAsset(latest, slot.DllAsset) is not { } asset)
+                return (false, string.Format(Resources.Strings.Plugin_Err_MissingAssets, latest.TagName, PluginZipAsset, slot.DllAsset));
+            slotAssets[slot] = asset;
+        }
+
+        bool wasRunning = SteamService.IsSteamRunning();
+
+        string tmp = Path.Combine(Path.GetTempPath(), "datajackui-plugin-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmp);
+        Dictionary<string, List<string>>? disabledMillenniumEntries = null;
+        try
+        {
+            var (dlOk, dlErr, zipSha, slotShas, slotDlPaths, zipPath) = await DownloadAndVerifyAssetsAsync(tmp, latest, zipAsset, slotAssets, progress, ct);
+            if (!dlOk) return (false, dlErr);
+
+            if (Directory.Exists(FrontendDir)) Directory.Delete(FrontendDir, recursive: true);
+            Directory.CreateDirectory(FrontendDir);
+            ZipFile.ExtractToDirectory(zipPath!, FrontendDir);
+            NormalizeFrontendLayout();
+            if (!File.Exists(DataJackUIJsPath))
+                return (false, Resources.Strings.Plugin_Err_NoDataJackUIJs);
+
+            await injector.ReloadPluginFilesAsync();
+
+            if (!IsInstalledLocally())
+            {
+                var mode = unlocker.SelectedMode ?? UnlockerMode.IceBreaker;
+                await unlocker.InstallAsync(mode, progress, ct);
+            }
+
+            if (CdpMarkerPath is { } markerPath)
+                CreateCdpMarkerJunction(markerPath);
+
+            WriteManifest(new Manifest
+            {
+                Tag = latest.TagName,
+                DllShas = slotShas!.ToDictionary(kv => kv.Key.DllAsset, kv => kv.Value),
+                ZipSha = zipSha!,
+                DisabledMillenniumEntries = disabledMillenniumEntries,
+            });
+
+            if (wasRunning)
+            {
+                steam.RestartSteam();
+            }
+
+            return (true, null);
+        }
+        catch (Exception ex) { return (false, ex.Message); }
+        finally { try { Directory.Delete(tmp, recursive: true); } catch { /* temp cleanup */ } }
+    }
+
+    private async Task<(bool ok, string? error, string? zipSha, Dictionary<LoaderSlot, string>? slotShas, Dictionary<LoaderSlot, string>? slotDlPaths, string? zipPath)> DownloadAndVerifyAssetsAsync(
+        string tmp, GithubRelease latest, GithubAsset zipAsset, Dictionary<LoaderSlot, GithubAsset> slotAssets, IProgress<double?>? progress, CancellationToken ct)
+    {
+        string zipPath = Path.Combine(tmp, PluginZipAsset);
+        await gh.DownloadAsync(zipAsset.DownloadUrl, zipPath, progress, ct);
+
+        var slotDlPaths = new Dictionary<LoaderSlot, string>();
+        foreach (var (slot, asset) in slotAssets)
+        {
+            string p = Path.Combine(tmp, slot.DllAsset);
+            await gh.DownloadAsync(asset.DownloadUrl, p, progress, ct);
+            slotDlPaths[slot] = p;
+        }
+
+        string zipSha = AssetHash.OfFile(zipPath);
+        if (AssetDigest(latest, PluginZipAsset) is { } zd && zipSha != zd)
+            return (false, string.Format(Resources.Strings.Plugin_Err_VerifyFailed, PluginZipAsset), null, null, null, null);
+
+        var slotShas = new Dictionary<LoaderSlot, string>();
+        foreach (var (slot, p) in slotDlPaths)
+        {
+            string sha = AssetHash.OfFile(p);
+            slotShas[slot] = sha;
+            if (AssetDigest(latest, slot.DllAsset) is { } dd && sha != dd)
+                return (false, string.Format(Resources.Strings.Plugin_Err_VerifyFailed, slot.DllAsset), null, null, null, null);
+        }
+        return (true, null, zipSha, slotShas, slotDlPaths, zipPath);
+    }
+
+    private async Task<Dictionary<string, List<string>>?> UpdateLoaderDllsAsync(string steamDir, Dictionary<LoaderSlot, string> slotDlPaths, CancellationToken ct)
+    {
+        bool wasRunning = Process.GetProcessesByName("steam").Length > 0;
+        steam.StopSteam();
+        await Task.Delay(1200, ct);
+
+        foreach (var slot in Slots)
+        {
+            File.Copy(slotDlPaths[slot], Path.Combine(steamDir, slot.DllAsset), overwrite: true);
+            if (SlotRealPath(slot) is { } real && File.Exists(slot.SystemSourcePath))
+                File.Copy(slot.SystemSourcePath, real, overwrite: true);
+        }
+
+        foreach (var legacy in LegacyDllPaths)
+            if (File.Exists(legacy)) { try { File.Delete(legacy); } catch { /* locked/again next time */ } }
+
+        Dictionary<string, List<string>>? disabledMillenniumEntries = null;
+        if (MillenniumPresent)
+        {
+            RestoreMillenniumPluginFolder(steamDir);
+            disabledMillenniumEntries = SetMillenniumDataJackUIEnabled(enable: false);
+        }
+
+        if (wasRunning) steam.StartSteam();
+        return disabledMillenniumEntries;
+    }
+
+    /// <summary>Silent auto-update: if an update is available for an already-installed plugin, apply it
+    /// (frontend silently; DLL change stops/swaps/restarts Steam). Returns true if an update was applied.
+    /// Fire-and-forget safe: swallows offline/errors. Called from the app's Steam-open update flow.</summary>
+    public async Task<bool> AutoUpdateAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var st = await GetStatusAsync(force: true, ct);
+            if (!st.UpdateAvailable) return false; // not installed, offline, or already current
+            var (ok, _) = await InstallAsync(progress: null, ct);
+            return ok;
+        }
+        catch { return false; }
+    }
+
+    // ── Uninstall ──
+    public Task<(bool ok, string? error)> UninstallAsync(CancellationToken ct = default)
+    {
+        return Task.Run(async () =>
+        {
+            try
+            {
+                // Read the manifest BEFORE the FrontendDir delete below wipes it. It holds the exact
+                // enabledPlugins entries we stripped from Millennium's config at install time.
+                var manifest = ReadManifest();
+
+                bool wasRunning = Process.GetProcessesByName("steam").Length > 0;
+                steam.StopSteam();
+                await Task.Delay(1200, ct);
+
+                foreach (var slot in Slots)
+                {
+                    if (SlotPath(slot) is { } bp && File.Exists(bp)) File.Delete(bp);
+                    if (SlotRealPath(slot) is { } br && File.Exists(br)) File.Delete(br);
+                }
+                foreach (var legacy in LegacyDllPaths)
+                    if (File.Exists(legacy)) File.Delete(legacy);
+                if (CdpMarkerPath is { } markerPath) RemoveCdpMarkerJunction(markerPath);
+                if (Directory.Exists(FrontendDir)) Directory.Delete(FrontendDir, recursive: true);
+
+                // Give Millennium its datajackui plugin back: we're the ones who disabled it. Steam is
+                // stopped here, so the edit sticks and applies on the restart below.
+                if (MillenniumPresent)
+                    SetMillenniumDataJackUIEnabled(enable: true, restore: manifest?.DisabledMillenniumEntries);
+
+                // Stop injecting the now-deleted content immediately, same reasoning as InstallAsync.
+                await injector.ReloadPluginFilesAsync();
+
+                if (wasRunning) steam.StartSteam();
+                return (true, (string?)null);
+            }
+            catch (Exception ex) { return (false, (string?)ex.Message); }
+        }, ct);
+    }
+
+    // ── Millennium coexistence: disable its datajackui plugin via config (reversible), not folder-rename ──
+
+    private const string MillenniumPluginName = "datajackui";
+    private const string MillenniumDisabledName = MillenniumPluginName + ".disabled-by-datajackui";
+
+    /// <summary>Options for rewriting Millennium's config. The <see cref="DefaultJsonTypeInfoResolver"/> is
+    /// REQUIRED, not cosmetic: re-enabling adds CLR-backed <see cref="JsonValue"/> nodes (from plain strings),
+    /// and serializing those through custom options without a resolver throws
+    /// "JsonSerializerOptions instance must specify a TypeInfoResolver". Removal-only writes happen to work
+    /// without it (all surviving nodes are JsonElement-backed from Parse), so the failure would only ever
+    /// surface on uninstall. Silently, inside the best-effort catch.</summary>
+    private static readonly JsonSerializerOptions ConfigWriteOpts = new()
+    {
+        WriteIndented = true,
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+    };
+
+    /// <summary>Every place Millennium might keep its config.json, newest first. Legacy Millennium used
+    /// <c>&lt;steam&gt;\ext\config.json</c>; current uses <c>&lt;steam&gt;\millennium\config\config.json</c>;
+    /// an intermediate build used <c>&lt;steam&gt;\millennium\config.json</c>. A <c>MILLENNIUM__CONFIG_PATH</c>
+    /// env var overrides the directory. Both real files can coexist, so callers edit *every* one present.</summary>
+    private IEnumerable<string> MillenniumConfigPaths()
+    {
+        if (SteamDir is not { } s) yield break;
+        yield return Path.Combine(s, "millennium", "config", "config.json");
+        yield return Path.Combine(s, "millennium", "config.json");
+        yield return Path.Combine(s, "ext", "config.json");
+        var env = Environment.GetEnvironmentVariable("MILLENNIUM__CONFIG_PATH");
+        if (!string.IsNullOrWhiteSpace(env))
+            yield return Path.Combine(env, "config.json");
+    }
+
+    /// <summary>True if an enabledPlugins entry refers to our plugin. The entry's leading space-delimited
+    /// token is the plugin id; Millennium versions store it as <c>datajackui</c>, <c>datajackui LUA</c>
+    /// (name + backend), or (from the old rename) <c>datajackui.disabled-by-datajackui[ LUA]</c>.</summary>
+    private static bool IsDataJackUIEntry(string entry)
+    {
+        string token = entry.Split(' ', 2)[0];
+        return token.Equals(MillenniumPluginName, StringComparison.OrdinalIgnoreCase)
+            || token.Equals(MillenniumDisabledName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static JsonArray? NestedEnabled(JsonObject root) =>
+        root["plugins"] is JsonObject p ? p["enabledPlugins"] as JsonArray : null;
+    private static JsonArray? FlatEnabled(JsonObject root) =>
+        root["plugins.enabledPlugins"] as JsonArray; // stray dotted key some Millennium builds also write
+
+    /// <summary>Remove (enable=false) or restore (enable=true) our plugin from <c>plugins.enabledPlugins</c>
+    /// in every Millennium config that exists. On disable returns configPath → the exact entry strings
+    /// removed, so uninstall can restore them verbatim (passed back in as <paramref name="restore"/>).
+    /// Best-effort per file; edits a JSON DOM so all unrelated keys/plugins are preserved.</summary>
+    private Dictionary<string, List<string>> SetMillenniumDataJackUIEnabled(
+        bool enable, IReadOnlyDictionary<string, List<string>>? restore = null)
+    {
+        var removedMap = new Dictionary<string, List<string>>();
+        foreach (string path in MillenniumConfigPaths())
+        {
+            try
+            {
+                if (!File.Exists(path)) continue;
+                if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject root) continue;
+
+                bool changed = false;
+                if (!enable)
+                {
+                    var removed = RemoveDataJackUIEntries(root, out bool c);
+                    if (removed.Count > 0)
+                    {
+                        removed.Reverse();
+                        removedMap[path] = removed;
+                        changed = c;
+                    }
+                }
+                else
+                {
+                    changed = RestoreDataJackUIEntries(root, path, restore);
+                }
+
+                if (changed) File.WriteAllText(path, root.ToJsonString(ConfigWriteOpts));
+            }
+            catch { /* best effort per file */ }
+        }
+        return removedMap;
+    }
+
+    private List<string> RemoveDataJackUIEntries(JsonObject root, out bool changed)
+    {
+        changed = false;
+        var removed = new List<string>();
+        if (NestedEnabled(root) is { } nested)
+        {
+            for (int i = nested.Count - 1; i >= 0; i--)
+            {
+                if (nested[i]?.GetValue<string>() is { } v && IsDataJackUIEntry(v))
+                {
+                    removed.Add(v);
+                    nested.RemoveAt(i);
+                    changed = true;
+                }
+            }
+        }
+        if (FlatEnabled(root) is { } flat)
+        {
+            for (int i = flat.Count - 1; i >= 0; i--)
+            {
+                if (flat[i]?.GetValue<string>() is { } v && IsDataJackUIEntry(v))
+                {
+                    flat.RemoveAt(i);
+                    changed = true;
+                }
+            }
+        }
+        return removed;
+    }
+
+    private bool RestoreDataJackUIEntries(JsonObject root, string path, IReadOnlyDictionary<string, List<string>>? restore)
+    {
+        var arr = NestedEnabled(root);
+        if (arr is not null && !arr.Any(n => n?.GetValue<string>() is { } v && IsDataJackUIEntry(v)))
+        {
+            var toAdd = restore is not null && restore.TryGetValue(path, out var r) && r.Count > 0
+                ? r
+                : new List<string> { MillenniumPluginName };
+            foreach (string e in toAdd) arr.Add(e);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Undo the previous folder-rename approach: bring <c>plugins\datajackui</c> back to a normal
+    /// state so only config governs enablement. If both the real and the renamed-aside folder exist
+    /// (Millennium recreated it), drop the stale aside copy; otherwise rename the aside copy back.</summary>
+    private static void RestoreMillenniumPluginFolder(string steamDir)
+    {
+        try
+        {
+            string dir = Path.Combine(steamDir, "millennium", "plugins");
+            string real = Path.Combine(dir, MillenniumPluginName);
+            string aside = Path.Combine(dir, MillenniumDisabledName);
+            if (!Directory.Exists(aside)) return;
+            if (Directory.Exists(real)) Directory.Delete(aside, recursive: true);
+            else Directory.Move(aside, real);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>If plugin.zip wrapped everything in a single top-level folder, hoist that folder's contents
+    /// up so <c>public/datajackui.js</c> sits directly under FrontendDir.</summary>
+    private static void NormalizeFrontendLayout()
+    {
+        if (Directory.Exists(Path.Combine(FrontendDir, "public"))) return;
+        foreach (var sub in Directory.GetDirectories(FrontendDir))
+        {
+            if (!Directory.Exists(Path.Combine(sub, "public"))) continue;
+            foreach (var entry in Directory.GetFileSystemEntries(sub))
+            {
+                string dest = Path.Combine(FrontendDir, Path.GetFileName(entry));
+                if (Directory.Exists(entry)) Directory.Move(entry, dest);
+                else File.Move(entry, dest, overwrite: true);
+            }
+            try { Directory.Delete(sub, recursive: true); } catch { /* leftover wrapper */ }
+            return;
+        }
+    }
+
+    // ── Helpers (same shape as UnlockerService's) ──
+    private static string? AssetDigest(GithubRelease r, string name) =>
+        AssetHash.ParseDigest(r.Assets.FirstOrDefault(a => a.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Digest);
+
+    private static GithubAsset? FindAsset(GithubRelease r, string name) =>
+        r.Assets.FirstOrDefault(a => a.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+}
