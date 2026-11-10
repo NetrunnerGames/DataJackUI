@@ -19,6 +19,8 @@ public partial class App : Application
 
     public App()
     {
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
         DispatcherUnhandledException += (s, e) =>
         {
             System.Diagnostics.Debug.WriteLine($"[App] Unhandled UI Exception: {e.Exception}");

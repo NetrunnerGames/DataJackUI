@@ -211,11 +211,14 @@ public partial class OnlineFixesViewModel : FixesViewModel
                 notes = scrape?.Notes;
             }
 
-            card.Notes = !string.IsNullOrWhiteSpace(notes) ? notes : "No special setup notes found for this game.";
+            if (!string.IsNullOrWhiteSpace(notes))
+            {
+                card.Notes = notes;
+            }
 
             await UiMessageBox.ShowConfirmAsync(
                 $"{card.Name} - Setup Notes",
-                card.Notes,
+                !string.IsNullOrWhiteSpace(notes) ? notes : "No special setup notes found for this game.",
                 "OK",
                 "");
         }

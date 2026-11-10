@@ -2401,31 +2401,53 @@ public class DataJackUIApiClient
 
         lock (_ofLock)
         {
-            if (_ofCache.TryGetValue(articleUrl, out var hit) && hit?.Notes is not null)
+            if (_ofCache.TryGetValue(articleUrl, out var hit) && !string.IsNullOrWhiteSpace(hit?.Notes))
                 return hit.Notes;
         }
 
         try
         {
             string html = await GetOnlineFixHtmlAsync(articleUrl, ct);
-            if (string.IsNullOrWhiteSpace(html)) return null;
-
-            var rawNotes = ExtractNotesFromArticleHtml(html);
-            if (rawNotes.Count == 0) return null;
-
-            string joined = string.Join("\n\n", rawNotes);
-            string? translated = await TranslateRuToEnAsync(joined, ct);
-            string finalNotes = !string.IsNullOrWhiteSpace(translated) ? translated : joined;
-
-            lock (_ofLock)
+            if (!string.IsNullOrWhiteSpace(html))
             {
-                if (_ofCache.TryGetValue(articleUrl, out var existing) && existing is not null)
+                var rawNotes = ExtractNotesFromArticleHtml(html);
+                if (rawNotes.Count > 0)
                 {
-                    _ofCache[articleUrl] = existing with { Notes = finalNotes };
+                    string joined = string.Join("\n\n", rawNotes);
+                    string? translated = await TranslateRuToEnAsync(joined, ct);
+                    string finalNotes = !string.IsNullOrWhiteSpace(translated) ? translated : joined;
+
+                    lock (_ofLock)
+                    {
+                        if (_ofCache.TryGetValue(articleUrl, out var existing) && existing is not null)
+                        {
+                            _ofCache[articleUrl] = existing with { Notes = finalNotes };
+                        }
+                    }
+
+                    return finalNotes;
                 }
             }
 
-            return finalNotes;
+            // Fallback: try resolving notes via Cloudflare worker proxy
+            var workerResult = await ResolveOnlineFixViaWorkerAsync("", "", articleUrl, ct);
+            if (!string.IsNullOrWhiteSpace(workerResult?.Notes))
+            {
+                lock (_ofLock)
+                {
+                    if (_ofCache.TryGetValue(articleUrl, out var existing) && existing is not null)
+                    {
+                        _ofCache[articleUrl] = existing with { Notes = workerResult.Notes };
+                    }
+                    else
+                    {
+                        _ofCache[articleUrl] = workerResult;
+                    }
+                }
+                return workerResult.Notes;
+            }
+
+            return null;
         }
         catch
         {
@@ -2498,7 +2520,7 @@ public class DataJackUIApiClient
         try
         {
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(10));
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
             req.Headers.UserAgent.ParseAdd(OnlineFixUserAgent);
             req.Headers.Referrer = new Uri(OnlineFixReferer);
