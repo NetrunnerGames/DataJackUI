@@ -2204,13 +2204,28 @@ public class DataJackUIApiClient
             using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync(timeoutCts.Token), cancellationToken: timeoutCts.Token);
             var root = doc.RootElement;
             if (!root.TryGetProperty("success", out var okElem) || !okElem.GetBoolean()) return null;
-            if (!root.TryGetProperty("data", out var dataElem) || dataElem.ValueKind != JsonValueKind.Object) return null;
+            var dataElem = root.TryGetProperty("data", out var dElem) && dElem.ValueKind == JsonValueKind.Object ? dElem : root;
 
             string title = dataElem.TryGetProperty("title", out var tProp) ? tProp.GetString() ?? gameName : gameName;
             string foundArticleUrl = dataElem.TryGetProperty("article_url", out var aProp) ? aProp.GetString() ?? (articleUrl ?? "") : (articleUrl ?? "");
             string version = dataElem.TryGetProperty("version", out var vProp) ? vProp.GetString() ?? "Game version: Latest" : "Game version: Latest";
             string? notes = dataElem.TryGetProperty("notes", out var nProp) ? nProp.GetString() : null;
-            if (!string.IsNullOrWhiteSpace(notes) && Regex.IsMatch(notes, @"[Ѐ-ӿ]"))
+
+            if (string.IsNullOrWhiteSpace(notes) && dataElem.TryGetProperty("raw_notes", out var rnProp) && rnProp.ValueKind == JsonValueKind.Array)
+            {
+                var rnList = new List<string>();
+                foreach (var item in rnProp.EnumerateArray())
+                {
+                    string? s = item.GetString();
+                    if (!string.IsNullOrWhiteSpace(s)) rnList.Add(s);
+                }
+                if (rnList.Count > 0)
+                {
+                    notes = string.Join("\n", rnList);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(notes) && Regex.IsMatch(notes, @"[\u0400-\u04FF]"))
             {
                 // Translate locally using Google Translate if Worker AI didn't translate or neurons were exhausted
                 notes = await TranslateRuToEnAsync(notes, ct);
@@ -2327,7 +2342,9 @@ public class DataJackUIApiClient
 
                         continue;
 
-                    string clean = Regex.Replace(textLi, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Trim();
+                    // Preserve Markdown links [text](url) before stripping HTML tags
+                    string textWithLinks = Regex.Replace(textLi, @"<a\s+[^>]*href=[""']([^""']+)[""'][^>]*>([\s\S]*?)</a>", "[$2]($1)", RegexOptions.IgnoreCase);
+                    string clean = Regex.Replace(textWithLinks, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Replace("&nbsp;", " ").Trim();
 
                     if (clean.Length > 5)
                     {
@@ -2348,7 +2365,8 @@ public class DataJackUIApiClient
 
                     if (endCut >= 0) after = after.Substring(0, endCut);
 
-                    string clean = Regex.Replace(after, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Trim();
+                    string afterWithLinks = Regex.Replace(after, @"<a\s+[^>]*href=[""']([^""']+)[""'][^>]*>([\s\S]*?)</a>", "[$2]($1)", RegexOptions.IgnoreCase);
+                    string clean = Regex.Replace(afterWithLinks, @"<[^>]+>", "").Replace("&quot;", "\"").Replace("&amp;", "&").Replace("&nbsp;", " ").Trim();
 
                     clean = Regex.Replace(clean, @"\s+", " ");
 
