@@ -2367,7 +2367,7 @@ public class DataJackUIApiClient
         if (string.IsNullOrWhiteSpace(html)) return rawNotes;
 
         // 1. Launch instructions (Как запускать:)
-        var launchMatch = Regex.Match(html, @"(?:<b>|<u>)?\s*Как запускать:?\s*(?:</b>|</u>)?([\s\S]*?)(?:(?:<b>|<u>)?\s*(?:Информация о сетевых режимах|Подключение|Создание сервера|Примечания)|<!--dle_list-->|$)", RegexOptions.IgnoreCase);
+        var launchMatch = Regex.Match(html, @"(?:<b>|<u>)?\s*Как запускать:?\s*(?:</b>|</u>)?([\s\S]*?)(?:(?:<b>|<u>)?\s*(?:Информация о сетевых режимах|Подключение|Создание сервера|Примечания)|<!--dle_list-->|$)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
         if (launchMatch.Success)
         {
             string clean = CleanGuideText(launchMatch.Groups[1].Value);
