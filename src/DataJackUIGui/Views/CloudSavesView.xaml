@@ -121,14 +121,15 @@
                 <!--  Provider Selector  -->
                 <ComboBox
                     Grid.Column="1"
-                    MinHeight="35"
-                    Padding="12,6"
+                    MinWidth="210"
+                    MinHeight="36"
+                    Padding="10,6"
                     VerticalAlignment="Center"
                     VerticalContentAlignment="Center"
                     ItemsSource="{Binding ProviderOptions}"
                     SelectedItem="{Binding SelectedProviderOption, Mode=TwoWay}">
                     <ComboBox.ItemContainerStyle>
-                        <Style TargetType="ComboBoxItem">
+                        <Style BasedOn="{StaticResource {x:Type ComboBoxItem}}" TargetType="ComboBoxItem">
                             <Setter Property="IsEnabled" Value="{Binding IsEnabled}" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsEnabled}" Value="False">
@@ -140,7 +141,18 @@
                     </ComboBox.ItemContainerStyle>
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding DisplayName}" />
+                            <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                                <ui:SymbolIcon
+                                    Margin="0,0,8,0"
+                                    FontSize="16"
+                                    Foreground="#38bdf8"
+                                    Symbol="{Binding Icon}" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="12.5"
+                                    FontWeight="SemiBold"
+                                    Text="{Binding DisplayName}" />
+                            </StackPanel>
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                 </ComboBox>

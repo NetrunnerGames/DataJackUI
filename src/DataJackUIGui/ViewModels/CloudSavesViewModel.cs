@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataJackUIGui.Services;
 using Microsoft.Win32;
+using Wpf.Ui.Controls;
 
 namespace DataJackUIGui.ViewModels;
 
@@ -137,8 +138,10 @@ public partial class CloudSavesViewModel : ObservableObject
 
     public CloudProviderOption[] ProviderOptions { get; } =
     [
-        new CloudProviderOption { Key = "Local", DisplayName = "Local Storage", IsEnabled = true },
-        new CloudProviderOption { Key = "Cloud", DisplayName = "Cloud Storage (Coming Soon)", IsEnabled = false }
+        new CloudProviderOption { Key = "Local", DisplayName = "Local Storage", Icon = SymbolRegular.Folder24, Description = "Store backups in custom or default local folder", IsEnabled = true },
+        new CloudProviderOption { Key = "OneDrive", DisplayName = "Microsoft OneDrive (Coming Soon)", Icon = SymbolRegular.Cloud24, Description = "Sync backups directly to OneDrive cloud", IsEnabled = false },
+        new CloudProviderOption { Key = "GoogleDrive", DisplayName = "Google Drive (Coming Soon)", Icon = SymbolRegular.Cloud24, Description = "Sync backups directly to Google Drive cloud", IsEnabled = false },
+        new CloudProviderOption { Key = "Rclone", DisplayName = "Rclone (Coming Soon)", Icon = SymbolRegular.Server24, Description = "Sync with Rclone remotes (WebDAV, Nextcloud, S3, etc.)", IsEnabled = false }
     ];
 
     public string[] AvailableProviders => ["Local"];
