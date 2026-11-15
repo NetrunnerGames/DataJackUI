@@ -45,6 +45,25 @@
             <!--  WPF-UI button pressed foreground brushes (prevents text/icons turning black when pressed in dark theme)  -->
             <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#FFFFFF" />
             <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#090a0f" />
+
+            <!--  Global High-DPI Crisp Font & Subpixel ClearType Rendering for Windows 10 & 11  -->
+            <FontFamily x:Key="DefaultAppFont">Segoe UI Variable Text, Segoe UI, -apple-system, system-ui, sans-serif</FontFamily>
+
+            <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource DefaultAppFont}" />
+                <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+                <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+                <Setter Property="TextOptions.TextHintingMode" Value="Fixed" />
+                <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled" />
+            </Style>
+
+            <Style TargetType="Control">
+                <Setter Property="FontFamily" Value="{StaticResource DefaultAppFont}" />
+                <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+                <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+                <Setter Property="TextOptions.TextHintingMode" Value="Fixed" />
+                <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

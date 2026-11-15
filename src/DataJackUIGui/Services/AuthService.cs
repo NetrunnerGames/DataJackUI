@@ -255,7 +255,7 @@ public class AuthService
         }
     }
 
-    public const string GoogleClientId = "781682855217-v068fks3g2a945d8bvd9sff5e135ek60.apps.googleusercontent.com";
+    public const string GoogleClientId = "719548187884-ps8i4gss2gon2u6bfndjh8uc3iqn0i7k.apps.googleusercontent.com";
 
     // ── Interactive sign-in ─────────────────────────────────────────
 
@@ -428,17 +428,18 @@ public class AuthService
             try { listener.Stop(); } catch { }
         }
 
-        // Exchange code for tokens
+        // Exchange code for tokens via PKCE
+        var tokenDict = new Dictionary<string, string>
+        {
+            ["client_id"] = GoogleClientId,
+            ["code"] = authCode,
+            ["code_verifier"] = verifier,
+            ["grant_type"] = "authorization_code",
+            ["redirect_uri"] = redirectUri
+        };
         var tokenReq = new HttpRequestMessage(HttpMethod.Post, "https://oauth2.googleapis.com/token")
         {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["client_id"] = GoogleClientId,
-                ["code"] = authCode,
-                ["code_verifier"] = verifier,
-                ["grant_type"] = "authorization_code",
-                ["redirect_uri"] = redirectUri
-            })
+            Content = new FormUrlEncodedContent(tokenDict)
         };
 
         var tokenRes = await _http.SendAsync(tokenReq, ct);
@@ -825,6 +826,12 @@ public class AuthService
     public void SignOut()
     {
         ClearSession();
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\DataJackUI");
+            key?.SetValue("OnboardingComplete", 0, Microsoft.Win32.RegistryValueKind.DWord);
+        }
+        catch { }
         NotifyAuthStateChanged();
     }
 

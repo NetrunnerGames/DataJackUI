@@ -570,7 +570,7 @@ public partial class CloudSavesService(
 
     private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
 
-    private const string GoogleClientId = "781682855217-v068fks3g2a945d8bvd9sff5e135ek60.apps.googleusercontent.com";
+    private const string GoogleClientId = AuthService.GoogleClientId;
     private const string MicrosoftClientId = "d3590ed6-52b3-4102-aeff-aad2292ab01c";
 
     public bool IsGoogleDriveConnected =>

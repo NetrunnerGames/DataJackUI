@@ -79,19 +79,5 @@ public class OnboardingAuthTests : IDisposable
         await vm.SignInCommand.ExecuteAsync(null);
         Assert.Equal("Waiting for Discord...", vm.WaitingMessage);
         Assert.False(vm.IsSigningIn);
-
-        // Username / OTP flow
-        vm.StartUsernameSignInCommand.Execute(null);
-        Assert.True(vm.IsOtpMode);
-
-        // Set invalid OTP code
-        vm.OtpInput = "123";
-        await vm.VerifyOtpCommand.ExecuteAsync(null);
-        Assert.Equal("Please enter a valid 6-digit OTP code.", vm.StatusLine);
-
-        // Cancel OTP mode
-        vm.CancelOtpModeCommand.Execute(null);
-        Assert.False(vm.IsOtpMode);
-        Assert.Equal("", vm.OtpInput);
     }
 }

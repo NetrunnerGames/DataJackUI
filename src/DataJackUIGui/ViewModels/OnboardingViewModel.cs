@@ -34,7 +34,7 @@ public partial class OnboardingViewModel : ObservableObject
         _auth.AuthStateChanged += () =>
         {
             IsSignedIn = _auth.IsSignedIn;
-            if (!_auth.IsSignedIn && !_cache.OnboardingComplete) IsOpen = true;
+            if (!_auth.IsSignedIn) IsOpen = true;
         };
         IsSignedIn = _auth.IsSignedIn;
     }
@@ -104,22 +104,28 @@ public partial class OnboardingViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void StartUsernameSignIn()
+    private async Task SignInWithGoogle()
     {
-        IsOtpMode = true;
-        OtpInput = "";
+        if (IsSigningIn) return;
+        IsSigningIn = true;
         StatusLine = null;
+        WaitingMessage = "Waiting for Google...";
+        _signInCts?.Cancel();
+        _signInCts?.Dispose();
+        _signInCts = new CancellationTokenSource();
         try
         {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "https://auth.netrunnergames.workers.dev/login",
-                UseShellExecute = true
-            });
+            await _auth.SignInWithGoogleAsync(_signInCts.Token);
+            IsOtpMode = false;
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            StatusLine = "Failed to launch browser: " + ex.Message;
+            StatusLine = ex.Message;
+        }
+        finally
+        {
+            IsSigningIn = false;
         }
     }
 

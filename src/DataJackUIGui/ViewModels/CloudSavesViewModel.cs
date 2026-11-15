@@ -139,12 +139,12 @@ public partial class CloudSavesViewModel : ObservableObject
     public CloudProviderOption[] ProviderOptions { get; } =
     [
         new CloudProviderOption { Key = "Local", DisplayName = "Local Storage", Icon = SymbolRegular.Folder24, Description = "Store backups in custom or default local folder", IsEnabled = true },
-        new CloudProviderOption { Key = "OneDrive", DisplayName = "Microsoft OneDrive (Coming Soon)", Icon = SymbolRegular.Cloud24, Description = "Sync backups directly to OneDrive cloud", IsEnabled = false },
-        new CloudProviderOption { Key = "GoogleDrive", DisplayName = "Google Drive (Coming Soon)", Icon = SymbolRegular.Cloud24, Description = "Sync backups directly to Google Drive cloud", IsEnabled = false },
-        new CloudProviderOption { Key = "Rclone", DisplayName = "Rclone (Coming Soon)", Icon = SymbolRegular.Server24, Description = "Sync with Rclone remotes (WebDAV, Nextcloud, S3, etc.)", IsEnabled = false }
+        new CloudProviderOption { Key = "GoogleDrive", DisplayName = "Google Drive", Icon = SymbolRegular.Cloud24, Description = "Sync backups directly to Google Drive cloud", IsEnabled = true },
+        new CloudProviderOption { Key = "Rclone", DisplayName = "Rclone Remote", Icon = SymbolRegular.Server24, Description = "Sync with custom Rclone remotes (WebDAV, Nextcloud, S3, etc.)", IsEnabled = true },
+        new CloudProviderOption { Key = "OneDrive", DisplayName = "Microsoft OneDrive (Coming Soon)", Icon = SymbolRegular.Cloud24, Description = "Sync backups directly to OneDrive cloud", IsEnabled = false }
     ];
 
-    public string[] AvailableProviders => ["Local"];
+    public string[] AvailableProviders => ["Local", "GoogleDrive", "Rclone"];
 
     public CloudProviderOption? SelectedProviderOption
     {
