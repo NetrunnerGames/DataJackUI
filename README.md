@@ -11,6 +11,7 @@ A modern desktop interface for Steam manifest management, native hook injection,
 <a href="https://github.com/NetrunnerGames/Jack-in/releases/tag/v1.3"><img src="https://img.shields.io/badge/Jack--in_Plugin-v1.3-090a0f?style=for-the-badge&labelColor=090a0f&logo=steam&logoColor=00adf0" height="42" alt="Jack-in Plugin" /></a>
 <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/Framework-.NET_8.0_WPF-090a0f?style=for-the-badge&labelColor=090a0f&logo=dotnet&logoColor=512bd4" height="42" alt="Framework" /></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-090a0f?style=for-the-badge&labelColor=090a0f&logo=open-source-initiative&logoColor=3da639" height="42" alt="License" /></a>
+<a href="https://app.fossa.com/projects/git%2Bgithub.com%2FNetrunnerGames%2FDataJackUI?ref=badge_shield" alt="FOSSA Status"><img src="https://app.fossa.com/api/projects/git%2Bgithub.com%2FNetrunnerGames%2FDataJackUI.svg?type=shield"/></a>
 
 <img src="docs/screenshot.png" width="95%" alt="DataJackUI Interface Screenshot" />
 <br ><br >
@@ -86,3 +87,6 @@ DataJackUI is developed using architecture adapted from community open-source pr
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FNetrunnerGames%2FDataJackUI.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FNetrunnerGames%2FDataJackUI?ref=badge_large)
