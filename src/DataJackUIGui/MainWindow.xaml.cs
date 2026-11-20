@@ -235,6 +235,9 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     /// <summary>Switch to Plugin (used by Home's "Plugin Status" tile).</summary>
     public void NavigateToPlugin() => RootNavigation.Navigate(typeof(PluginView));
 
+    /// <summary>Switch to FAQ & Tutorials.</summary>
+    public void NavigateToFaq() => RootNavigation.Navigate(typeof(FaqView));
+
     /// <summary>Switch to Mode (used by Home's mode status row).</summary>
     public void NavigateToMode() => RootNavigation.Navigate(typeof(ModeView));
 

@@ -96,6 +96,7 @@ public partial class App : Application
                 services.AddSingleton<DownloadsViewModel>();
                 services.AddSingleton<PluginViewModel>();
                 services.AddSingleton<CloudSavesViewModel>();
+                services.AddSingleton<FaqViewModel>();
                 services.AddSingleton<OnboardingViewModel>();
                 services.AddSingleton<MainViewModel>();
                 // Pages resolved by NavigationView via the DI service provider.
@@ -109,6 +110,7 @@ public partial class App : Application
                 services.AddSingleton<OnlineFixesView>();
                 services.AddSingleton<PluginView>();
                 services.AddSingleton<CloudSavesView>();
+                services.AddSingleton<FaqView>();
                 services.AddSingleton<SettingsView>();
                 services.AddSingleton<MainWindow>();
             })

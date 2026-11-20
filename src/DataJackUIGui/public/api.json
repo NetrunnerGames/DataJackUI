@@ -2,7 +2,7 @@
   "api_list": [
     {
       "name": "DepotBox",
-      "url": "https://depotbox.org/api/direct-download",
+      "url": "https://depotbox.lol/api/direct-download",
       "weight": 300
     },
     {

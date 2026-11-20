@@ -68,7 +68,7 @@ public class HttpServerService : IHostedService
         _log.LogWarning("api.json not found, using fallback sources");
         _apiSources = new()
         {
-            new("DepotBox", "https://depotbox.org/api/direct-download", 200),
+            new("DepotBox", "https://depotbox.lol/api/direct-download", 200),
             new("Ryuu", "https://generator.ryuu.lol/manifestinfo/<appid>", 200),
             new("Ryuu Direct", "https://generator.ryuu.lol/api/download/<appid>?file_type=manifest", 200),
             new("Sushi", "https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/<appid>.zip", 200),

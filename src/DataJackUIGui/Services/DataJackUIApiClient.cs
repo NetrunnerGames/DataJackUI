@@ -1908,7 +1908,7 @@ public class DataJackUIApiClient
         catch { }
 
         // Direct fallback endpoint if worker is unreachable
-        string directUrl = $"https://depotbox.org/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
+        string directUrl = $"https://depotbox.lol/api/game-fixes/download?id={Uri.EscapeDataString(fixId)}&file={Uri.EscapeDataString(fallbackName)}";
         return await DownloadFromUrlAsync(directUrl, fallbackName, progress, ct);
     }
 

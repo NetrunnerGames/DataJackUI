@@ -428,18 +428,17 @@ public class AuthService
             try { listener.Stop(); } catch { }
         }
 
-        // Exchange code for tokens via PKCE
-        var tokenDict = new Dictionary<string, string>
+        // Exchange code for tokens via backend proxy (keeps Google Client Secret secure)
+        var exchangePayload = new
         {
-            ["client_id"] = GoogleClientId,
-            ["code"] = authCode,
-            ["code_verifier"] = verifier,
-            ["grant_type"] = "authorization_code",
-            ["redirect_uri"] = redirectUri
+            client_id = GoogleClientId,
+            code = authCode,
+            code_verifier = verifier,
+            redirect_uri = redirectUri
         };
-        var tokenReq = new HttpRequestMessage(HttpMethod.Post, "https://oauth2.googleapis.com/token")
+        var tokenReq = new HttpRequestMessage(HttpMethod.Post, $"{AppConfig.AuthWorkerUrl}/api/auth/google/exchange")
         {
-            Content = new FormUrlEncodedContent(tokenDict)
+            Content = new StringContent(JsonSerializer.Serialize(exchangePayload), Encoding.UTF8, "application/json")
         };
 
         var tokenRes = await _http.SendAsync(tokenReq, ct);
@@ -456,29 +455,40 @@ public class AuthService
         if (string.IsNullOrEmpty(accessToken))
             throw new AuthException("Invalid token response from Google.");
 
-        // Fetch user profile
+        // Fetch user profile from response or fallback to userinfo endpoint
         string? userEmail = null;
         string? userName = null;
         string? userPicture = null;
         string? userId = null;
 
-        try
+        if (root.TryGetProperty("user", out var uObj))
         {
-            var userReq = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
-            userReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-            var userRes = await _http.SendAsync(userReq, ct);
-            if (userRes.IsSuccessStatusCode)
-            {
-                string userBody = await userRes.Content.ReadAsStringAsync(ct);
-                using var userDoc = JsonDocument.Parse(userBody);
-                var uRoot = userDoc.RootElement;
-                if (uRoot.TryGetProperty("id", out var idProp)) userId = idProp.GetString();
-                if (uRoot.TryGetProperty("email", out var emailProp)) userEmail = emailProp.GetString();
-                if (uRoot.TryGetProperty("name", out var nameProp)) userName = nameProp.GetString();
-                if (uRoot.TryGetProperty("picture", out var picProp)) userPicture = picProp.GetString();
-            }
+            if (uObj.TryGetProperty("id", out var uid)) userId = uid.GetString();
+            if (uObj.TryGetProperty("email", out var uem)) userEmail = uem.GetString();
+            if (uObj.TryGetProperty("name", out var unm)) userName = unm.GetString();
+            if (uObj.TryGetProperty("picture", out var upic)) userPicture = upic.GetString();
         }
-        catch { }
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            try
+            {
+                var userReq = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
+                userReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                var userRes = await _http.SendAsync(userReq, ct);
+                if (userRes.IsSuccessStatusCode)
+                {
+                    string userBody = await userRes.Content.ReadAsStringAsync(ct);
+                    using var userDoc = JsonDocument.Parse(userBody);
+                    var uRoot = userDoc.RootElement;
+                    if (uRoot.TryGetProperty("id", out var idProp)) userId = idProp.GetString();
+                    if (uRoot.TryGetProperty("email", out var emailProp)) userEmail = emailProp.GetString();
+                    if (uRoot.TryGetProperty("name", out var nameProp)) userName = nameProp.GetString();
+                    if (uRoot.TryGetProperty("picture", out var picProp)) userPicture = picProp.GetString();
+                }
+            }
+            catch { }
+        }
 
         _accessToken = accessToken;
         _refreshToken = !string.IsNullOrEmpty(refreshToken) ? refreshToken : accessToken;

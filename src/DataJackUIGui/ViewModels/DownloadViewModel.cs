@@ -1243,11 +1243,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         {
             InstallFailed = !result.Ok;
             InstallStatus = result.Message;
-            if (result.Ok && _fastFetchSource is not null)
-            {
-                InstallStatus += " " + string.Format(Resources.Strings.Add_FastFetch_Via, _fastFetchSource);
-                _fastFetchSource = null;
-            }
+            _fastFetchSource = null;
         }
 
         // Usage just changed: Hubcap against the key's own quota, everything else against the 25/day.

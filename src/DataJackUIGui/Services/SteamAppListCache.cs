@@ -17,8 +17,8 @@ public class SteamAppListCache
         "https://generator.ryuu.lol/gamelist",
         "https://generator.ryuu.lol/api/gamelist",
         "https://generator.ryuu.lol/api/games",
-        "https://depotbox.org/gamelist",
-        "https://depotbox.org/api/gamelist",
+        "https://depotbox.lol/gamelist",
+        "https://depotbox.lol/api/gamelist",
         "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
     ];
 

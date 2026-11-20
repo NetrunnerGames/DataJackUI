@@ -113,6 +113,11 @@
                                 <ui:SymbolIcon Symbol="Cloud24" />
                             </ui:NavigationViewItem.Icon>
                         </ui:NavigationViewItem>
+                        <ui:NavigationViewItem Content="F.A.Q" TargetPageType="{x:Type views:FaqView}">
+                            <ui:NavigationViewItem.Icon>
+                                <ui:SymbolIcon Symbol="QuestionCircle24" />
+                            </ui:NavigationViewItem.Icon>
+                        </ui:NavigationViewItem>
                     </ui:NavigationView.MenuItems>
 
                     <ui:NavigationView.FooterMenuItems>

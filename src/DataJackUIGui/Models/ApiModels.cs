@@ -222,7 +222,7 @@ public static class SourceMeta
 
     public static readonly Dictionary<string, Meta> All = new()
     {
-        ["DepotBox"] = new(DisplayName: "DepotBox", DiscordUrl: "https://depotbox.org"),
+        ["DepotBox"] = new(DisplayName: "DepotBox", DiscordUrl: "https://depotbox.lol"),
         ["Ryuu"] = new(DiscordUrl: "https://discord.gg/manifests"),
         ["TwentyTwo Cloud"] = new(DiscordUrl: "https://discord.gg/RrukXPyv5b"),
         ["Sushi"] = new(DiscordUrl: "https://discord.gg/hMdv5dQhcN"),

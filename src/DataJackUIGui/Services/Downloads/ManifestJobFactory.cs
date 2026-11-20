@@ -449,13 +449,24 @@ public class ManifestJobFactory(
                 return new JobResult(false,
                     string.Format(Resources.Strings.Add_Status_InstallFailed, result.Failed.Count));
 
-            string message = result.ManifestCount > 0
-                ? string.Format(Resources.Strings.Add_Status_AddedManifests, gameName, result.ManifestCount)
-                : string.Format(Resources.Strings.Add_Status_AddedFetch, gameName);
+            int dlcCount = 0;
+            string? installedLua = installer.ReadInstalledLua(appId);
+            if (!string.IsNullOrEmpty(installedLua) && File.Exists(installedLua))
+            {
+                var parsed = LuaFileParser.Parse(installedLua, appId);
+                if (parsed is not null)
+                {
+                    dlcCount = parsed.Entries.Count(e => e.Id != appId);
+                }
+            }
+
+            string message = dlcCount > 0
+                ? $"{gameName} has been downloaded with {dlcCount} DLC{(dlcCount == 1 ? "" : "s")}."
+                : $"{gameName} has been downloaded.";
 
             // Where it LANDED, not where it was staged: file.FilePath is deleted by the finally below,
             // so returning it handed callers a path guaranteed not to exist.
-            return new JobResult(true, message, installer.ReadInstalledLua(appId));
+            return new JobResult(true, message, installedLua);
         }
         finally
         {
