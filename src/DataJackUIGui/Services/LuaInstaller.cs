@@ -389,18 +389,28 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
                 CaptureInstalled(appId, dest, buildId, source);
                 luaInstalled = true;
                 RecordLoaded(appId);
+                PluginLog.Log($"LuaInstaller: installed lua -> {dest}");
             }
             else
             {
-                entry.ExtractToFile(dest, overwrite: true);
+                using (var entryStream = entry.Open())
+                using (var outStream = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    entryStream.CopyTo(outStream);
+                }
                 if (settings.IsAppUnlocked(appId))
                 {
                     MachineProtectionService.LockInstalledFile(dest, appId);
                 }
                 StampNow(dest);
                 manifestCount++;
+                PluginLog.Log($"LuaInstaller: installed manifest -> {dest} ({entry.Length} bytes)");
             }
         }
-        catch { failed.Add(entry.Name); }
+        catch (Exception ex)
+        {
+            PluginLog.Log($"LuaInstaller: failed to extract {entry.Name} -> {dest}: {ex.Message}");
+            failed.Add(entry.Name);
+        }
     }
 }
