@@ -172,12 +172,29 @@ if ($semgrepCmd) {
 Write-Host "`n1. Publishing DataJackUI WPF Application (v$DataJackVersion)..." -ForegroundColor Yellow
 dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --self-contained false -o $PublishDir
 
-# 3. Pack Velopack delta packages & binary releases
-Write-Host "`n2. Packaging Velopack Installer & Delta Updates..." -ForegroundColor Yellow
-vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop --runtime win-x64 --noPortable -o $ReleasesDir
-# Clean up duplicate default Velopack installer exe (we distribute modern Inno Setup instead)
+# 3. Pack Velopack delta packages & portable binary releases
+Write-Host "`n2. Packaging Velopack Portable & Delta Updates..." -ForegroundColor Yellow
+vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop --runtime win-x64 --noInst -o $ReleasesDir
+
+# Clean up duplicate default Velopack installer exe if any was generated
 Remove-Item -Force "$ReleasesDir/DataJackUI-win-Setup.exe" -ErrorAction SilentlyContinue
-Remove-Item -Force "$ReleasesDir/DataJackUI-win-Portable.zip" -ErrorAction SilentlyContinue
+
+# Ensure Velopack's generated portable zip is named DataJackUI-Portable.zip
+$VeloWinPortable = "$ReleasesDir/DataJackUI-win-Portable.zip"
+$PortableZip = "$ReleasesDir/DataJackUI-Portable.zip"
+$PortableRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-Portable.zip"
+
+if (Test-Path $VeloWinPortable) {
+    Move-Item -Path $VeloWinPortable -Destination $PortableZip -Force
+    Copy-Item $PortableZip $PortableRootZip -Force
+    Write-Host "Velopack portable bundle normalized to: $PortableZip" -ForegroundColor Green
+} elseif (Test-Path $PublishDir) {
+    if (Test-Path $PortableZip) { Remove-Item -Force $PortableZip }
+    if (Test-Path $PortableRootZip) { Remove-Item -Force $PortableRootZip }
+    [System.IO.Compression.ZipFile]::CreateFromDirectory((Resolve-Path $PublishDir), $PortableZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+    Copy-Item $PortableZip $PortableRootZip -Force
+    Write-Host "Portable ZIP created: $PortableZip" -ForegroundColor Green
+}
 
 # 4. Compile Inno Setup Modern Dynamic Installer (wraps Velopack metadata for seamless in-app delta updates)
 Write-Host "`n3. Compiling Inno Setup Modern Installer..." -ForegroundColor Yellow
@@ -220,20 +237,13 @@ if (Test-Path $InnoSetupExePath) {
     Write-Host "Inno Setup ZIP created: $InnoZipTarget" -ForegroundColor Green
 }
 
-# 6. Package Portable ZIP from publish output
-Write-Host "`n5. Packaging Portable ZIP in Releases..." -ForegroundColor Yellow
-$PortableZip = "$ReleasesDir/DataJackUI-Portable.zip"
-$PortableRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-Portable.zip"
-
-if (Test-Path $PortableZip) { Remove-Item -Force $PortableZip }
-if (Test-Path $PortableRootZip) { Remove-Item -Force $PortableRootZip }
-
-if (Test-Path $PublishDir) {
+# 6. Normalize Portable ZIP
+# Velopack generated DataJackUI-win-Portable.zip which is renamed to DataJackUI-Portable.zip above.
+if (-not (Test-Path $PortableZip) -and (Test-Path $PublishDir)) {
+    Write-Host "`n5. Packaging Portable ZIP in Releases fallback..." -ForegroundColor Yellow
     [System.IO.Compression.ZipFile]::CreateFromDirectory((Resolve-Path $PublishDir), $PortableZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
     Copy-Item $PortableZip $PortableRootZip -Force
     Write-Host "Portable ZIP created: $PortableZip" -ForegroundColor Green
-} else {
-    Write-Host "Warning: PublishDir ($PublishDir) not found for Portable ZIP creation!" -ForegroundColor Red
 }
 
 Write-Host "`n====================================================" -ForegroundColor Green
