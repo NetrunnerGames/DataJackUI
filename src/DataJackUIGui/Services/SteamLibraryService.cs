@@ -148,6 +148,14 @@ public partial class SteamLibraryService(SteamService steam)
     }
 
     /// <summary>Every Steam library root (the main install plus any added libraries).</summary>
+    public IEnumerable<string> GetAllLibraryRoots()
+    {
+        string? steamRoot = steam.EffectivePath;
+        if (steamRoot is null) return [];
+        return GetLibraryRoots(steamRoot);
+    }
+
+    /// <summary>Every Steam library root (the main install plus any added libraries).</summary>
     private static IEnumerable<string> GetLibraryRoots(string steamRoot)
     {
         // The main install is always a library.

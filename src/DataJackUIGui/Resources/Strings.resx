@@ -308,14 +308,22 @@
   <data name="Manage_Depot" xml:space="preserve"><value>Depot</value></data>
   <data name="Manage_SharedDepot" xml:space="preserve"><value>Shared depot</value></data>
   <data name="Manage_DlcName" xml:space="preserve"><value>DLC {0}</value></data>
-  <data name="Manage_Delete_Title" xml:space="preserve"><value>Remove lua file</value></data>
+  <data name="Manage_Delete_Title" xml:space="preserve"><value>Uninstall / Delete Game</value></data>
   <data name="Manage_Delete_Body" xml:space="preserve"><value>Remove "{0}" (App ID {1})?
 
-This deletes its .lua file from Steam\config\stplug-in.</value></data>
-  <data name="Manage_DeleteMany_Title" xml:space="preserve"><value>Remove lua files</value></data>
-  <data name="Manage_DeleteMany_Body" xml:space="preserve"><value>Remove {0} lua files?
+This removes its .lua file, clears cached manifests, and unregisters it from Steam's library database.</value></data>
+  <data name="Manage_Delete_WithFiles_Body" xml:space="preserve"><value>Remove "{0}" (App ID {1})?
 
-This deletes the .lua files from Steam\config\stplug-in.</value></data>
+Installed game files were detected:
+{2}
+
+Choose whether to delete the downloaded game files from disk or only unregister from Steam.</value></data>
+  <data name="Manage_Delete_Action_UninstallAll" xml:space="preserve"><value>Delete Game Files</value></data>
+  <data name="Manage_Delete_Action_KeepFiles" xml:space="preserve"><value>Keep Files</value></data>
+  <data name="Manage_DeleteMany_Title" xml:space="preserve"><value>Uninstall Selected Games</value></data>
+  <data name="Manage_DeleteMany_Body" xml:space="preserve"><value>Uninstall {0} selected game(s)?
+
+This removes their .lua files, cleans up cached manifests, and unregisters them from Steam's library database.</value></data>
   <data name="Manage_RemoveFailed_Title" xml:space="preserve"><value>Remove failed</value></data>
   <data name="Manage_RemoveFailed_File" xml:space="preserve"><value>Couldn't delete the file:
 {0}</value></data>

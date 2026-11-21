@@ -36,11 +36,23 @@ public static class UiMessageBox
 
     public static async Task<bool> ShowConfirmAsync(string title, string body, string confirmText = "OK", string cancelText = "Cancel")
     {
+        var result = await ShowThreeOptionAsync(title, body, confirmText, secondaryText: "", cancelText: cancelText);
+        return result == Wpf.Ui.Controls.MessageBoxResult.Primary;
+    }
+
+    public static async Task<Wpf.Ui.Controls.MessageBoxResult> ShowThreeOptionAsync(
+        string title,
+        string body,
+        string primaryText,
+        string secondaryText = "",
+        string cancelText = "Cancel")
+    {
         if (Application.Current?.Dispatcher is { } dispatcher && !dispatcher.CheckAccess())
         {
-            return await dispatcher.InvokeAsync(() => ShowConfirmAsync(title, body, confirmText, cancelText)).Task.Unwrap();
+            return await dispatcher.InvokeAsync(() => ShowThreeOptionAsync(title, body, primaryText, secondaryText, cancelText)).Task.Unwrap();
         }
 
+        bool hasSecondary = !string.IsNullOrWhiteSpace(secondaryText);
         bool hasCancel = !string.IsNullOrWhiteSpace(cancelText);
 
         object content;
@@ -101,7 +113,8 @@ public static class UiMessageBox
         {
             Title = title,
             Content = content,
-            PrimaryButtonText = confirmText,
+            PrimaryButtonText = primaryText,
+            SecondaryButtonText = hasSecondary ? secondaryText : "",
             CloseButtonText = hasCancel ? cancelText : "",
             IsCloseButtonEnabled = hasCancel,
         };
@@ -111,7 +124,6 @@ public static class UiMessageBox
             msgBox.Owner = mainWindow;
         }
 
-        var result = await msgBox.ShowDialogAsync();
-        return result == Wpf.Ui.Controls.MessageBoxResult.Primary;
+        return await msgBox.ShowDialogAsync();
     }
 }

@@ -265,6 +265,9 @@ public static class Strings
     public static string Manage_DlcName => Get(nameof(Manage_DlcName));
     public static string Manage_Delete_Title => Get(nameof(Manage_Delete_Title));
     public static string Manage_Delete_Body => Get(nameof(Manage_Delete_Body));
+    public static string Manage_Delete_WithFiles_Body => Get(nameof(Manage_Delete_WithFiles_Body));
+    public static string Manage_Delete_Action_UninstallAll => Get(nameof(Manage_Delete_Action_UninstallAll));
+    public static string Manage_Delete_Action_KeepFiles => Get(nameof(Manage_Delete_Action_KeepFiles));
     public static string Manage_DeleteMany_Title => Get(nameof(Manage_DeleteMany_Title));
     public static string Manage_DeleteMany_Body => Get(nameof(Manage_DeleteMany_Body));
     public static string Manage_RemoveFailed_Title => Get(nameof(Manage_RemoveFailed_Title));

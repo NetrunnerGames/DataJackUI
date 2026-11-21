@@ -300,10 +300,12 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
     public string SelectionLabel => string.Format(Resources.Strings.Manage_SelectionLabel, SelectedCount);
 
     private readonly AuthService _auth;
+    private readonly SteamLibraryService _library;
+    private readonly IceBreakerIpcClient _ipc;
 
     public ManageViewModel(SteamService steam, SteamAppListCache appList, SteamAppInfoCache appInfo,
         CoverCache covers, ToastService toast, SettingsService settings,
-        SteamlessService steamless, AuthService auth)
+        SteamlessService steamless, AuthService auth, SteamLibraryService library, IceBreakerIpcClient ipc)
     {
         _steam = steam;
         _appList = appList;
@@ -313,6 +315,8 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         _settings = settings;
         _steamless = steamless;
         _auth = auth;
+        _library = library;
+        _ipc = ipc;
         InitPageSize(settings.ManagePageSize);
     }
 
@@ -466,32 +470,45 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         }
     }
 
-    /// <summary>Confirm, then delete the &lt;appid&gt;.lua file and remove the tile from the grid.</summary>
+    /// <summary>Confirm, then clean up manifests, library entries, optional files, and delete the lua.</summary>
     [RelayCommand]
     private async Task Delete(LuaTileViewModel tile)
     {
-        bool result = await UiMessageBox.ShowConfirmAsync(
-            Resources.Strings.Manage_Delete_Title,
-            string.Format(Resources.Strings.Manage_Delete_Body, tile.Name, tile.AppId),
-            "OK",
-            "Cancel");
-        if (!result) return;
+        string? installDir = _library.GetInstallDir(tile.AppId);
+        bool hasFiles = installDir is not null && Directory.Exists(installDir);
 
-        try
+        bool deleteGameFiles = false;
+        if (hasFiles)
         {
-            if (File.Exists(tile.FilePath)) File.Delete(tile.FilePath);
+            var choice = await UiMessageBox.ShowThreeOptionAsync(
+                Resources.Strings.Manage_Delete_Title,
+                string.Format(Resources.Strings.Manage_Delete_WithFiles_Body, tile.Name, tile.AppId, installDir),
+                primaryText: Resources.Strings.Manage_Delete_Action_UninstallAll,
+                secondaryText: Resources.Strings.Manage_Delete_Action_KeepFiles,
+                cancelText: "Cancel");
+
+            if (choice == Wpf.Ui.Controls.MessageBoxResult.None) return;
+            deleteGameFiles = choice == Wpf.Ui.Controls.MessageBoxResult.Primary;
         }
-        catch (Exception ex)
+        else
         {
-            await UiMessageBox.ShowConfirmAsync(
-                Resources.Strings.Manage_RemoveFailed_Title,
-                string.Format(Resources.Strings.Manage_RemoveFailed_File, ex.Message),
-                "OK", "");
-            return;
+            bool result = await UiMessageBox.ShowConfirmAsync(
+                Resources.Strings.Manage_Delete_Title,
+                string.Format(Resources.Strings.Manage_Delete_Body, tile.Name, tile.AppId),
+                "OK",
+                "Cancel");
+            if (!result) return;
         }
+
+        await CleanUpGameArtifactsAsync(tile.AppId, tile.FilePath, deleteGameFiles ? installDir : null);
 
         if (!await TryDeleteFileAsync(tile.FilePath, tile.Name)) return;
         RemoveTile(tile);
+
+        _ = Task.Run(async () =>
+        {
+            try { await _ipc.ReloadManifestsAsync(); } catch { }
+        });
     }
 
     private void RecountSelection() => SelectedCount = _all.Count(t => t.IsSelected);
@@ -503,7 +520,7 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         SelectedCount = 0;
     }
 
-    /// <summary>Delete all selected lua files after one confirm; offer a Steam restart afterwards.</summary>
+    /// <summary>Delete all selected games after one confirm; cleans up manifests and ACF files.</summary>
     [RelayCommand]
     private async Task DeleteSelected()
     {
@@ -520,6 +537,8 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         int failed = 0;
         foreach (var t in targets)
         {
+            await CleanUpGameArtifactsAsync(t.AppId, t.FilePath, installDir: null);
+
             if (await TryDeleteFileAsync(t.FilePath, t.Name, silent: true))
             {
                 t.SelectionChanged = null;
@@ -533,13 +552,79 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         ApplyFilter();
         SelectedCount = _all.Count(t => t.IsSelected);
 
+        _ = Task.Run(async () =>
+        {
+            try { await _ipc.ReloadManifestsAsync(); } catch { }
+        });
+
         if (failed > 0)
             await UiMessageBox.ShowConfirmAsync(
                 Resources.Strings.Manage_RemoveFailed_Title,
                 string.Format(Resources.Strings.Manage_RemoveFailed_Count, failed),
                 "OK", "");
+    }
 
-        // No restart prompt: OST/BST watch config/stplug-in, so deleting a lua un-applies it live.
+    /// <summary>Cleans up appmanifest_&lt;appid&gt;.acf, cached depot manifests, and optionally common game folder.</summary>
+    private async Task CleanUpGameArtifactsAsync(long appId, string luaPath, string? installDir)
+    {
+        await Task.Run(() =>
+        {
+            // 1. Delete installed game files if requested
+            if (installDir is not null && Directory.Exists(installDir))
+            {
+                try { Directory.Delete(installDir, recursive: true); } catch { }
+            }
+
+            // 2. Delete appmanifest_<appid>.acf across all library roots
+            foreach (string library in _library.GetAllLibraryRoots())
+            {
+                string acf = Path.Combine(library, "steamapps", $"appmanifest_{appId}.acf");
+                if (File.Exists(acf)) { try { File.Delete(acf); } catch { } }
+
+                if (installDir is not null && Directory.Exists(installDir))
+                {
+                    string common = Path.Combine(library, "steamapps", "common");
+                    if (installDir.StartsWith(common, StringComparison.OrdinalIgnoreCase))
+                    {
+                        try { Directory.Delete(installDir, recursive: true); } catch { }
+                    }
+                }
+            }
+
+            // 3. Delete manifests from depotcache
+            string? depotCache = _steam.DepotCacheDir;
+            if (depotCache is not null && Directory.Exists(depotCache))
+            {
+                try
+                {
+                    var installedDepots = _library.GetInstalledDepots(appId);
+                    foreach (var depotId in installedDepots.Keys)
+                    {
+                        var files = Directory.GetFiles(depotCache, $"{depotId}_*.manifest");
+                        foreach (var f in files) { try { File.Delete(f); } catch { } }
+                    }
+
+                    // Also check setManifestid lines inside the lua file itself before it is deleted
+                    if (File.Exists(luaPath))
+                    {
+                        string luaText = File.ReadAllText(luaPath);
+                        var depotMatches = System.Text.RegularExpressions.Regex.Matches(
+                            luaText,
+                            @"setManifestid\(\s*(\d+)\s*,\s*""(\d+)""",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                        foreach (System.Text.RegularExpressions.Match m in depotMatches)
+                        {
+                            string depotId = m.Groups[1].Value;
+                            string manifestId = m.Groups[2].Value;
+                            string manifestFile = Path.Combine(depotCache, $"{depotId}_{manifestId}.manifest");
+                            if (File.Exists(manifestFile)) { try { File.Delete(manifestFile); } catch { } }
+                        }
+                    }
+                }
+                catch { }
+            }
+        });
     }
 
     /// <summary>Delete one lua file; returns false (and warns, unless silent) on failure.</summary>
