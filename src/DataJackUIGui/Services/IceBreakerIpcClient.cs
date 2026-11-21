@@ -93,4 +93,14 @@ public class IceBreakerIpcClient
         string? res = await SendCommandAsync("RELOAD", 1500);
         return res is not null && res.StartsWith("OK");
     }
+
+    /// <summary>
+    /// Explicitly tells IceBreaker to sanitize any stale error state (UpdateResult 6 / StateFlags 6)
+    /// in appmanifest_{appId}.acf and re-arm the license so the download resumes cleanly.
+    /// </summary>
+    public async Task<bool> RetryAppDownloadAsync(uint appId)
+    {
+        string? res = await SendCommandAsync($"RETRY_APP {appId}", 1500);
+        return res is not null && res.StartsWith("OK");
+    }
 }

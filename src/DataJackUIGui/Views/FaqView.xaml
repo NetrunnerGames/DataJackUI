@@ -14,12 +14,11 @@
     <Grid Margin="32,24,32,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!--  Header  -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,18">
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
             <TextBlock
                 FontSize="24"
                 FontWeight="Bold"
@@ -29,54 +28,45 @@
                 Margin="0,4,0,0"
                 FontSize="13"
                 Foreground="#9ca3af"
-                Text="Browse answers, troubleshooting tips, and helpful guides for DataJackUI." />
+                Text="Knowledge base, setup walkthroughs, and troubleshooting guides." />
         </StackPanel>
 
-        <!--  Search Bar  -->
-        <Grid Grid.Row="1" Margin="0,0,0,20">
-            <ui:TextBox
-                ClearButtonEnabled="True"
-                Icon="Search24"
-                PlaceholderText="Search questions, keywords, or topics..."
-                Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
-        </Grid>
-
-        <!--  FAQ Items Accordions  -->
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding FilteredItems}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:FaqItemViewModel}">
-                        <Border
-                            Margin="0,0,0,10"
-                            Background="#181824"
-                            BorderBrush="#2d2d3f"
-                            BorderThickness="1"
-                            CornerRadius="8">
-                            <Expander
-                                Padding="12,10"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
-                                <Expander.Header>
-                                    <Grid Margin="4,0,0,0">
+        <!--  Main Content Area with Blurred Skeleton Items & Coming Soon Overlay  -->
+        <Grid Grid.Row="1">
+            <!--  Blurred Placeholder / Skeleton FAQs  -->
+            <ScrollViewer
+                IsHitTestVisible="False"
+                Opacity="0.38"
+                VerticalScrollBarVisibility="Hidden">
+                <ScrollViewer.Effect>
+                    <BlurEffect Radius="9" />
+                </ScrollViewer.Effect>
+                <ItemsControl ItemsSource="{Binding PlaceholderItems}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:FaqPlaceholderItem}">
+                            <Border
+                                Margin="0,0,0,14"
+                                Padding="16,14"
+                                Background="#14141e"
+                                BorderBrush="#252536"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock
                                             Grid.Column="0"
-                                            VerticalAlignment="Center"
                                             FontSize="14"
                                             FontWeight="SemiBold"
-                                            Foreground="#f3f4f6"
-                                            Text="{Binding Question}"
-                                            TextWrapping="Wrap" />
+                                            Foreground="#e5e7eb"
+                                            Text="{Binding Question}" />
                                         <Border
                                             Grid.Column="1"
-                                            Margin="12,0,8,0"
-                                            Padding="6,2"
-                                            VerticalAlignment="Center"
-                                            Background="#232336"
+                                            Padding="8,2"
+                                            Background="#1f1f2e"
                                             CornerRadius="4">
                                             <TextBlock
                                                 FontSize="11"
@@ -84,35 +74,81 @@
                                                 Text="{Binding Category}" />
                                         </Border>
                                     </Grid>
-                                </Expander.Header>
-
-                                <StackPanel Margin="8,8,8,12">
                                     <TextBlock
-                                        FontSize="13"
-                                        Foreground="#d1d5db"
-                                        LineHeight="20"
+                                        FontSize="12"
+                                        Foreground="#6b7280"
+                                        LineHeight="18"
                                         Text="{Binding Answer}"
                                         TextWrapping="Wrap" />
-
-                                    <ui:Button
-                                        Margin="0,12,0,0"
-                                        Padding="10,6"
-                                        HorizontalAlignment="Left"
-                                        Appearance="Secondary"
-                                        Command="{Binding OpenLinkCommand}"
-                                        Cursor="Hand"
-                                        Visibility="{Binding HasLink, Converter={StaticResource BoolToVis}}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <ui:SymbolIcon Margin="0,0,6,0" Symbol="Open24" />
-                                            <TextBlock Text="{Binding LinkText}" />
-                                        </StackPanel>
-                                    </ui:Button>
                                 </StackPanel>
-                            </Expander>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!--  "Coming Soon" Floating Glass Badge / Card  -->
+            <Border
+                Padding="36,28"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="#EE0e0e17"
+                BorderBrush="#3b82f6"
+                BorderThickness="1"
+                CornerRadius="16">
+                <Border.Effect>
+                    <DropShadowEffect
+                        BlurRadius="32"
+                        Opacity="0.45"
+                        ShadowDepth="0"
+                        Color="#3b82f6" />
+                </Border.Effect>
+                <StackPanel HorizontalAlignment="Center">
+                    <Border
+                        Width="56"
+                        Height="56"
+                        Margin="0,0,0,16"
+                        HorizontalAlignment="Center"
+                        Background="#1e293b"
+                        BorderBrush="#60a5fa"
+                        BorderThickness="1"
+                        CornerRadius="28">
+                        <ui:SymbolIcon
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontSize="26"
+                            Foreground="#60a5fa"
+                            Symbol="Clock24" />
+                    </Border>
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        FontSize="20"
+                        FontWeight="Bold"
+                        Foreground="White"
+                        Text="Knowledge Base Coming Soon" />
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        HorizontalAlignment="Center"
+                        FontSize="13"
+                        Foreground="#9ca3af"
+                        Text="Comprehensive step-by-step guides, FAQs, and tutorials are currently being prepared."
+                        TextAlignment="Center" />
+                    <Border
+                        Margin="0,16,0,0"
+                        Padding="10,4"
+                        HorizontalAlignment="Center"
+                        Background="#1e1e2d"
+                        BorderBrush="#374151"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                        <TextBlock
+                            FontSize="11"
+                            FontWeight="SemiBold"
+                            Foreground="#60a5fa"
+                            Text="UNDER PREPARATION" />
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>

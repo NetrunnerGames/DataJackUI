@@ -17,6 +17,7 @@
             x:Key="ChoiceButton"
             BasedOn="{StaticResource {x:Type ui:Button}}"
             TargetType="ui:Button">
+            <Setter Property="Appearance" Value="Secondary" />
             <Setter Property="MinWidth" Value="92" />
             <Setter Property="Margin" Value="6,0,0,0" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
@@ -245,6 +246,9 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding ApplyRecommended}" Value="True">
                                             <Setter Property="Appearance" Value="Primary" />
+                                            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+                                            <Setter Property="Foreground" Value="White" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -259,6 +263,9 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding ApplyRecommended}" Value="False">
                                             <Setter Property="Appearance" Value="Primary" />
+                                            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+                                            <Setter Property="Foreground" Value="White" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -298,6 +305,9 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding InstallPlugin}" Value="True">
                                             <Setter Property="Appearance" Value="Primary" />
+                                            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+                                            <Setter Property="Foreground" Value="White" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -312,6 +322,9 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding InstallPlugin}" Value="False">
                                             <Setter Property="Appearance" Value="Primary" />
+                                            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+                                            <Setter Property="Foreground" Value="White" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -327,9 +340,12 @@
                     HorizontalAlignment="Stretch"
                     HorizontalContentAlignment="Center"
                     Appearance="Primary"
+                    Background="{DynamicResource AccentFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource AccentFillColorSecondaryBrush}"
                     Command="{Binding FinishCommand}"
                     Content="{x:Static res:Strings.Onboarding_Go}"
                     FontSize="14"
+                    Foreground="White"
                     IsEnabled="{Binding CanFinish}" />
             </StackPanel>
         </Border>

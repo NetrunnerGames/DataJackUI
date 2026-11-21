@@ -1,11 +1,9 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using DataJackUIGui.Services;
 
 namespace DataJackUIGui.ViewModels;
 
-public partial class FaqItemViewModel : ObservableObject
+public partial class FaqPlaceholderItem : ObservableObject
 {
     [ObservableProperty]
     private string _category = "";
@@ -15,125 +13,53 @@ public partial class FaqItemViewModel : ObservableObject
 
     [ObservableProperty]
     private string _answer = "";
-
-    [ObservableProperty]
-    private string? _linkText;
-
-    [ObservableProperty]
-    private string? _linkUrl;
-
-    [ObservableProperty]
-    private bool _isExpanded;
-
-    public bool HasLink => !string.IsNullOrEmpty(LinkUrl);
-
-    [RelayCommand]
-    private void OpenLink()
-    {
-        if (!string.IsNullOrEmpty(LinkUrl))
-        {
-            try { SteamService.OpenUrl(LinkUrl); } catch { }
-        }
-    }
 }
 
 public partial class FaqViewModel : ObservableObject
 {
     [ObservableProperty]
-    private string _searchText = "";
-
-    [ObservableProperty]
-    private ObservableCollection<FaqItemViewModel> _items = [];
-
-    [ObservableProperty]
-    private ObservableCollection<FaqItemViewModel> _filteredItems = [];
+    private ObservableCollection<FaqPlaceholderItem> _placeholderItems = [];
 
     public FaqViewModel()
     {
-        LoadFaqs();
-    }
-
-    partial void OnSearchTextChanged(string value)
-    {
-        Filter();
-    }
-
-    private void Filter()
-    {
-        if (string.IsNullOrWhiteSpace(SearchText))
-        {
-            FilteredItems = new ObservableCollection<FaqItemViewModel>(Items);
-            return;
-        }
-
-        string q = SearchText.Trim().ToLowerInvariant();
-        var matches = Items.Where(i =>
-            i.Question.ToLowerInvariant().Contains(q) ||
-            i.Answer.ToLowerInvariant().Contains(q) ||
-            i.Category.ToLowerInvariant().Contains(q));
-
-        FilteredItems = new ObservableCollection<FaqItemViewModel>(matches);
-    }
-
-    private void LoadFaqs()
-    {
-        var list = new List<FaqItemViewModel>
+        PlaceholderItems = new ObservableCollection<FaqPlaceholderItem>
         {
             new()
             {
-                Category = "Getting Started",
-                Question = "How do I jack in a game or DLC with DataJackUI?",
-                Answer = "Go to the 'Jack-in' tab, search for your game by title or Steam App ID, select it, and click 'Jack-in'. DataJackUI will automatically download and stage the verified Lua configuration and manifests into Steam.",
-                LinkText = "Join Discord Community",
-                LinkUrl = "https://dsc.gg/datajackui"
+                Category = "Consectetur Adipiscing",
+                Question = "Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod?",
+                Answer = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
             },
             new()
             {
-                Category = "Getting Started",
-                Question = "Do I need to keep Steam running while downloading?",
-                Answer = "You can download manifests and game files while Steam is running. However, when switching active unlocker modes or restarting Steam, any running downloads in Steam may momentarily pause while files are applied."
+                Category = "Tempor Incididunt",
+                Question = "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore?",
+                Answer = "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
             },
             new()
             {
-                Category = "Steam & Plugins",
-                Question = "What is the Jack-in Store Plugin?",
-                Answer = "The Jack-in plugin integrates an 'Add via DataJackUI' button directly onto official Steam store pages within the Steam desktop client. You can install or update it from the 'Plugin' tab."
+                Category = "Magna Aliqua",
+                Question = "Excepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit?",
+                Answer = "Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris. Integer in mauris eu nibh euismod gravida."
             },
             new()
             {
-                Category = "Steam & Plugins",
-                Question = "What is the difference between IceBreaker and Ost mode?",
-                Answer = "IceBreaker is DataJackUI's high-performance native hook (version.dll) that loads custom Lua scripts directly. Ost uses the official OpenSteamTool engine. You can seamlessly switch between them anytime in the 'Mode' tab."
+                Category = "Laboris Nisi",
+                Question = "Ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor?",
+                Answer = "Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra nonummy pede. Mauris et orci. Aenean nec lorem. In porttitor."
             },
             new()
             {
-                Category = "Fixes & Multiplayer",
-                Question = "How do multiplayer fixes work in DataJackUI?",
-                Answer = "In the 'Fixes' and 'Online Fixes' tabs, you can download community-verified multiplayer patches and bypasses. These connect you to Steam Spacewar or dedicated LAN lobbies so you can play co-op with friends."
+                Category = "Officia Deserunt",
+                Question = "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium?",
+                Answer = "Fusce aliquet pede non pede. Suspendisse dapibus lorem pellentesque magna. Integer nulla donec blandit feugiat ligula. Donec hendrerit, felis et imperdiet euismod, purus ipsum pretium metus. Vivamus quis mi."
             },
             new()
             {
-                Category = "Cloud Saves",
-                Question = "How do Cloud Saves work?",
-                Answer = "DataJackUI supports saving and restoring snapshots of your game progress locally, to Google Drive, or to custom remote storage via Rclone. You can configure and connect your cloud providers under the 'Cloud Saves' tab."
-            },
-            new()
-            {
-                Category = "Account & Authentication",
-                Question = "Why sign in with Google or Discord?",
-                Answer = "Signing in unlocks access to the full manifest catalog and downloads. Google Sign-In uses zero-secret PKCE authentication, and Discord connects your verified roles and server entitlements."
-            },
-            new()
-            {
-                Category = "Support & Tutorials",
-                Question = "Where can I find video guides and support?",
-                Answer = "Our community Discord server hosts step-by-step video tutorials, announcements, troubleshooting guides, and a helpful community ready to answer any questions.",
-                LinkText = "Open Support Discord",
-                LinkUrl = "https://dsc.gg/datajackui"
+                Category = "Doloremque",
+                Question = "Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit?",
+                Answer = "At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident."
             }
         };
-
-        Items = new ObservableCollection<FaqItemViewModel>(list);
-        FilteredItems = new ObservableCollection<FaqItemViewModel>(list);
     }
 }
