@@ -174,7 +174,10 @@ dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --se
 
 # 3. Pack Velopack delta packages & binary releases
 Write-Host "`n2. Packaging Velopack Installer & Delta Updates..." -ForegroundColor Yellow
-vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop --runtime win-x64 --noInst --noPortable -o $ReleasesDir
+vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop --runtime win-x64 --noPortable -o $ReleasesDir
+# Clean up duplicate default Velopack installer exe (we distribute modern Inno Setup instead)
+Remove-Item -Force "$ReleasesDir/DataJackUI-win-Setup.exe" -ErrorAction SilentlyContinue
+Remove-Item -Force "$ReleasesDir/DataJackUI-win-Portable.zip" -ErrorAction SilentlyContinue
 
 # 4. Compile Inno Setup Modern Dynamic Installer (wraps Velopack metadata for seamless in-app delta updates)
 Write-Host "`n3. Compiling Inno Setup Modern Installer..." -ForegroundColor Yellow
