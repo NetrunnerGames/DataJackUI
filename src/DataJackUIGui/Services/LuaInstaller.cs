@@ -335,7 +335,8 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
         int manifestCount = 0;
         var failed = new List<string>();
 
-        bool hasManifests = archive.Entries.Any(e => e.Name.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase));
+        bool hasManifests = archive.Entries.Any(e => e.Name.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase) ||
+                                                     e.FullName.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase));
 
         using (archive)
         {
@@ -344,33 +345,33 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
 
             foreach (var entry in archive.Entries)
             {
-                if (string.IsNullOrEmpty(entry.Name)) continue;
+                string rawName = string.IsNullOrEmpty(entry.Name) ? Path.GetFileName(entry.FullName) : entry.Name;
+                if (string.IsNullOrEmpty(rawName)) continue;
 
-                bool isLua = entry.Name.EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
-                bool isManifest = entry.Name.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase);
+                bool isLua = rawName.EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
+                bool isManifest = rawName.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase);
                 if (!isLua && !isManifest) continue;
 
-                ProcessZipEntry(entry, plugDir, depotDir, appId, forceLocked || hasManifests, source, isLua, isManifest, ref luaInstalled, ref manifestCount, failed);
+                ProcessZipEntry(entry, rawName, plugDir, depotDir, appId, forceLocked || hasManifests, source, isLua, isManifest, ref luaInstalled, ref manifestCount, failed);
             }
         }
 
         return new InstallResult(luaInstalled, manifestCount, failed, Error: null);
     }
 
-    private void ProcessZipEntry(ZipArchiveEntry entry, string plugDir, string depotDir, long appId, bool forceLocked, string? source, bool isLua, bool isManifest, ref bool luaInstalled, ref int manifestCount, List<string> failed)
+    private void ProcessZipEntry(ZipArchiveEntry entry, string rawName, string plugDir, string depotDir, long appId, bool forceLocked, string? source, bool isLua, bool isManifest, ref bool luaInstalled, ref int manifestCount, List<string> failed)
     {
-        string dest = isLua ? Path.Combine(plugDir, $"{appId}.lua") : Path.Combine(depotDir, entry.Name);
+        string dest = isLua ? Path.Combine(plugDir, $"{appId}.lua") : Path.Combine(depotDir, rawName);
         if (isManifest && File.Exists(dest)) { manifestCount++; return; }
 
         try
         {
             if (isLua)
             {
-                // Stream directly in memory without writing any intermediate .lua to disk
                 using var stream = entry.Open();
                 using var reader = new StreamReader(stream);
                 string lua = reader.ReadToEnd();
-                string? buildId = BuildIdFromFileName(entry.Name);
+                string? buildId = BuildIdFromFileName(rawName);
                 if (AutoUpdate && !KeepPinsFor(buildId, forceLocked))
                 {
                     lua = CommentOutManifestPins(lua);
@@ -409,8 +410,8 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
         }
         catch (Exception ex)
         {
-            PluginLog.Log($"LuaInstaller: failed to extract {entry.Name} -> {dest}: {ex.Message}");
-            failed.Add(entry.Name);
+            PluginLog.Log($"LuaInstaller: failed to extract {rawName} -> {dest}: {ex.Message}");
+            failed.Add(rawName);
         }
     }
 }
