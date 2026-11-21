@@ -389,6 +389,8 @@ public partial class App : Application
         var manage = _host.Services.GetRequiredService<ManageViewModel>();
         var builds = _host.Services.GetRequiredService<BuildsViewModel>();
         var home = _host.Services.GetRequiredService<HomeViewModel>();
+        var cef = _host.Services.GetRequiredService<SteamCefClient>();
+        var ipc = _host.Services.GetRequiredService<IceBreakerIpcClient>();
 
         luaInstaller.Installed += appId => Dispatcher.InvokeAsync(async () =>
         {
@@ -396,6 +398,20 @@ public partial class App : Application
             _ = builds.LoadAsync();
             await home.RefreshLibraryAsync();
             if (await appInfo.EnsureFullDetailsAsync(appId)) await home.RefreshLibraryAsync();
+
+            // Notify IceBreaker and reload Steam library UI live
+            try
+            {
+                if (await ipc.IsAvailableAsync())
+                {
+                    await ipc.ReloadManifestsAsync();
+                }
+                if (await cef.IsCefDebuggingAvailableAsync())
+                {
+                    await cef.ReloadSteamUiAsync();
+                }
+            }
+            catch { }
         });
     }
 
