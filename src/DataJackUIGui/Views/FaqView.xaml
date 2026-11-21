@@ -11,18 +11,18 @@
     d:DesignWidth="900"
     mc:Ignorable="d">
 
-    <Grid Margin="32,24,32,24">
+    <Grid Margin="16,16,16,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!--  Header  -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+        <StackPanel Grid.Row="0" Margin="0,0,0,18">
             <TextBlock
-                FontSize="24"
+                FontSize="22"
                 FontWeight="Bold"
-                Foreground="White"
+                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                 Text="Frequently Asked Questions" />
             <TextBlock
                 Margin="0,4,0,0"
@@ -33,24 +33,24 @@
 
         <!--  Main Content Area with Blurred Skeleton Items & Coming Soon Overlay  -->
         <Grid Grid.Row="1">
-            <!--  Blurred Placeholder / Skeleton FAQs  -->
+            <!--  Blurred Placeholder / Skeleton FAQs (matching native App Card styling)  -->
             <ScrollViewer
                 IsHitTestVisible="False"
-                Opacity="0.38"
+                Opacity="0.32"
                 VerticalScrollBarVisibility="Hidden">
                 <ScrollViewer.Effect>
-                    <BlurEffect Radius="9" />
+                    <BlurEffect Radius="8" />
                 </ScrollViewer.Effect>
                 <ItemsControl ItemsSource="{Binding PlaceholderItems}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:FaqPlaceholderItem}">
                             <Border
-                                Margin="0,0,0,14"
-                                Padding="16,14"
-                                Background="#14141e"
-                                BorderBrush="#252536"
+                                Margin="0,0,0,12"
+                                Padding="18"
+                                Background="#0DFFFFFF"
+                                BorderBrush="#1FFFFFFF"
                                 BorderThickness="1"
-                                CornerRadius="8">
+                                CornerRadius="10">
                                 <StackPanel>
                                     <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
@@ -59,14 +59,17 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock
                                             Grid.Column="0"
-                                            FontSize="14"
+                                            FontSize="14.5"
                                             FontWeight="SemiBold"
-                                            Foreground="#e5e7eb"
+                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                             Text="{Binding Question}" />
                                         <Border
                                             Grid.Column="1"
-                                            Padding="8,2"
-                                            Background="#1f1f2e"
+                                            Margin="10,0,0,0"
+                                            Padding="8,2.5"
+                                            Background="#14FFFFFF"
+                                            BorderBrush="#20FFFFFF"
+                                            BorderThickness="1"
                                             CornerRadius="4">
                                             <TextBlock
                                                 FontSize="11"
@@ -75,9 +78,9 @@
                                         </Border>
                                     </Grid>
                                     <TextBlock
-                                        FontSize="12"
+                                        FontSize="12.5"
                                         Foreground="#6b7280"
-                                        LineHeight="18"
+                                        LineHeight="19"
                                         Text="{Binding Answer}"
                                         TextWrapping="Wrap" />
                                 </StackPanel>
@@ -87,64 +90,67 @@
                 </ItemsControl>
             </ScrollViewer>
 
-            <!--  "Coming Soon" Floating Glass Badge / Card  -->
+            <!--  "Coming Soon" Floating Card (fluent card styling matching the rest of DataJackUI)  -->
             <Border
-                Padding="36,28"
+                MaxWidth="520"
+                Padding="32,28"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Background="#EE0e0e17"
-                BorderBrush="#3b82f6"
+                Background="#1c1c22"
+                BorderBrush="#33FFFFFF"
                 BorderThickness="1"
-                CornerRadius="16">
+                CornerRadius="14">
                 <Border.Effect>
                     <DropShadowEffect
-                        BlurRadius="32"
-                        Opacity="0.45"
-                        ShadowDepth="0"
-                        Color="#3b82f6" />
+                        BlurRadius="36"
+                        Direction="270"
+                        Opacity="0.6"
+                        ShadowDepth="6"
+                        Color="#000000" />
                 </Border.Effect>
                 <StackPanel HorizontalAlignment="Center">
                     <Border
-                        Width="56"
-                        Height="56"
+                        Width="52"
+                        Height="52"
                         Margin="0,0,0,16"
                         HorizontalAlignment="Center"
-                        Background="#1e293b"
-                        BorderBrush="#60a5fa"
+                        Background="#0DFFFFFF"
+                        BorderBrush="#28FFFFFF"
                         BorderThickness="1"
-                        CornerRadius="28">
+                        CornerRadius="26">
                         <ui:SymbolIcon
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            FontSize="26"
-                            Foreground="#60a5fa"
+                            FontSize="24"
+                            Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
                             Symbol="Clock24" />
                     </Border>
                     <TextBlock
                         HorizontalAlignment="Center"
                         FontSize="20"
                         FontWeight="Bold"
-                        Foreground="White"
-                        Text="Knowledge Base Coming Soon" />
+                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                        Text="Coming Soon" />
                     <TextBlock
                         Margin="0,8,0,0"
                         HorizontalAlignment="Center"
                         FontSize="13"
                         Foreground="#9ca3af"
-                        Text="Comprehensive step-by-step guides, FAQs, and tutorials are currently being prepared."
-                        TextAlignment="Center" />
+                        Text="This section hasn't been fully built yet, we will notify you once it's built fully"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
                     <Border
-                        Margin="0,16,0,0"
-                        Padding="10,4"
+                        Margin="0,18,0,0"
+                        Padding="12,4"
                         HorizontalAlignment="Center"
-                        Background="#1e1e2d"
-                        BorderBrush="#374151"
+                        Background="#14FFFFFF"
+                        BorderBrush="#24FFFFFF"
                         BorderThickness="1"
                         CornerRadius="6">
                         <TextBlock
                             FontSize="11"
                             FontWeight="SemiBold"
-                            Foreground="#60a5fa"
+                            Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
                             Text="UNDER PREPARATION" />
                     </Border>
                 </StackPanel>
