@@ -206,10 +206,16 @@ if (Test-Path $UpdateZip) { Remove-Item -Force $UpdateZip }
 if (Test-Path $UpdateRootZip) { Remove-Item -Force $UpdateRootZip }
 
 if (Test-Path $PublishDir) {
-    # Include all application binaries, native libraries, and resources for comprehensive in-place update
+    # Include only modified application binaries, native components, and assets (diff update package ~2.1 MB)
     $tempDirUpdate = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_UpdateZip_$([Guid]::NewGuid().ToString('N'))"
     New-Item -ItemType Directory -Path $tempDirUpdate | Out-Null
-    Copy-Item "$PublishDir/*" "$tempDirUpdate" -Recurse -Force
+    Copy-Item "$PublishDir/DataJackUI.*" "$tempDirUpdate" -Force
+    if (Test-Path "$PublishDir/Resources") {
+        Copy-Item "$PublishDir/Resources" "$tempDirUpdate/Resources" -Recurse -Force
+    }
+    if (Test-Path "$PublishDir/public") {
+        Copy-Item "$PublishDir/public" "$tempDirUpdate/public" -Recurse -Force
+    }
     [System.IO.Compression.ZipFile]::CreateFromDirectory($tempDirUpdate, $UpdateRootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
     Copy-Item $UpdateRootZip $UpdateZip -Force
     Remove-Item -Recurse -Force $tempDirUpdate -ErrorAction SilentlyContinue
