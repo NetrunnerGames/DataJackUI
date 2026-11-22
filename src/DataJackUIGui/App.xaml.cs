@@ -508,14 +508,14 @@ public partial class App : Application
             try
             {
                 await System.Threading.Tasks.Task.Delay(2000);
-                var info = await Updates.CheckAndAutoUpdateAsync();
-                if (info != null)
+                await Updates.CheckAndAutoUpdateAsync();
+                if (Updates.HasStagedUpdate)
                 {
                     var toast = _host.Services.GetRequiredService<ToastService>();
-                    string ver = info.TargetFullRelease.Version.ToString();
+                    string ver = Updates.StagedVersion ?? "new version";
                     Dispatcher.Invoke(() => toast.Show(
-                        "Update Downloaded",
-                        $"DataJackUI v{ver} is ready and will apply automatically when you close the app."));
+                        "Update Ready",
+                        $"DataJackUI v{ver} has been downloaded and will apply when you close the app."));
                 }
                 Updates.StartPeriodicChecks(TimeSpan.FromHours(6));
             }

@@ -61,6 +61,9 @@ public class UpdateService : IDisposable
     /// <summary>True once an update is downloaded and waiting to be applied.</summary>
     public bool HasStagedUpdate => _staged is not null || _hasDirectStagedUpdate;
 
+    /// <summary>Version of the staged update, if any.</summary>
+    public string? StagedVersion => _staged?.TargetFullRelease.Version.ToString() ?? _directStagedVersion;
+
     /// <summary>Details of the staged update, if any (null if updated via direct binary fallback).</summary>
     public UpdateInfo? StagedUpdate => _staged;
 
