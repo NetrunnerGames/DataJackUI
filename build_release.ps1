@@ -99,24 +99,12 @@ if (Test-Path $PublishDir) {
     Remove-Item -Recurse -Force $PublishDir -ErrorAction SilentlyContinue
 }
 
-# Ensure releases directory exists and prune older .nupkg packages, maintaining
-# only the current release and 1 previous version for delta updates.
+# Ensure releases directory exists and clean older artifacts
 if (-not (Test-Path $ReleasesDir)) {
     New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
 } else {
-    # Keep only the latest 2 full packages (current + 1 previous)
-    $existingFullNupkgs = Get-ChildItem "$ReleasesDir/*-full.nupkg" | Sort-Object LastWriteTime -Descending
-    if ($existingFullNupkgs.Count -gt 2) {
-        $existingFullNupkgs | Select-Object -Skip 2 | Remove-Item -Force
-    }
-
-    # Keep only the latest 2 delta packages (current + 1 previous)
-    $existingDeltaNupkgs = Get-ChildItem "$ReleasesDir/*-delta.nupkg" | Sort-Object LastWriteTime -Descending
-    if ($existingDeltaNupkgs.Count -gt 2) {
-        $existingDeltaNupkgs | Select-Object -Skip 2 | Remove-Item -Force
-    }
-    # Note: Retain previous full and delta packages and RELEASES manifest so Velopack vpk pack
-    # accurately links delta diffs against the existing base release in RELEASES and releases.win.json
+    # Clean previous build artifacts from releases directory
+    Get-ChildItem -Path $ReleasesDir -Include "*.nupkg", "RELEASES", "*.json", "DataJackUI-*.zip", "DataJackUI-Inno-Setup.exe" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
 # 1. Update plugin.json version property (if plugin source exists locally)
@@ -172,12 +160,8 @@ if ($semgrepCmd) {
 Write-Host "`n1. Publishing DataJackUI WPF Application (v$DataJackVersion)..." -ForegroundColor Yellow
 dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --self-contained false -o $PublishDir
 
-# 3. Pack Velopack delta packages & binary releases
-Write-Host "`n2. Packaging Velopack Installer & Delta Updates..." -ForegroundColor Yellow
-vpk pack -u DataJackUI -v $DataJackVersion -p $PublishDir -e DataJackUI.exe -i src/DataJackUIGui/icon.ico --framework net8-x64-desktop --runtime win-x64 -o $ReleasesDir
-
-# 4. Compile Inno Setup Modern Dynamic Installer (wraps Velopack metadata for seamless in-app delta updates)
-Write-Host "`n3. Compiling Inno Setup Modern Installer..." -ForegroundColor Yellow
+# 3. Compile Inno Setup Modern Dynamic Installer
+Write-Host "`n2. Compiling Inno Setup Modern Installer..." -ForegroundColor Yellow
 $isccPath = "C:\Program Files\Inno Setup 7\ISCC.exe"
 if (-not (Test-Path $isccPath)) {
     $isccCmd = Get-Command iscc.exe -ErrorAction SilentlyContinue
@@ -188,18 +172,8 @@ if (Test-Path $isccPath) {
     Write-Host "Inno Setup modern installer created: DataJackUI-Inno-Setup.exe" -ForegroundColor Green
 }
 
-# 4. Package Plugin (Jack-in) into plugin.zip (if plugin source exists)
-if (Test-Path "src/DataJackUIPlugin") {
-    Write-Host "`n3. Packaging DataJackUI Plugin (v$PluginVersion for NetrunnerGames/Jack-in)..." -ForegroundColor Yellow
-    $PluginSrc = Resolve-Path "src/DataJackUIPlugin"
-    $ZipTarget = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "$ReleasesDir/plugin.zip"
-
-    if (Test-Path $ZipTarget) { Remove-Item -Force $ZipTarget }
-    [System.IO.Compression.ZipFile]::CreateFromDirectory($PluginSrc, $ZipTarget)
-}
-
-# 5. Package Setup ZIP (Inno Setup Installer for Discord & Releases)
-Write-Host "`n4. Packaging Inno Setup ZIP..." -ForegroundColor Yellow
+# 4. Package Setup ZIP (Inno Setup Installer for Discord & Releases)
+Write-Host "`n3. Packaging Inno Setup ZIP..." -ForegroundColor Yellow
 $InnoSetupExePath = "$ReleasesDir/DataJackUI-Inno-Setup.exe"
 
 if (Test-Path $InnoSetupExePath) {
@@ -215,6 +189,30 @@ if (Test-Path $InnoSetupExePath) {
     Copy-Item $InnoRootZip $InnoZipTarget -Force
     Remove-Item -Recurse -Force $tempDirInno -ErrorAction SilentlyContinue
     Write-Host "Inno Setup ZIP created: $InnoZipTarget" -ForegroundColor Green
+}
+
+# 5.5 Package Direct Update ZIP containing published application binaries
+Write-Host "`n5. Packaging Direct Update ZIP (DataJackUI-Update.zip)..." -ForegroundColor Yellow
+$UpdateZip = "$ReleasesDir/DataJackUI-Update.zip"
+$UpdateRootZip = Join-Path (Resolve-Path . | Select-Object -ExpandProperty Path) "DataJackUI-Update.zip"
+if (Test-Path $UpdateZip) { Remove-Item -Force $UpdateZip }
+if (Test-Path $UpdateRootZip) { Remove-Item -Force $UpdateRootZip }
+
+if (Test-Path $PublishDir) {
+    # Include DataJackUI application binaries and dependencies for direct fast in-app updating
+    $tempDirUpdate = Join-Path ([System.IO.Path]::GetTempPath()) "DataJackUI_UpdateZip_$([Guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $tempDirUpdate | Out-Null
+    Copy-Item "$PublishDir/DataJackUI.*" "$tempDirUpdate" -Force
+    if (Test-Path "$PublishDir/Resources") {
+        Copy-Item "$PublishDir/Resources" "$tempDirUpdate/Resources" -Recurse -Force
+    }
+    if (Test-Path "$PublishDir/public") {
+        Copy-Item "$PublishDir/public" "$tempDirUpdate/public" -Recurse -Force
+    }
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($tempDirUpdate, $UpdateRootZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+    Copy-Item $UpdateRootZip $UpdateZip -Force
+    Remove-Item -Recurse -Force $tempDirUpdate -ErrorAction SilentlyContinue
+    Write-Host "Direct Update ZIP created: $UpdateZip" -ForegroundColor Green
 }
 
 # 6. Package Portable ZIP from publish output

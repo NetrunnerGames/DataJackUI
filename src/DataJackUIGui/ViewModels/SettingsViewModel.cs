@@ -26,6 +26,8 @@ public partial class SettingsViewModel : ObservableObject
     private readonly UpdateService _updateService;
 
     [ObservableProperty] private bool _isCheckingForUpdates;
+    [ObservableProperty] private bool _isDownloadingUpdate;
+    [ObservableProperty] private double _downloadProgress;
     [ObservableProperty] private string? _updateStatusText;
     [ObservableProperty] private string _updateStatusColor = "#9ca3af";
 
@@ -495,12 +497,21 @@ public partial class SettingsViewModel : ObservableObject
     private async Task CheckForUpdatesAsync()
     {
         IsCheckingForUpdates = true;
+        IsDownloadingUpdate = false;
+        DownloadProgress = 0;
         UpdateStatusText = "Checking for DataJackUI updates…";
         UpdateStatusColor = "#9ca3af";
 
         try
         {
-            var info = await _updateService.CheckAndAutoUpdateAsync();
+            var progress = new Progress<int>(percent =>
+            {
+                IsDownloadingUpdate = true;
+                DownloadProgress = percent;
+                UpdateStatusText = $"Downloading update… {percent}%";
+            });
+
+            var info = await _updateService.CheckAndAutoUpdateAsync(progress);
 
             if (info != null)
             {
@@ -530,6 +541,7 @@ public partial class SettingsViewModel : ObservableObject
         finally
         {
             IsCheckingForUpdates = false;
+            IsDownloadingUpdate = false;
         }
     }
 

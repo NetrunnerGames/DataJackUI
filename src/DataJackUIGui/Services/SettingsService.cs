@@ -61,7 +61,7 @@ public class AppSettings
     public string? ToolsPath { get; set; }
 
     // When true, FastFetch auto-picks the first available source and downloads immediately.
-    // Nullable so "never set" (→ default OFF) is distinguishable from an explicit choice.
+    // Nullable so "never set" (→ default ON) is distinguishable from an explicit choice.
     public bool? FastFetch { get; set; }
 
     // DNS resolution preference: "Auto" | "Always" | "Never". Null = "Auto".
@@ -246,10 +246,10 @@ public class SettingsService
         set { _settings.MinimizeToTray = value; Save(); }
     }
 
-    /// <summary>When true, FastFetch auto-picks the first available source and downloads immediately (default OFF).</summary>
+    /// <summary>When true, FastFetch auto-picks the first available source and downloads immediately (default ON).</summary>
     public bool FastFetch
     {
-        get => _settings.FastFetch ?? false; // default OFF
+        get => _settings.FastFetch ?? true; // default ON (CyberJack)
         set { _settings.FastFetch = value; Save(); }
     }
 

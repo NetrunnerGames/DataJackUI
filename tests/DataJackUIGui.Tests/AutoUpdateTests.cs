@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using DataJackUIGui.Services;
 using Xunit;
@@ -171,5 +172,28 @@ public class AutoUpdateTests
     {
         Assert.Equal("https://proxy.netrunnergames.workers.dev/DataJackUI", AppConfig.VelopackReleaseFeedUrl);
         Assert.DoesNotContain("api.github.com", AppConfig.VelopackReleaseFeedUrl);
+    }
+
+    [Fact]
+    public void UpdateService_PendingUpdateDir_IsInLocalAppData()
+    {
+        string expectedBase = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        Assert.StartsWith(expectedBase, UpdateService.PendingUpdateDir, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith(Path.Combine("DataJackUI", "pending_update"), UpdateService.PendingUpdateDir, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void UpdateService_ApplyAndRestart_WhenCustomHandlerSet_InvokesHandlerWithArgs()
+    {
+        using var updateService = new UpdateService();
+        string[]? receivedArgs = null;
+        updateService.CustomApplyUpdatesHandler = args => receivedArgs = args;
+
+        updateService.ApplyAndRestart(["--minimized", "--tray-locked"]);
+
+        Assert.NotNull(receivedArgs);
+        Assert.Equal(2, receivedArgs!.Length);
+        Assert.Equal("--minimized", receivedArgs[0]);
+        Assert.Equal("--tray-locked", receivedArgs[1]);
     }
 }

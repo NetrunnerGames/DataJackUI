@@ -66,21 +66,36 @@ public class SteamCefClient
         var pages = await GetPagesAsync(port);
         if (pages is null || pages.Length == 0) return null;
 
-        // Target the main Steam client page (SP / SharedJSContext / Steam)
+        // Target the main Steam Web client context (SharedJSContext or steamloopback.host).
+        // NEVER target the root desktop window wrapper ("about:blank?createflags=...")
+        // as calling window.location.reload() on it destroys the native Steam client frame.
         CefPage? targetPage = null;
         foreach (var page in pages)
         {
             if (string.IsNullOrEmpty(page.WebSocketDebuggerUrl)) continue;
-            if (page.Title?.Contains("Steam", StringComparison.OrdinalIgnoreCase) == true ||
-                page.Url?.Contains("steamloopback", StringComparison.OrdinalIgnoreCase) == true)
+            if (page.Url?.StartsWith("about:blank", StringComparison.OrdinalIgnoreCase) == true) continue;
+
+            if (page.Title?.Equals("SharedJSContext", StringComparison.OrdinalIgnoreCase) == true ||
+                page.Url?.Contains("steamloopback.host", StringComparison.OrdinalIgnoreCase) == true)
             {
                 targetPage = page;
                 break;
             }
         }
-        targetPage ??= pages[0];
 
-        if (string.IsNullOrEmpty(targetPage.WebSocketDebuggerUrl)) return null;
+        // Fallback: search for any non-about:blank page
+        if (targetPage is null)
+        {
+            foreach (var page in pages)
+            {
+                if (string.IsNullOrEmpty(page.WebSocketDebuggerUrl)) continue;
+                if (page.Url?.StartsWith("about:blank", StringComparison.OrdinalIgnoreCase) == true) continue;
+                targetPage = page;
+                break;
+            }
+        }
+
+        if (targetPage is null || string.IsNullOrEmpty(targetPage.WebSocketDebuggerUrl)) return null;
 
         try
         {

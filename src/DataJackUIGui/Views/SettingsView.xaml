@@ -619,25 +619,32 @@
                                     TextWrapping="Wrap"
                                     Visibility="{Binding UpdateStatusText, Converter={StaticResource NullToCollapsed}}" />
                             </StackPanel>
-                            <StackPanel
-                                Grid.Column="1"
-                                VerticalAlignment="Center"
-                                Orientation="Horizontal">
-                                <ui:Button
-                                    Margin="12,0,0,0"
-                                    Appearance="Primary"
-                                    Command="{Binding CheckForUpdatesCommand}"
-                                    Content="Check for Updates"
-                                    Icon="{ui:SymbolIcon ArrowSync24}"
-                                    IsEnabled="{Binding IsCheckingForUpdates, Converter={StaticResource InverseBool}}" />
-                                <ui:Button
-                                    Margin="8,0,0,0"
-                                    Appearance="Secondary"
-                                    Command="{Binding ApplyUpdateCommand}"
-                                    Content="Restart Now"
-                                    Icon="{ui:SymbolIcon Play24}"
-                                    ToolTip="Restart DataJackUI immediately to apply the staged update"
-                                    Visibility="{Binding HasStagedUpdate, Converter={StaticResource BoolToVis}}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button
+                                        Margin="12,0,0,0"
+                                        Appearance="Primary"
+                                        Command="{Binding CheckForUpdatesCommand}"
+                                        Content="Check for Updates"
+                                        Icon="{ui:SymbolIcon ArrowSync24}"
+                                        IsEnabled="{Binding IsCheckingForUpdates, Converter={StaticResource InverseBool}}" />
+                                    <ui:Button
+                                        Margin="8,0,0,0"
+                                        Appearance="Secondary"
+                                        Command="{Binding ApplyUpdateCommand}"
+                                        Content="Restart Now"
+                                        Icon="{ui:SymbolIcon Play24}"
+                                        ToolTip="Restart DataJackUI immediately to apply the staged update"
+                                        Visibility="{Binding HasStagedUpdate, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
+                                <ProgressBar
+                                    Height="4"
+                                    Margin="12,8,0,0"
+                                    HorizontalAlignment="Stretch"
+                                    Maximum="100"
+                                    Minimum="0"
+                                    Visibility="{Binding IsDownloadingUpdate, Converter={StaticResource BoolToVis}}"
+                                    Value="{Binding DownloadProgress, Mode=OneWay}" />
                             </StackPanel>
                         </Grid>
                     </StackPanel>

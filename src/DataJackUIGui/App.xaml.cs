@@ -1,3 +1,5 @@
+using System.IO;
+using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using DataJackUIGui.Models;
@@ -382,6 +384,9 @@ public partial class App : Application
         main.Onboarding.RefreshHome = () => Dispatcher.Invoke(() => home.LoadAsync());
     }
 
+    private FileSystemWatcher? _luaWatcher;
+    private System.Threading.Timer? _luaDebounceTimer;
+
     private void WireLibraryRefresh(MainWindow window)
     {
         var luaInstaller = _host.Services.GetRequiredService<LuaInstaller>();
@@ -391,13 +396,17 @@ public partial class App : Application
         var home = _host.Services.GetRequiredService<HomeViewModel>();
         var cef = _host.Services.GetRequiredService<SteamCefClient>();
         var ipc = _host.Services.GetRequiredService<IceBreakerIpcClient>();
+        var steam = _host.Services.GetRequiredService<SteamService>();
 
-        luaInstaller.Installed += appId => Dispatcher.InvokeAsync(async () =>
+        async Task TriggerReloadAsync(long appId = 0)
         {
             _ = manage.LoadAsync();
             _ = builds.LoadAsync();
             await home.RefreshLibraryAsync();
-            if (await appInfo.EnsureFullDetailsAsync(appId)) await home.RefreshLibraryAsync();
+            if (appId > 0 && await appInfo.EnsureFullDetailsAsync(appId))
+            {
+                await home.RefreshLibraryAsync();
+            }
 
             // Notify IceBreaker and reload Steam library UI live
             try
@@ -412,7 +421,47 @@ public partial class App : Application
                 }
             }
             catch { }
-        });
+        }
+
+        luaInstaller.Installed += appId => Dispatcher.InvokeAsync(() => TriggerReloadAsync(appId));
+
+        // Kernel-level event watcher on Steam\config\stplug-in\ (ReadDirectoryChangesW)
+        // 0% CPU, sleeping until Windows kernel notifies of .lua additions/deletions/changes.
+        try
+        {
+            string? plugDir = steam.StPlugInDir;
+            if (!string.IsNullOrEmpty(plugDir))
+            {
+                Directory.CreateDirectory(plugDir);
+                _luaWatcher = new FileSystemWatcher(plugDir, "*.lua")
+                {
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+                    EnableRaisingEvents = true
+                };
+
+                void OnLuaDirectoryChanged(object sender, FileSystemEventArgs e)
+                {
+                    // Debounce rapid writes (e.g. multiple files pasted) to a single reload event
+                    _luaDebounceTimer?.Dispose();
+                    _luaDebounceTimer = new System.Threading.Timer(_ =>
+                    {
+                        long appId = 0;
+                        string fileName = Path.GetFileNameWithoutExtension(e.Name ?? "");
+                        if (long.TryParse(fileName.Split('_')[0], out long parsed))
+                        {
+                            appId = parsed;
+                        }
+                        Dispatcher.InvokeAsync(() => TriggerReloadAsync(appId));
+                    }, null, 500, Timeout.Infinite);
+                }
+
+                _luaWatcher.Created += OnLuaDirectoryChanged;
+                _luaWatcher.Changed += OnLuaDirectoryChanged;
+                _luaWatcher.Deleted += OnLuaDirectoryChanged;
+                _luaWatcher.Renamed += (s, e) => OnLuaDirectoryChanged(s, e);
+            }
+        }
+        catch { }
     }
 
     private async Task ShowOrInitializeSilentAsync(bool silentStartup, MainWindow window, MainViewModel main)

@@ -40,23 +40,9 @@ $releasesDir = Join-Path $PSScriptRoot "Releases"
 $assets = @(
     "DataJackUI-Inno-Setup.exe",
     "DataJackUI-Inno-Setup.zip",
-    "DataJackUI-Portable.zip",
-    "RELEASES",
-    "releases.win.json",
-    "assets.win.json",
-    "plugin.zip"
+    "DataJackUI-Update.zip",
+    "DataJackUI-Portable.zip"
 )
-
-# Collect Velopack full and delta nupkgs
-if (Test-Path $releasesDir) {
-    Get-ChildItem -Path $releasesDir -Filter "DataJackUI-*-full.nupkg" | ForEach-Object {
-        $assets += $_.Name
-    }
-    Get-ChildItem -Path $releasesDir -Filter "DataJackUI-*-delta.nupkg" | ForEach-Object {
-        $assets += $_.Name
-    }
-}
-$assets = $assets | Select-Object -Unique
 
 # 4. Upload each asset via gh release upload --clobber
 $uploadFiles = @()

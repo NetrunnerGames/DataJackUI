@@ -56,11 +56,6 @@ Name: "startmenuicon"; Description: "Create a Start Menu shortcut"; GroupDescrip
 ; 1. Application files
 Source: "..\bin\PublishFrameworkDependent\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; 2. Embed Velopack update manager assets so the app is recognized as installed by Velopack
-Source: "..\Releases\assets.win.json"; DestDir: "{app}\.."; Flags: ignoreversion
-Source: "..\Releases\releases.win.json"; DestDir: "{app}\.."; Flags: ignoreversion
-; Source: "..\Releases\DataJackUI-{#MyAppVersion}-full.nupkg"; DestDir: "{app}\.."; Flags: ignoreversion
-
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startmenuicon
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"; Tasks: startmenuicon
@@ -77,6 +72,37 @@ Root: HKCU; Subkey: "Software\Classes\datajackui\shell\open\command"; ValueType:
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+// ── Ensure readable path / group selection under modern dark mode ─────
+procedure InitializeWizard();
+begin
+  // Disable automatic full selection on focus so text doesn't invert into a white highlight block
+  WizardForm.DirEdit.AutoSelect := False;
+  WizardForm.GroupEdit.AutoSelect := False;
+
+  if IsDarkInstallMode then
+  begin
+    WizardForm.DirEdit.Color := $1F1F1F;
+    WizardForm.DirEdit.Font.Color := $D6D6D6;
+    WizardForm.GroupEdit.Color := $1F1F1F;
+    WizardForm.GroupEdit.Font.Color := $D6D6D6;
+  end;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  // When entering Select Directory or Select Program Group, clear full highlight so text is crisp and readable
+  if CurPageID = wpSelectDir then
+  begin
+    WizardForm.DirEdit.SelLength := 0;
+    WizardForm.DirEdit.SelStart := Length(WizardForm.DirEdit.Text);
+  end
+  else if CurPageID = wpSelectProgramGroup then
+  begin
+    WizardForm.GroupEdit.SelLength := 0;
+    WizardForm.GroupEdit.SelStart := Length(WizardForm.GroupEdit.Text);
+  end;
+end;
+
 // ── Check if DataJackUI is running before install ──────────────────────
 function InitializeSetup(): Boolean;
 begin
