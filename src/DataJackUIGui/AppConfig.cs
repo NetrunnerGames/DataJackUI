@@ -81,9 +81,10 @@ public static class AppConfig
     public const string ManifestBackendUserAgent = DefaultUserAgent;
     public const string DefaultUserAgent = "DataJackUI/2.0";
 
-    // The donate-keys endpoint gates on a DIFFERENT User-Agent than the manifest backend (it 403s
-    // otherwise). This matches the DataJackUI plugin's config.USER_AGENT.
-    public const string DonateKeysUserAgent = "https://discord.gg/SadzcAwdjW";
+    // ── Community Depot Decryption Keys Pool Endpoint ───────────
+    public const string DonateKeysEndpoint = "https://bots.netrunnergames.workers.dev/api/keys/donate";
+    public const string DonateKeysLookupEndpoint = "https://bots.netrunnergames.workers.dev/api/keys";
+    public const string DonateKeysUserAgent = "DataJackUI/2.0";
 
     // ── Analytics Endpoint (Cloudflare Worker -> PostHog) ──────────────
     public const string AnalyticsEndpoint = "https://analytics.netrunnergames.workers.dev/api/launch";

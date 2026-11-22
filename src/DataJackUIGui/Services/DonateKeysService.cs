@@ -14,7 +14,7 @@ namespace DataJackUIGui.Services;
 /// </summary>
 public partial class DonateKeysService(SettingsService settings, SteamService steam, CacheService cache)
 {
-    private const string DonationUrl = AppConfig.ManifestBackendUrl + "/donatekeys/send";
+    private const string DonationUrl = AppConfig.DonateKeysEndpoint;
 
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(15) };
 
@@ -38,8 +38,7 @@ public partial class DonateKeysService(SettingsService settings, SteamService st
             var pairs = ExtractKeys(File.ReadAllText(configPath));
             if (pairs.Count == 0) return;
 
-            // Dedup against everything we've ever donated: the backend accepts a depot only once per
-            // IP, so re-sending is wasted. Only genuinely-new keys (newly installed games) get sent.
+            // Dedup against everything we've ever donated: only genuinely-new keys get sent.
             var donated = new HashSet<string>(cache.GetDonatedAppIds());
             var fresh = pairs.Where(p => !donated.Contains(p.appid)).ToList();
             if (fresh.Count == 0) return;
@@ -51,13 +50,16 @@ public partial class DonateKeysService(SettingsService settings, SteamService st
             };
             req.Headers.TryAddWithoutValidation("User-Agent", AppConfig.DonateKeysUserAgent);
 
-            // External communication disabled: Key donation POST request commented out
-            await Task.CompletedTask;
-            return;
-            /*
             var res = await _http.SendAsync(req, ct);
-            if (res.StatusCode != System.Net.HttpStatusCode.OK) return;
-            */
+            if (res.IsSuccessStatusCode)
+            {
+                var allDonated = new HashSet<string>(donated);
+                foreach (var (appid, _) in fresh)
+                {
+                    allDonated.Add(appid);
+                }
+                cache.SaveDonatedAppIds(allDonated);
+            }
         }
         catch
         {
