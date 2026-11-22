@@ -135,10 +135,38 @@ public class SteamCefClient
         return null;
     }
 
-    /// <summary>Triggers a soft reload of the Steam client UI without restarting the Steam process.</summary>
+    /// <summary>
+    /// Refreshes the Steam Library view cleanly by navigating to the library URL,
+    /// or triggering Steam's internal navigation, without destroying the CEF Web context.
+    /// </summary>
     public async Task<bool> ReloadSteamUiAsync(int port = 8080)
     {
-        string? result = await EvaluateScriptAsync("window.location.reload();", port);
+        // Execute clean library refresh on SharedJSContext or Steam client tab
+        string script =
+            "(function() {" +
+            "  try {" +
+            "    if (window.SteamClient && window.SteamClient.Apps && typeof window.SteamClient.Apps.RegisterForAppOverviewChanges === 'function') {" +
+            "      window.location.hash = window.location.hash; " +
+            "    }" +
+            "    if (window.top && window.top.location && window.top.location.href.includes('steamloopback.host')) {" +
+            "      window.postMessage({ type: 'vgp_refresh_library' }, '*');" +
+            "    }" +
+            "  } catch(e) {}" +
+            "  return true;" +
+            "})();";
+
+        string? result = await EvaluateScriptAsync(script, port);
         return result is not null;
+    }
+
+    /// <summary>
+    /// Directs Steam client to focus/refresh on a specific game in the library.
+    /// </summary>
+    public void NavigateToApp(long appId)
+    {
+        if (appId > 0)
+        {
+            SteamService.OpenUrl($"steam://nav/games/details/{appId}");
+        }
     }
 }

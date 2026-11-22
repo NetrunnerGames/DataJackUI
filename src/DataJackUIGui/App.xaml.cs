@@ -408,16 +408,17 @@ public partial class App : Application
                 await home.RefreshLibraryAsync();
             }
 
-            // Notify IceBreaker and reload Steam library UI live
+            // Notify IceBreaker to reload lua manifests
             try
             {
                 if (await ipc.IsAvailableAsync())
                 {
                     await ipc.ReloadManifestsAsync();
                 }
-                if (await cef.IsCefDebuggingAvailableAsync())
+                if (appId > 0)
                 {
-                    await cef.ReloadSteamUiAsync();
+                    // Clean Steam protocol navigation - updates the library list for this app without restarting Steam
+                    cef.NavigateToApp(appId);
                 }
             }
             catch { }
