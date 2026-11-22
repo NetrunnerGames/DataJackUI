@@ -39,7 +39,7 @@
                 Opacity="0.32"
                 VerticalScrollBarVisibility="Hidden">
                 <ScrollViewer.Effect>
-                    <BlurEffect Radius="8" />
+                    <BlurEffect Radius="14" RenderingBias="Performance" />
                 </ScrollViewer.Effect>
                 <ItemsControl ItemsSource="{Binding PlaceholderItems}">
                     <ItemsControl.ItemTemplate>
@@ -90,22 +90,24 @@
                 </ItemsControl>
             </ScrollViewer>
 
-            <!--  "Coming Soon" Floating Card (fluent card styling matching the rest of DataJackUI)  -->
+            <!--  "Coming Soon" Floating Card (crisp, pixel-sharp, non-blurred fluent card)  -->
             <Border
                 MaxWidth="520"
                 Padding="32,28"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Background="#1c1c22"
-                BorderBrush="#33FFFFFF"
+                Background="#1e1e24"
+                BorderBrush="#38FFFFFF"
                 BorderThickness="1"
-                CornerRadius="14">
+                CornerRadius="14"
+                SnapsToDevicePixels="True"
+                UseLayoutRounding="True">
                 <Border.Effect>
                     <DropShadowEffect
-                        BlurRadius="36"
+                        BlurRadius="32"
                         Direction="270"
-                        Opacity="0.6"
-                        ShadowDepth="6"
+                        Opacity="0.75"
+                        ShadowDepth="8"
                         Color="#000000" />
                 </Border.Effect>
                 <StackPanel HorizontalAlignment="Center">
