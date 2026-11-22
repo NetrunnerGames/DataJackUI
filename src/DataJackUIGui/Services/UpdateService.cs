@@ -178,10 +178,16 @@ public class UpdateService : IDisposable
         }
 
         string stagingDir = PendingUpdateDir;
-        string tempZip = Path.Combine(Path.GetTempPath(), $"DataJackUI_Update_{Guid.NewGuid():N}.zip");
+        string tempZip = Path.Combine(stagingDir, $"update_{Guid.NewGuid():N}.zip");
 
         try
         {
+            if (Directory.Exists(stagingDir))
+            {
+                try { Directory.Delete(stagingDir, recursive: true); } catch { }
+            }
+            Directory.CreateDirectory(stagingDir);
+
             IProgress<double?>? proxyProgress = progress != null
                 ? new Progress<double?>(val =>
                 {
@@ -191,12 +197,6 @@ public class UpdateService : IDisposable
 
             PluginLog.Log($"[UpdateService] Downloading {asset.Name} from {asset.DownloadUrl}...");
             await _githubProxy.DownloadAsync(asset.DownloadUrl, tempZip, proxyProgress, ct);
-
-            if (Directory.Exists(stagingDir))
-            {
-                try { Directory.Delete(stagingDir, recursive: true); } catch { }
-            }
-            Directory.CreateDirectory(stagingDir);
 
             PluginLog.Log($"[UpdateService] Extracting update to {stagingDir}...");
             ZipFile.ExtractToDirectory(tempZip, stagingDir, overwriteFiles: true);
