@@ -65,7 +65,14 @@ if ($Bump -ne "none") {
                 switch ($Bump) {
                     "major" { $major++; $minor = 0; $patch = 0 }
                     "minor" { $minor++; $patch = 0 }
-                    "patch" { $patch++ }
+                    "patch" {
+                        $patch++
+                        # Enforce single-digit patch format: 2.xx.x (caps patch at 0-9)
+                        if ($patch -gt 9) {
+                            $minor++
+                            $patch = 0
+                        }
+                    }
                 }
                 $DataJackVersion = "$major.$minor.$patch"
                 $xml.Project.PropertyGroup.Version = $DataJackVersion
