@@ -103,8 +103,8 @@ if (Test-Path $PublishDir) {
 if (-not (Test-Path $ReleasesDir)) {
     New-Item -ItemType Directory -Path $ReleasesDir | Out-Null
 } else {
-    # Clean previous build artifacts from releases directory
-    Get-ChildItem -Path $ReleasesDir -Include "*.nupkg", "RELEASES", "*.json", "DataJackUI-*.zip", "DataJackUI-Inno-Setup.exe" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
+    # Clean all previous build artifacts from releases directory
+    Get-ChildItem -Path $ReleasesDir -Recurse | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
 }
 
 # 1. Update plugin.json version property (if plugin source exists locally)
