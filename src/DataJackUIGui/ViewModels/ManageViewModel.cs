@@ -302,10 +302,12 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
     private readonly AuthService _auth;
     private readonly SteamLibraryService _library;
     private readonly IceBreakerIpcClient _ipc;
+    private readonly SteamCefClient _cef;
 
     public ManageViewModel(SteamService steam, SteamAppListCache appList, SteamAppInfoCache appInfo,
         CoverCache covers, ToastService toast, SettingsService settings,
-        SteamlessService steamless, AuthService auth, SteamLibraryService library, IceBreakerIpcClient ipc)
+        SteamlessService steamless, AuthService auth, SteamLibraryService library, IceBreakerIpcClient ipc,
+        SteamCefClient cef)
     {
         _steam = steam;
         _appList = appList;
@@ -317,6 +319,7 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         _auth = auth;
         _library = library;
         _ipc = ipc;
+        _cef = cef;
         InitPageSize(settings.ManagePageSize);
     }
 
@@ -470,7 +473,7 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         }
     }
 
-    /// <summary>Confirm, then clean up manifests, library entries, optional files, and delete the lua.</summary>
+    /// <summary>Clean up manifests, library entries, optional files, and delete the lua.</summary>
     [RelayCommand]
     private async Task Delete(LuaTileViewModel tile)
     {
@@ -490,15 +493,6 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
             if (choice == Wpf.Ui.Controls.MessageBoxResult.None) return;
             deleteGameFiles = choice == Wpf.Ui.Controls.MessageBoxResult.Primary;
         }
-        else
-        {
-            bool result = await UiMessageBox.ShowConfirmAsync(
-                Resources.Strings.Manage_Delete_Title,
-                string.Format(Resources.Strings.Manage_Delete_Body, tile.Name, tile.AppId),
-                "OK",
-                "Cancel");
-            if (!result) return;
-        }
 
         await CleanUpGameArtifactsAsync(tile.AppId, tile.FilePath, deleteGameFiles ? installDir : null);
 
@@ -507,7 +501,16 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
 
         _ = Task.Run(async () =>
         {
-            try { await _ipc.ReloadManifestsAsync(); } catch { }
+            try
+            {
+                await _ipc.LockAppAsync((uint)tile.AppId);
+                await _ipc.ReloadManifestsAsync();
+                if (_cef != null && await _cef.IsCefDebuggingAvailableAsync())
+                {
+                    await _cef.ReloadSteamUiAsync();
+                }
+            }
+            catch { }
         });
     }
 
@@ -554,7 +557,19 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
 
         _ = Task.Run(async () =>
         {
-            try { await _ipc.ReloadManifestsAsync(); } catch { }
+            try
+            {
+                foreach (var t in targets)
+                {
+                    try { await _ipc.LockAppAsync((uint)t.AppId); } catch { }
+                }
+                await _ipc.ReloadManifestsAsync();
+                if (_cef != null && await _cef.IsCefDebuggingAvailableAsync())
+                {
+                    await _cef.ReloadSteamUiAsync();
+                }
+            }
+            catch { }
         });
 
         if (failed > 0)
@@ -575,11 +590,20 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
                 try { Directory.Delete(installDir, recursive: true); } catch { }
             }
 
-            // 2. Delete appmanifest_<appid>.acf across all library roots
+            // 2. Delete appmanifest_<appid>.acf, downloading, temp, and shadercache across all library roots
             foreach (string library in _library.GetAllLibraryRoots())
             {
                 string acf = Path.Combine(library, "steamapps", $"appmanifest_{appId}.acf");
                 if (File.Exists(acf)) { try { File.Delete(acf); } catch { } }
+
+                string downloading = Path.Combine(library, "steamapps", "downloading", appId.ToString());
+                if (Directory.Exists(downloading)) { try { Directory.Delete(downloading, recursive: true); } catch { } }
+
+                string temp = Path.Combine(library, "steamapps", "temp", appId.ToString());
+                if (Directory.Exists(temp)) { try { Directory.Delete(temp, recursive: true); } catch { } }
+
+                string shadercache = Path.Combine(library, "steamapps", "shadercache", appId.ToString());
+                if (Directory.Exists(shadercache)) { try { Directory.Delete(shadercache, recursive: true); } catch { } }
 
                 if (installDir is not null && Directory.Exists(installDir))
                 {
@@ -591,6 +615,21 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
                 }
             }
 
+            // 2b. Clean up variant lua files in plugin directory
+            try
+            {
+                string? pluginDir = Path.GetDirectoryName(luaPath);
+                if (!string.IsNullOrEmpty(pluginDir) && Directory.Exists(pluginDir))
+                {
+                    var variantFiles = Directory.GetFiles(pluginDir, $"{appId}_*.lua");
+                    foreach (var vf in variantFiles)
+                    {
+                        try { File.Delete(vf); } catch { }
+                    }
+                }
+            }
+            catch { }
+
             // 3. Delete manifests from depotcache
             string? depotCache = _steam.DepotCacheDir;
             if (depotCache is not null && Directory.Exists(depotCache))
@@ -601,7 +640,15 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
                     foreach (var depotId in installedDepots.Keys)
                     {
                         var files = Directory.GetFiles(depotCache, $"{depotId}_*.manifest");
-                        foreach (var f in files) { try { File.Delete(f); } catch { } }
+                        foreach (var f in files)
+                        {
+                            try
+                            {
+                                File.SetAttributes(f, FileAttributes.Normal);
+                                File.Delete(f);
+                            }
+                            catch { }
+                        }
                     }
 
                     // Also check setManifestid lines inside the lua file itself before it is deleted
@@ -618,7 +665,15 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
                             string depotId = m.Groups[1].Value;
                             string manifestId = m.Groups[2].Value;
                             string manifestFile = Path.Combine(depotCache, $"{depotId}_{manifestId}.manifest");
-                            if (File.Exists(manifestFile)) { try { File.Delete(manifestFile); } catch { } }
+                            if (File.Exists(manifestFile))
+                            {
+                                try
+                                {
+                                    File.SetAttributes(manifestFile, FileAttributes.Normal);
+                                    File.Delete(manifestFile);
+                                }
+                                catch { }
+                            }
                         }
                     }
                 }

@@ -283,7 +283,15 @@ public class DemoService
                         foreach (var depotId in installedDepots.Keys)
                         {
                             var files = Directory.GetFiles(depotCache, $"{depotId}_*.manifest");
-                            foreach (var f in files) { try { File.Delete(f); } catch { } }
+                            foreach (var f in files)
+                            {
+                                try
+                                {
+                                    File.SetAttributes(f, FileAttributes.Normal);
+                                    File.Delete(f);
+                                }
+                                catch { }
+                            }
                         }
                     }
                     catch { }

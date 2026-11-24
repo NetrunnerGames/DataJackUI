@@ -415,10 +415,9 @@ public partial class App : Application
                 {
                     await ipc.ReloadManifestsAsync();
                 }
-                if (appId > 0)
+                if (cef != null && await cef.IsCefDebuggingAvailableAsync())
                 {
-                    // Clean Steam protocol navigation - updates the library list for this app without restarting Steam
-                    cef.NavigateToApp(appId);
+                    await cef.ReloadSteamUiAsync();
                 }
             }
             catch { }

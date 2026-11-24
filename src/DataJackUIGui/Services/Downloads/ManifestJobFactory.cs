@@ -25,7 +25,8 @@ public class ManifestJobFactory(
     DepotDownloaderService depotTool,
     SteamDepotInfo depotInfo,
     SteamAutoCrackService sac,
-    AppliedFixIndexService fixIndex)
+    AppliedFixIndexService fixIndex,
+    IceBreakerIpcClient ipc)
 {
     // ── Job builders ─────────────────────────────────────────────────
 
@@ -464,6 +465,12 @@ public class ManifestJobFactory(
                 ? $"{gameName} has been downloaded with {dlcCount} DLC{(dlcCount == 1 ? "" : "s")}."
                 : $"{gameName} has been downloaded.";
 
+            // Hot-reload IceBreaker live over IPC so manifests and licenses take effect instantly
+            _ = Task.Run(async () =>
+            {
+                try { await ipc.ReloadManifestsAsync(); } catch { }
+            });
+
             // Where it LANDED, not where it was staged: file.FilePath is deleted by the finally below,
             // so returning it handed callers a path guaranteed not to exist.
             return new JobResult(true, message, installedLua);
@@ -501,6 +508,13 @@ public class ManifestJobFactory(
 
             string message = string.Format(Resources.Strings.Fixes_Toast_FixInstalled_Body, gameName);
             toast.Show(Resources.Strings.Fixes_Toast_FixInstalled, message);
+
+            // Hot-reload IceBreaker live over IPC
+            _ = Task.Run(async () =>
+            {
+                try { await ipc.ReloadManifestsAsync(); } catch { }
+            });
+
             return new JobResult(true, message, installer.ReadInstalledLua(appId)); // see InstallManifest
         }
         finally

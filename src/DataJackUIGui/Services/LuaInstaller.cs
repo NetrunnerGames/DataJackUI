@@ -151,6 +151,35 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
         return null;
     }
 
+    public static void CleanStaleAppManifest(SteamService steam, long appId)
+    {
+        try
+        {
+            if (steam.SteamAppsDir is not { } appsDir) return;
+            string acf = Path.Combine(appsDir, $"appmanifest_{appId}.acf");
+            if (!File.Exists(acf)) return;
+
+            string text = File.ReadAllText(acf);
+            // If InstalledDepots is empty or missing, or BytesDownloaded is 0 with an error state,
+            // Steam considered it failed and will treat depotcache manifests as orphans.
+            bool isEmptyDepots = text.Contains("\"InstalledDepots\"\r\n\t{\r\n\t}") ||
+                                 text.Contains("\"InstalledDepots\"\n\t{\n\t}") ||
+                                 text.Contains("\"InstalledDepots\"\r\n{\r\n}") ||
+                                 text.Contains("\"InstalledDepots\"\n{\n}");
+            bool isUpdateFailed = text.Contains("\"UpdateResult\"\t\t\"6\"") || text.Contains("\"UpdateResult\" \"6\"");
+
+            if (isEmptyDepots || isUpdateFailed)
+            {
+                File.Delete(acf);
+                PluginLog.Log($"LuaInstaller: deleted stale/empty appmanifest_{appId}.acf before install");
+            }
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Log($"LuaInstaller: failed to check/clean appmanifest_{appId}.acf: {ex.Message}");
+        }
+    }
+
     /// <summary>Copy a bare &lt;appid&gt;.lua into datalua (overwrites). Used for DLC unlocks.
     /// <paramref name="forceLocked"/> keeps manifest pins (for Denuvo fixes). The build id is read from
     /// <paramref name="luaPath"/>'s own name, so a &lt;appid&gt;_&lt;buildid&gt;.lua is vaulted as that build.</summary>
@@ -283,6 +312,7 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
             if (!File.Exists(dest))
             {
                 File.Copy(manifestPath, dest, overwrite: false);
+                try { File.SetAttributes(dest, FileAttributes.ReadOnly); } catch { }
                 StampNow(dest);
             }
             return new InstallResult(LuaInstalled: false, ManifestCount: 1, Failed: [], Error: null);
@@ -340,6 +370,7 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
 
         using (archive)
         {
+            CleanStaleAppManifest(steam, appId);
             try { Directory.CreateDirectory(plugDir); } catch { }
             try { Directory.CreateDirectory(depotDir); } catch { }
 
@@ -381,11 +412,13 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
                     lua = MachineProtectionService.ProtectLua(appId, lua);
                 }
 
-                File.WriteAllText(dest, lua);
-                if (settings.IsAppUnlocked(appId))
+                // Write directly with sharing flags in single atomic pass
+                using (var outStream = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+                using (var writer = new StreamWriter(outStream, System.Text.Encoding.UTF8))
                 {
-                    MachineProtectionService.LockInstalledFile(dest, appId);
+                    writer.Write(lua);
                 }
+
                 StampNow(dest);
                 CaptureInstalled(appId, dest, buildId, source);
                 luaInstalled = true;
@@ -399,10 +432,10 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
                 {
                     entryStream.CopyTo(outStream);
                 }
-                if (settings.IsAppUnlocked(appId))
-                {
-                    MachineProtectionService.LockInstalledFile(dest, appId);
-                }
+
+                // Mark manifest ReadOnly so Steam cannot delete or purge it during download reconciliations
+                try { File.SetAttributes(dest, FileAttributes.ReadOnly); } catch { }
+
                 StampNow(dest);
                 manifestCount++;
                 PluginLog.Log($"LuaInstaller: installed manifest -> {dest} ({entry.Length} bytes)");
