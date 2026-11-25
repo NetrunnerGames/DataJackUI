@@ -127,16 +127,17 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
             lua = File.ReadAllText(sourceLuaPath);
         }
 
-        if (appId.HasValue && settings.IsAppUnlocked(appId.Value))
-        {
-            lua = MachineProtectionService.ProtectLua(appId.Value, lua);
-        }
+        // Machine protection bypassed to allow seamless cross-PC family/friend sharing
+        // if (appId.HasValue && settings.IsAppUnlocked(appId.Value))
+        // {
+        //     lua = MachineProtectionService.ProtectLua(appId.Value, lua);
+        // }
 
         File.WriteAllText(dest, lua);
-        if (appId.HasValue && settings.IsAppUnlocked(appId.Value))
-        {
-            MachineProtectionService.LockInstalledFile(dest, appId.Value);
-        }
+        // if (appId.HasValue && settings.IsAppUnlocked(appId.Value))
+        // {
+        //     MachineProtectionService.LockInstalledFile(dest, appId.Value);
+        // }
         StampNow(dest);
     }
 
@@ -407,10 +408,11 @@ public partial class LuaInstaller(SteamService steam, SettingsService settings, 
                 {
                     lua = CommentOutManifestPins(lua);
                 }
-                if (settings.IsAppUnlocked(appId))
-                {
-                    lua = MachineProtectionService.ProtectLua(appId, lua);
-                }
+                // Machine protection bypassed to allow seamless cross-PC family/friend sharing
+                // if (settings.IsAppUnlocked(appId))
+                // {
+                //     lua = MachineProtectionService.ProtectLua(appId, lua);
+                // }
 
                 // Write directly with sharing flags in single atomic pass
                 using (var outStream = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))

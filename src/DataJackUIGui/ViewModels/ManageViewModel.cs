@@ -39,6 +39,9 @@ public partial class LuaTileViewModel : ObservableObject
     [ObservableProperty] private ImageSource? _cover;
     [ObservableProperty] private bool _isSelected;
 
+    /// <summary>True when this game is linked to the user's cloud account but not yet installed locally.</summary>
+    [ObservableProperty] private bool _isCloudOnly;
+
     /// <summary>True once this app's full details are cached (so filters/sort can use it).</summary>
     [ObservableProperty] private bool _detailsLoaded;
 
@@ -224,6 +227,26 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
     // and the empty-state gating all live in PagedListViewModel<LuaTileViewModel>.
 
     [ObservableProperty] private string _searchText = "";
+
+    // ── Library view mode: 0 = Installed on this PC, 1 = Purchased (Cloud) ──
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsInstalledTabSelected))]
+    [NotifyPropertyChangedFor(nameof(IsCloudTabSelected))]
+    private int _libraryViewMode = 0; // 0 = Installed, 1 = Cloud
+
+    public bool IsInstalledTabSelected => LibraryViewMode == 0;
+    public bool IsCloudTabSelected => LibraryViewMode == 1;
+
+    [RelayCommand]
+    public void SetViewMode(string mode)
+    {
+        int target = mode == "1" || mode.Equals("Cloud", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        if (LibraryViewMode != target)
+        {
+            LibraryViewMode = target;
+            ApplyFilter(resetPage: true);
+        }
+    }
 
     // ── Filters & sort (Manage page) ─────────────────────────────────
     [ObservableProperty] private bool _isFilterPanelOpen;
@@ -728,7 +751,7 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
             // Bulk game-name list (downloaded once, cached). Gives every game a name with no rate limit.
             await _appList.EnsureLoadedAsync();
 
-            var tiles = await Task.Run(() =>
+            var installedTiles = await Task.Run(() =>
                 LuaInstaller.EnumerateInstalled(_steam) // shared scan rule across datalua, stplug-in, and lua
                     .Select(f =>
                     {
@@ -741,6 +764,26 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
                     })
                     .OrderByDescending(t => t.AddedAt)
                     .ToList());
+
+            // Merge cloud-purchased games from user entitlement
+            var installedAppIds = new HashSet<long>(installedTiles.Select(t => t.AppId));
+            var cloudTiles = new List<LuaTileViewModel>();
+            if (_auth.IsSignedIn && _auth.CurrentEntitlement?.AllowedAppIds is { Count: > 0 } allowed)
+            {
+                foreach (var appId in allowed)
+                {
+                    if (installedAppIds.Contains(appId)) continue;
+                    string? name = _appList.GetName(appId) ?? _appInfo.GetCached(appId)?.Name;
+                    bool placeholder = name is null;
+                    var tile = new LuaTileViewModel(appId, "", DateTime.UtcNow, name ?? string.Format(Resources.Strings.Common_AppFallback, appId), placeholder)
+                    {
+                        IsCloudOnly = true
+                    };
+                    cloudTiles.Add(tile);
+                }
+            }
+
+            var tiles = installedTiles.Concat(cloudTiles).ToList();
 
             foreach (var t in tiles) t.SelectionChanged = RecountSelection;
             _all = tiles;
@@ -824,6 +867,14 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
     private void RefreshPendingCount() =>
         PendingDetailsCount = _all.Count(t => _appInfo.GetFilterData(t.AppId) is null);
 
+    /// <summary>Installs a cloud-only game by navigating to Add page and kicking off installation.</summary>
+    [RelayCommand]
+    public void InstallCloudGame(LuaTileViewModel tile)
+    {
+        if (tile is null) return;
+        NavigateToAdd?.Invoke(tile.AppId);
+    }
+
     /// <param name="resetPage">True (default) for a user-initiated filter/search/sort/page-size change.
     /// Jump back to page 1. False for passive re-renders (backfill completing) so the user stays on
     /// their current page; the page is still clamped into range below.</param>
@@ -833,6 +884,16 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         bool filtersActive = HasActiveFilters;
 
         IEnumerable<LuaTileViewModel> result = _all;
+
+        // Filter by View Mode: 0 = Installed on this PC, 1 = Purchased (Cloud)
+        if (LibraryViewMode == 0)
+        {
+            result = result.Where(t => !t.IsCloudOnly);
+        }
+        else
+        {
+            result = result.Where(t => t.IsCloudOnly || _auth.IsAppAllowed(t.AppId));
+        }
 
         // Text search (name / appid).
         if (!string.IsNullOrEmpty(q)) result = result.Where(t => t.Matches(q));

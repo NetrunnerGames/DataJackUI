@@ -42,11 +42,71 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel>
+            <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
                 <TextBlock
+                    VerticalAlignment="Center"
                     FontSize="22"
                     FontWeight="Bold"
                     Text="{x:Static res:Strings.Manage_Title}" />
+
+                <!--  Installed / Cloud Toggle Pills  -->
+                <Border
+                    Margin="24,0,0,0"
+                    Padding="3"
+                    VerticalAlignment="Center"
+                    Background="#14FFFFFF"
+                    CornerRadius="8">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button
+                            Padding="12,5"
+                            Command="{Binding SetViewModeCommand}"
+                            CommandParameter="0"
+                            Content="Installed on this PC"
+                            FontSize="12"
+                            FontWeight="SemiBold">
+                            <ui:Button.Style>
+                                <Style BasedOn="{StaticResource {x:Type ui:Button}}" TargetType="ui:Button">
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsInstalledTabSelected}" Value="True">
+                                            <Setter Property="Background" Value="#2563eb" />
+                                            <Setter Property="Foreground" Value="White" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsInstalledTabSelected}" Value="False">
+                                            <Setter Property="Foreground" Value="#9ca3af" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Button.Style>
+                        </ui:Button>
+
+                        <ui:Button
+                            Margin="4,0,0,0"
+                            Padding="12,5"
+                            Command="{Binding SetViewModeCommand}"
+                            CommandParameter="1"
+                            Content="Purchased (Cloud)"
+                            FontSize="12"
+                            FontWeight="SemiBold">
+                            <ui:Button.Style>
+                                <Style BasedOn="{StaticResource {x:Type ui:Button}}" TargetType="ui:Button">
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsCloudTabSelected}" Value="True">
+                                            <Setter Property="Background" Value="#2563eb" />
+                                            <Setter Property="Foreground" Value="White" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsCloudTabSelected}" Value="False">
+                                            <Setter Property="Foreground" Value="#9ca3af" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Button.Style>
+                        </ui:Button>
+                    </StackPanel>
+                </Border>
             </StackPanel>
             <ui:Button
                 Grid.Column="1"
@@ -343,6 +403,9 @@
                                                 <Setter Property="Opacity" Value="0" />
                                                 <Setter Property="Background" Value="#cc1f1417" />
                                                 <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsCloudOnly}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
                                                     <!--  Reveal on tile hover  -->
                                                     <DataTrigger Binding="{Binding IsMouseOver, ElementName=TileRoot}" Value="True">
                                                         <Setter Property="Opacity" Value="1" />
@@ -354,6 +417,31 @@
                                             </Style>
                                         </ui:Button.Style>
                                     </ui:Button>
+
+                                    <!--  Cloud badge or Install button on card  -->
+                                    <Border
+                                        Margin="6"
+                                        Padding="6,2"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Bottom"
+                                        Background="#b31e293b"
+                                        BorderBrush="#3338bdf8"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Visibility="{Binding IsCloudOnly, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon
+                                                FontSize="12"
+                                                Foreground="#38bdf8"
+                                                Symbol="Cloud24" />
+                                            <TextBlock
+                                                Margin="4,0,0,0"
+                                                FontSize="10.5"
+                                                FontWeight="SemiBold"
+                                                Foreground="#38bdf8"
+                                                Text="Cloud Purchased" />
+                                        </StackPanel>
+                                    </Border>
                                 </Grid>
                             </Border>
                             <!--  Info  -->
@@ -375,7 +463,19 @@
                                     FontSize="11"
                                     Foreground="#4b5563"
                                     Text="{Binding AddedReleaseLabel}"
-                                    TextTrimming="CharacterEllipsis" />
+                                    TextTrimming="CharacterEllipsis"
+                                    Visibility="{Binding IsCloudOnly, Converter={StaticResource InverseBoolToVis}}" />
+                                <ui:Button
+                                    Margin="0,4,0,0"
+                                    Padding="10,4"
+                                    HorizontalAlignment="Stretch"
+                                    Appearance="Primary"
+                                    Command="{Binding DataContext.InstallCloudGameCommand, ElementName=Root}"
+                                    CommandParameter="{Binding}"
+                                    Content="Install to Steam"
+                                    FontSize="11.5"
+                                    Icon="{ui:SymbolIcon ArrowDownload24}"
+                                    Visibility="{Binding IsCloudOnly, Converter={StaticResource BoolToVis}}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
