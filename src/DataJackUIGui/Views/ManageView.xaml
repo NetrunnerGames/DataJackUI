@@ -49,64 +49,82 @@
                     FontWeight="Bold"
                     Text="{x:Static res:Strings.Manage_Title}" />
 
-                <!--  Installed / Cloud Toggle Pills  -->
-                <Border
-                    Margin="24,0,0,0"
-                    Padding="3"
+                <!--  Installed / Cloud Underline Tabs (Matches BuildsView / WinUI Pivot style)  -->
+                <StackPanel
+                    Margin="28,4,0,0"
                     VerticalAlignment="Center"
-                    Background="#14FFFFFF"
-                    CornerRadius="8">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:Button
-                            Padding="12,5"
-                            Command="{Binding SetViewModeCommand}"
-                            CommandParameter="0"
-                            Content="Installed on this PC"
-                            FontSize="12"
-                            FontWeight="SemiBold">
-                            <ui:Button.Style>
-                                <Style BasedOn="{StaticResource {x:Type ui:Button}}" TargetType="ui:Button">
-                                    <Setter Property="Background" Value="Transparent" />
-                                    <Setter Property="BorderThickness" Value="0" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsInstalledTabSelected}" Value="True">
-                                            <Setter Property="Background" Value="#2563eb" />
-                                            <Setter Property="Foreground" Value="White" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding IsInstalledTabSelected}" Value="False">
-                                            <Setter Property="Foreground" Value="#9ca3af" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ui:Button.Style>
-                        </ui:Button>
+                    Orientation="Horizontal">
+                    <Button
+                        Margin="0,0,18,0"
+                        Command="{Binding SetViewModeCommand}"
+                        CommandParameter="0"
+                        Content="Installed on this PC"
+                        Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Grid Background="Transparent">
+                                    <ContentPresenter
+                                        x:Name="HeaderText"
+                                        Margin="2,4,2,8"
+                                        TextElement.FontSize="13.5"
+                                        TextElement.FontWeight="SemiBold"
+                                        TextElement.Foreground="#9ca3af" />
+                                    <Border
+                                        x:Name="Bar"
+                                        Height="2"
+                                        VerticalAlignment="Bottom"
+                                        Background="{DynamicResource SystemAccentColorBrush}"
+                                        CornerRadius="1"
+                                        Visibility="Hidden" />
+                                </Grid>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="HeaderText" Property="TextElement.Foreground" Value="#d1d5db" />
+                                    </Trigger>
+                                    <DataTrigger Binding="{Binding IsInstalledTabSelected}" Value="True">
+                                        <Setter TargetName="HeaderText" Property="TextElement.Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                        <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
 
-                        <ui:Button
-                            Margin="4,0,0,0"
-                            Padding="12,5"
-                            Command="{Binding SetViewModeCommand}"
-                            CommandParameter="1"
-                            Content="Purchased (Cloud)"
-                            FontSize="12"
-                            FontWeight="SemiBold">
-                            <ui:Button.Style>
-                                <Style BasedOn="{StaticResource {x:Type ui:Button}}" TargetType="ui:Button">
-                                    <Setter Property="Background" Value="Transparent" />
-                                    <Setter Property="BorderThickness" Value="0" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsCloudTabSelected}" Value="True">
-                                            <Setter Property="Background" Value="#2563eb" />
-                                            <Setter Property="Foreground" Value="White" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding IsCloudTabSelected}" Value="False">
-                                            <Setter Property="Foreground" Value="#9ca3af" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ui:Button.Style>
-                        </ui:Button>
-                    </StackPanel>
-                </Border>
+                    <Button
+                        Command="{Binding SetViewModeCommand}"
+                        CommandParameter="1"
+                        Content="Purchased (Cloud)"
+                        Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Grid Background="Transparent">
+                                    <ContentPresenter
+                                        x:Name="HeaderText"
+                                        Margin="2,4,2,8"
+                                        TextElement.FontSize="13.5"
+                                        TextElement.FontWeight="SemiBold"
+                                        TextElement.Foreground="#9ca3af" />
+                                    <Border
+                                        x:Name="Bar"
+                                        Height="2"
+                                        VerticalAlignment="Bottom"
+                                        Background="{DynamicResource SystemAccentColorBrush}"
+                                        CornerRadius="1"
+                                        Visibility="Hidden" />
+                                </Grid>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="HeaderText" Property="TextElement.Foreground" Value="#d1d5db" />
+                                    </Trigger>
+                                    <DataTrigger Binding="{Binding IsCloudTabSelected}" Value="True">
+                                        <Setter TargetName="HeaderText" Property="TextElement.Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                        <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
             </StackPanel>
             <ui:Button
                 Grid.Column="1"
@@ -311,6 +329,11 @@
                                     CommandParameter="{Binding}"
                                     Header="{x:Static res:Strings.Manage_Action_RemoveDrm}"
                                     Icon="{ui:SymbolIcon WrenchScrewdriver24}" />
+                                <MenuItem
+                                    Command="{Binding PlacementTarget.Tag.FixZeroByteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                    CommandParameter="{Binding}"
+                                    Header="Fix 0B Download Cache"
+                                    Icon="{ui:SymbolIcon ArrowReset24}" />
                                 <Separator />
                                 <MenuItem
                                     Command="{Binding PlacementTarget.Tag.OpenStorePageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"

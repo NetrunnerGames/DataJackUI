@@ -413,6 +413,23 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
     private void EditLaunchOptions(LuaTileViewModel tile) => OpenLaunchOptions?.Invoke(tile.AppId, tile.Name);
 
     [RelayCommand]
+    private async Task FixZeroByte(LuaTileViewModel tile)
+    {
+        if (tile is null) return;
+        bool result = await UiMessageBox.ShowConfirmAsync(
+            "Fix 0B Download & Re-fetch Metadata",
+            $"This will restart Steam and purge cached appinfo/packageinfo metadata for \"{tile.Name}\" (App ID {tile.AppId}) so Valve re-sends full depot sizes. Continue?",
+            "Fix & Restart Steam",
+            "Cancel");
+        if (!result) return;
+
+        if (!_steam.ClearAppCacheAndRestart(tile.AppId))
+        {
+            _toast.Show(Resources.Strings.Manage_RestartSteam_Title, Resources.Strings.Manage_RestartSteam_Failed, error: true);
+        }
+    }
+
+    [RelayCommand]
     private static void OpenStorePage(LuaTileViewModel tile) =>
         SteamService.OpenUrl($"steam://store/{tile.AppId}");
 

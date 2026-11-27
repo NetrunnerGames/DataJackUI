@@ -91,4 +91,24 @@ public partial class MainViewModel : ObservableObject
                 Resources.Strings.Manage_RestartSteam_Failed,
                 "OK", "");
     }
+
+    /// <summary>Purge appinfo.vdf / packageinfo.vdf and restart Steam to fix 0-byte download metadata bugs.</summary>
+    [RelayCommand]
+    public async Task FixZeroByteCacheAsync()
+    {
+        bool result = await UiMessageBox.ShowConfirmAsync(
+            "Fix 0B Downloads & Refresh Cache",
+            "This will close Steam, clear stale appinfo.vdf and packageinfo.vdf metadata caches, and restart Steam so Valve re-sends full depot sizes. Continue?",
+            "Clear & Restart",
+            "Cancel");
+        if (!result) return;
+
+        if (!_steam.ClearAppCacheAndRestart())
+        {
+            await UiMessageBox.ShowConfirmAsync(
+                Resources.Strings.Manage_RestartSteam_Title,
+                Resources.Strings.Manage_RestartSteam_Failed,
+                "OK", "");
+        }
+    }
 }

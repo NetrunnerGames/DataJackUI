@@ -195,12 +195,21 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
 
     private readonly HardwareAppIdService _hardware;
 
+    public GameToolsViewModel Tools { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDepotsTab))]
+    private int _selectedTab;
+
+    public bool IsDepotsTab => SelectedTab == 0;
+
     public BuildsViewModel(SteamService steam, LuaVault vault, SteamAppListCache appList,
         SteamAppInfoCache appInfo, CoverCache covers, SteamDepotInfo depotInfo, ToastService toast,
         SettingsService settings, DepotDownloaderService depotTool, DownloadQueue queue,
         ManifestJobFactory jobs, SteamLibraryService library, HardwareAppIdService hardware,
-        HubcapService hubcap)
+        HubcapService hubcap, GameToolsViewModel tools)
     {
+        Tools = tools;
         _depotTool = depotTool;
         _queue = queue;
         _jobs = jobs;
@@ -272,6 +281,7 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
 
     partial void OnActiveGameChanged(LuaTileViewModel? value)
     {
+        Tools.ActiveGame = value;
         CancelEdit();
         IsRenaming = false;
         // A filter carried over from the previous game would show the new one's table as empty or
@@ -1508,60 +1518,35 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
             return;
         }
 
-        string? key = _settings.HubcapApiKey;
-        if (!string.IsNullOrWhiteSpace(key))
+        IsLockingCustomManifest = true;
+        try
         {
-            IsLockingCustomManifest = true;
-            try
+            // Back up original Lua file as <appid>.datalua before modifying
+            _vault.BackupLiveLua(game.AppId);
+
+            EditLive(text => LuaEditor.SetDepotManifest(text, depotId, manifestId.ToString()));
+            await LoadDepotsAsync(quiet: true);
+
+            _toast.Show(Resources.Strings.Builds_Title, $"Depot {depotId} locked to manifest {manifestId} in Lua!");
+
+            bool restart = await UiMessageBox.ShowConfirmAsync(
+                "Lock Build Complete",
+                $"Depot {depotId} was locked to manifest {manifestId} in {game.Name}'s Lua configuration.\n\nRestart Steam now so Steam downloads this build natively?",
+                "Restart Steam",
+                "Later");
+
+            if (restart && !_steam.RestartSteam())
             {
-                _toast.Show("Hubcap", $"Requesting manifest for Depot {depotId} (Manifest {manifestId})...");
-                byte[] bytes = await _hubcap.GenerateSingleManifestAsync(depotId, manifestId, key);
-                string savedPath = _hubcap.SaveSingleManifestToDepotCache(depotId, manifestId, bytes, _steam);
-
-                // Back up original Lua file as <appid>.datalua before modifying
-                _vault.BackupLiveLua(game.AppId);
-
-                EditLive(text => LuaEditor.SetDepotManifest(text, depotId, manifestId.ToString()));
-                await LoadDepotsAsync(quiet: true);
-                _ = RefreshHubcapUsageAsync();
-
-                _toast.Show("Hubcap", $"Manifest saved ({Path.GetFileName(savedPath)}) and build locked in Lua!");
-
-                bool restart = await UiMessageBox.ShowConfirmAsync(
-                    "Lock Build Complete",
-                    $"Manifest {depotId}_{manifestId}.manifest was saved to Steam depotcache and locked in {game.Name}'s Lua configuration.\n\nRestart Steam now so Steam downloads this build natively?",
-                    "Restart Steam",
-                    "Later");
-
-                if (restart)
-                {
-                    if (!_steam.RestartSteam())
-                    {
-                        _toast.Show(Resources.Strings.Manage_RestartSteam_Title, Resources.Strings.Manage_RestartSteam_Failed, error: true);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _toast.Show("Hubcap Error", ex.Message, error: true);
-            }
-            finally
-            {
-                IsLockingCustomManifest = false;
+                _toast.Show(Resources.Strings.Manage_RestartSteam_Title, Resources.Strings.Manage_RestartSteam_Failed, error: true);
             }
         }
-        else
+        catch (Exception ex)
         {
-            bool openSite = await UiMessageBox.ShowConfirmAsync(
-                "Hubcap API Key Required",
-                "A Hubcap API key is required to generate depot manifests from Steam.\n\nYou can generate an API key on Hubcap's website:\nhttps://hubcapmanifest.com/api-keys/stats\n(Login with Discord through their server's bot).\n\nSingle manifests are 1500 per API key (keys expire every 7 days).\n\nWould you like to open the Hubcap website to get your key now?",
-                "Get API Key",
-                "Cancel");
-
-            if (openSite)
-            {
-                SteamService.OpenUrl("https://hubcapmanifest.com/api-keys/stats");
-            }
+            _toast.Show(Resources.Strings.Builds_Title, ex.Message, error: true);
+        }
+        finally
+        {
+            IsLockingCustomManifest = false;
         }
     }
 

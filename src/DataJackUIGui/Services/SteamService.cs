@@ -280,6 +280,64 @@ public class SteamService(SettingsService settings)
         return StartSteam();
     }
 
+    /// <summary>
+    /// Closes Steam, deletes stale appinfo.vdf and packageinfo.vdf to purge 0-byte download metadata,
+    /// and restarts Steam to force fresh PICS metadata re-generation from Valve.
+    /// </summary>
+    public bool ClearAppCacheAndRestart(long? targetAppId = null)
+    {
+        StopSteam();
+
+        try
+        {
+            if (EffectivePath is { } steamDir)
+            {
+                string appcache = Path.Combine(steamDir, "appcache");
+                if (Directory.Exists(appcache))
+                {
+                    string appinfo = Path.Combine(appcache, "appinfo.vdf");
+                    string packageinfo = Path.Combine(appcache, "packageinfo.vdf");
+
+                    TryDeleteWithRetry(appinfo);
+                    TryDeleteWithRetry(packageinfo);
+                }
+
+                // If targeting a specific app that got stuck with a 0B error ACF, purge its corrupt ACF
+                if (targetAppId.HasValue && SteamAppsDir is { } appsDir)
+                {
+                    string acf = Path.Combine(appsDir, $"appmanifest_{targetAppId.Value}.acf");
+                    TryDeleteWithRetry(acf);
+
+                    string downloading = Path.Combine(appsDir, "downloading", targetAppId.Value.ToString());
+                    if (Directory.Exists(downloading))
+                    {
+                        try { Directory.Delete(downloading, recursive: true); } catch { }
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return StartSteam();
+    }
+
+    private static void TryDeleteWithRetry(string path)
+    {
+        if (!File.Exists(path)) return;
+        for (int i = 0; i < 5; i++)
+        {
+            try
+            {
+                File.Delete(path);
+                return;
+            }
+            catch
+            {
+                Thread.Sleep(200);
+            }
+        }
+    }
+
     private static string? DetectFromRegistry()
     {
         foreach (var (hive, view, subKey, value) in RegistryLocations)

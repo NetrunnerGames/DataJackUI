@@ -89,6 +89,11 @@ public partial class App : Application
                 services.AddSingleton<DownloadViewModel>();
                 services.AddSingleton<SettingsViewModel>();
                 services.AddSingleton<ManageViewModel>();
+                services.AddSingleton<Services.GameData.StatsHelperClient>();
+                services.AddSingleton<Services.GameData.GameStatsService>();
+                services.AddSingleton<Services.GameData.PlaytimeService>();
+                services.AddSingleton<Services.GameData.AchievementIconCache>();
+                services.AddSingleton<GameToolsViewModel>();
                 services.AddSingleton<BuildsViewModel>();
                 services.AddTransient<LaunchOptionsViewModel>(); // one per dialog
                 services.AddSingleton<HomeViewModel>();
@@ -349,9 +354,25 @@ public partial class App : Application
 
         manage.NavigateToAdd = appId => Dispatcher.Invoke(() => { window.NavigateToAdd(); download.SeedSearch(appId); });
         manage.NavigateToBuilds = appId => Dispatcher.Invoke(() => { window.NavigateToBuilds(); _ = builds.SelectAppAsync(appId); });
-        manage.OpenLaunchOptions = (appId, name) => Dispatcher.Invoke(() =>
+        Action<long, string> openLaunch = (appId, name) => Dispatcher.Invoke(() =>
         {
             var dialog = new LaunchOptionsDialog(_host.Services.GetRequiredService<LaunchOptionsViewModel>(), appId, name) { Owner = window };
+            dialog.ShowDialog();
+        });
+        manage.OpenLaunchOptions = openLaunch;
+
+        var gameTools = _host.Services.GetRequiredService<GameToolsViewModel>();
+        gameTools.OpenLaunchOptions = openLaunch;
+        gameTools.OpenAllLaunchOverrides = () => Dispatcher.Invoke(() =>
+        {
+            var dialog = new LaunchOverridesDialog(
+                _host.Services.GetRequiredService<Services.AppInfo.LaunchOptionsService>(),
+                _host.Services.GetRequiredService<SteamAppListCache>(),
+                _host.Services.GetRequiredService<ToastService>(),
+                openLaunch)
+            {
+                Owner = window
+            };
             dialog.ShowDialog();
         });
 

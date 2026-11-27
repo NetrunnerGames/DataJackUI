@@ -1,51 +1,51 @@
-<?xml version="1.0" encoding="utf-8"?>
-<root>
-  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
-    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
-    <xsd:element name="root" msdata:IsDataSet="true">
-      <xsd:complexType>
-        <xsd:choice maxOccurs="unbounded">
-          <xsd:element name="metadata">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" />
-              </xsd:sequence>
-              <xsd:attribute name="name" use="required" type="xsd:string" />
-              <xsd:attribute name="type" type="xsd:string" />
-              <xsd:attribute name="mimetype" type="xsd:string" />
-              <xsd:attribute ref="xml:space" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="assembly">
-            <xsd:complexType>
-              <xsd:attribute name="alias" type="xsd:string" />
-              <xsd:attribute name="name" type="xsd:string" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="data">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
-              </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
-              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
-              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
-              <xsd:attribute ref="xml:space" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="resheader">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-              </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" />
-            </xsd:complexType>
-          </xsd:element>
-        </xsd:choice>
-      </xsd:complexType>
-    </xsd:element>
-  </xsd:schema>
+<?xml version='1.0' encoding='utf-8'?>
+<root xmlns:ns1="urn:schemas-microsoft-com:xml-msdata" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:schema id="root">
+    <xs:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xs:element name="root" ns1:IsDataSet="true">
+      <xs:complexType>
+        <xs:choice maxOccurs="unbounded">
+          <xs:element name="metadata">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" />
+              </xs:sequence>
+              <xs:attribute name="name" use="required" type="xsd:string" />
+              <xs:attribute name="type" type="xsd:string" />
+              <xs:attribute name="mimetype" type="xsd:string" />
+              <xs:attribute ref="xml:space" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="assembly">
+            <xs:complexType>
+              <xs:attribute name="alias" type="xsd:string" />
+              <xs:attribute name="name" type="xsd:string" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="data">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" ns1:Ordinal="1" />
+                <xs:element name="comment" type="xsd:string" minOccurs="0" ns1:Ordinal="2" />
+              </xs:sequence>
+              <xs:attribute name="name" type="xsd:string" use="required" ns1:Ordinal="1" />
+              <xs:attribute name="type" type="xsd:string" ns1:Ordinal="3" />
+              <xs:attribute name="mimetype" type="xsd:string" ns1:Ordinal="4" />
+              <xs:attribute ref="xml:space" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="resheader">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" ns1:Ordinal="1" />
+              </xs:sequence>
+              <xs:attribute name="name" type="xsd:string" use="required" />
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+    </xs:element>
+  </xs:schema>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -59,7 +59,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
 
-  <!-- ── Navigation (MainWindow) ── -->
+  
   <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
   <data name="Nav_Add" xml:space="preserve"><value>Add</value></data>
   <data name="Nav_Manage" xml:space="preserve"><value>Manage</value></data>
@@ -79,7 +79,7 @@
   <data name="Nav_Footer_LoggedIn" xml:space="preserve"><value>Logged In</value></data>
   <data name="Main_RestartSteam_Ask" xml:space="preserve"><value>Restart Steam now? This closes Steam and any running games, then relaunches it.</value></data>
 
-  <!-- ── Settings ── -->
+  
   <data name="Settings_Title" xml:space="preserve"><value>Settings</value></data>
   <data name="Settings_Section_Account" xml:space="preserve"><value>ACCOUNT</value></data>
   <data name="Settings_Section_General" xml:space="preserve"><value>GENERAL</value></data>
@@ -150,12 +150,12 @@
   <data name="Settings_SteamWarning_NoExe" xml:space="preserve"><value>steam.exe not found in this folder.</value></data>
   <data name="Settings_ChooseSteamFolder" xml:space="preserve"><value>Choose your Steam folder</value></data>
 
-  <!-- ── Language changed prompt ── -->
+  
   <data name="Lang_Changed_Title" xml:space="preserve"><value>Language changed</value></data>
   <data name="Lang_Changed_Body" xml:space="preserve"><value>Restart the app to apply the new language.</value></data>
   <data name="Lang_Changed_Restart" xml:space="preserve"><value>Restart now</value></data>
 
-  <!-- ── Home ── -->
+  
   <data name="Home_Welcome" xml:space="preserve"><value>Welcome to DataJackUI</value></data>
   <data name="Home_LuasOnBoard" xml:space="preserve"><value>Games on board</value></data>
   <data name="Home_LastAdded" xml:space="preserve"><value>LAST ADDED</value></data>
@@ -171,7 +171,7 @@
   <data name="Home_NoModeSelected" xml:space="preserve"><value>No mode selected</value></data>
   <data name="Home_ModeIs" xml:space="preserve"><value>Mode · {0}</value></data>
 
-  <!-- ── Mode ── -->
+  
   <data name="Mode_Title" xml:space="preserve"><value>Mode</value></data>
   <data name="Mode_Subtitle" xml:space="preserve"><value>Switch the backend used to unlock games added with DataJackUI. Only one is active at a time.</value></data>
   <data name="Mode_CheckForUpdates" xml:space="preserve"><value>Check for updates</value></data>
@@ -180,14 +180,14 @@
   <data name="Mode_Confirm_Body" xml:space="preserve"><value>Steam will be closed so its files can be changed, then restarted automatically. Any running games or downloads will stop.</value></data>
   <data name="Mode_Cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="Mode_CloseSteamContinue" xml:space="preserve"><value>Close Steam &amp; continue</value></data>
-  <!-- Mode descriptions + C# strings -->
+  
   <data name="Mode_Desc_IceBreaker" xml:space="preserve"><value>DataJack's native single-DLL Steam hook (version.dll). Self-contained, lightweight, and loads custom Lua plugins &amp; manifests.</value></data>
   <data name="Mode_Desc_Ost" xml:space="preserve"><value>Upstream OpenSteamTool from official OpenSteam001 release downloads.</value></data>
   <data name="Mode_Name_Custom" xml:space="preserve"><value>Custom Unlocker</value></data>
   <data name="Mode_Desc_Custom" xml:space="preserve"><value>Use your own unlocking solution, we will not mess with it</value></data>
   <data name="Mode_UserManaged" xml:space="preserve"><value>You're on your own</value></data>
   <data name="Mode_Experimental" xml:space="preserve"><value>EXPERIMENTAL</value></data>
-  <!-- First-run onboarding (English-only draft; translations deferred) -->
+  
   <data name="Onboarding_Title" xml:space="preserve"><value>Welcome to the DataJackUI App!</value></data>
   <data name="Onboarding_SignIn_Blurb" xml:space="preserve"><value>Sign in to unlock adding games and fixes.</value></data>
   <data name="Onboarding_SignedIn" xml:space="preserve"><value>Signed in ✓</value></data>
@@ -217,13 +217,13 @@
   <data name="Mode_Toast_InstallFailed" xml:space="preserve"><value>Install failed</value></data>
   <data name="Mode_Toast_InstallFailed_Body" xml:space="preserve"><value>Something went wrong.</value></data>
 
-  <!-- ── Drop zone ── -->
+  
   <data name="Drop_Title" xml:space="preserve"><value>Drop .lua, .manifest or .zip files here</value></data>
   <data name="Drop_LinkHint" xml:space="preserve"><value>…or drag in a SteamDB / Steam store link to add that game.</value></data>
   <data name="Drop_BrowseFiles" xml:space="preserve"><value>Browse files…</value></data>
   <data name="Drop_Picker_Title" xml:space="preserve"><value>Choose .lua / .manifest / .zip files</value></data>
   <data name="Drop_Picker_Filter" xml:space="preserve"><value>Lua / manifest / zip|*.lua;*.manifest;*.zip|All files|*.*</value></data>
-  <!-- Drop installer C# strings -->
+  
   <data name="Drop_Nothing" xml:space="preserve"><value>Nothing to install. Drop .lua, .manifest, or .zip files.</value></data>
   <data name="Drop_Confirm_Replace" xml:space="preserve"><value>Replace "{0}"?</value></data>
   <data name="Drop_Confirm_NoChanges" xml:space="preserve"><value>No depot/DLC changes. Same content.</value></data>
@@ -233,13 +233,13 @@
   <data name="Drop_Result_Installed" xml:space="preserve"><value>Installed {0} to Steam.</value></data>
   <data name="Drop_Result_Failed" xml:space="preserve"><value> {0} file(s) failed. Close Steam and retry.</value></data>
 
-  <!-- ── Common ── -->
+  
   <data name="Common_SearchPlaceholder" xml:space="preserve"><value>Search by name or App ID...</value></data>
   <data name="Common_Loading" xml:space="preserve"><value>Loading…</value></data>
   <data name="Common_AppId" xml:space="preserve"><value>App ID: {0}</value></data>
   <data name="Common_AppFallback" xml:space="preserve"><value>App {0}</value></data>
 
-  <!-- ── Manage ── -->
+  
   <data name="Manage_Title" xml:space="preserve"><value>Manage</value></data>
   <data name="Manage_Refresh" xml:space="preserve"><value>Refresh</value></data>
   <data name="Manage_Filters" xml:space="preserve"><value>Filters</value></data>
@@ -280,7 +280,7 @@
   <data name="Manage_Clear" xml:space="preserve"><value>Clear</value></data>
   <data name="Manage_DeleteSelected" xml:space="preserve"><value>Delete selected</value></data>
   <data name="Manage_LoadingGames" xml:space="preserve"><value>Loading your games…</value></data>
-  <!-- Filter/sort option DISPLAY labels (the stored value stays the English key; only the shown text is localized). -->
+  
   <data name="Manage_Opt_Any" xml:space="preserve"><value>Any</value></data>
   <data name="Manage_Opt_Free" xml:space="preserve"><value>Free</value></data>
   <data name="Manage_Opt_Paid" xml:space="preserve"><value>Paid</value></data>
@@ -290,7 +290,7 @@
   <data name="Manage_Sort_Metacritic" xml:space="preserve"><value>Metacritic</value></data>
   <data name="Manage_Sort_MostReviewed" xml:space="preserve"><value>Most reviewed</value></data>
   <data name="Manage_PageSize_All" xml:space="preserve"><value>All</value></data>
-  <!-- Manage dynamic / C# strings -->
+  
   <data name="Manage_PageLabel" xml:space="preserve"><value>Page {0} of {1}</value></data>
   <data name="Manage_SelectionLabel" xml:space="preserve"><value>{0} selected</value></data>
   <data name="Manage_FetchingDetails" xml:space="preserve"><value>Fetching details for {0} apps</value></data>
@@ -333,7 +333,7 @@ This removes their .lua files, cleans up cached manifests, and unregisters them 
   <data name="Manage_RestartSteam_Title" xml:space="preserve"><value>Restart Steam</value></data>
   <data name="Manage_RestartSteam_Failed" xml:space="preserve"><value>Couldn't find or launch Steam. Set its location in Settings.</value></data>
 
-  <!-- ── Fixes ── -->
+  
   <data name="Fixes_Title" xml:space="preserve"><value>Game Fixes</value></data>
   <data name="OnlineFix_Title" xml:space="preserve"><value>Online Fix</value></data>
   <data name="OnlineFix_Subtitle" xml:space="preserve"><value>Multiplayer, co-op, and network fixes for supported games</value></data>
@@ -343,7 +343,7 @@ This removes their .lua files, cleans up cached manifests, and unregisters them 
   <data name="Fixes_Fix" xml:space="preserve"><value>Fix</value></data>
   <data name="Fixes_Sort_AZ" xml:space="preserve"><value>A to Z</value></data>
   <data name="Fixes_Sort_ZA" xml:space="preserve"><value>Z to A</value></data>
-  <!-- Fixes C# strings -->
+  
   <data name="Fixes_Count" xml:space="preserve"><value>{0} fixes</value></data>
   <data name="Fixes_Err_Load" xml:space="preserve"><value>Couldn't load fixes. Check your connection.</value></data>
   <data name="Fixes_Empty_None" xml:space="preserve"><value>No fixes available yet.</value></data>
@@ -381,7 +381,7 @@ This removes their .lua files, cleans up cached manifests, and unregisters them 
   <data name="Fixes_MyGames_Count" xml:space="preserve"><value>{0} of your games have fixes. Scroll the grid to browse the rest.</value></data>
   <data name="Fixes_MyGames_NotInstalled" xml:space="preserve"><value>No luas added yet — add a game (or install one) to see it here.</value></data>
 
-  <!-- ── Add / Download page ── -->
+  
   <data name="Add_Title" xml:space="preserve"><value>Let's Jack-in!</value></data>
   <data name="Add_Subtitle" xml:space="preserve"><value>Enter an App ID, paste a Steam link, or search by game name</value></data>
   <data name="Add_SearchPlaceholder" xml:space="preserve"><value>Enter App ID or search games...</value></data>
@@ -414,7 +414,7 @@ This removes their .lua files, cleans up cached manifests, and unregisters them 
   <data name="Add_AlreadyHaveFiles" xml:space="preserve"><value>Already have the files?</value></data>
   <data name="Add_WeeklyTopSellers" xml:space="preserve"><value>Weekly Top Sellers</value></data>
   <data name="Add_LatestMonthHits" xml:space="preserve"><value>Latest Month Hits</value></data>
-  <!-- Add / Download C# strings -->
+  
   <data name="Add_SignIn_Dlc" xml:space="preserve"><value>Sign in with Discord to view DLC unlocks.</value></data>
   <data name="Add_SignIn_Download" xml:space="preserve"><value>Sign in with Discord to download.</value></data>
   <data name="Add_Err_BaseGame" xml:space="preserve"><value>Could not resolve the base game for this DLC</value></data>
@@ -431,7 +431,7 @@ This removes their .lua files, cleans up cached manifests, and unregisters them 
   <data name="Add_FastFetch_NoSource" xml:space="preserve"><value>No available sources found for this game</value></data>
   <data name="Add_FastFetch_Via" xml:space="preserve"><value>· via {0}</value></data>
 
-  <!-- ── Confirm overlay (overwrite diff) ── -->
+  
   <data name="Confirm_OpenSteamDb" xml:space="preserve"><value>Open on SteamDB</value></data>
   <data name="Confirm_Shared" xml:space="preserve"><value>SHARED</value></data>
   <data name="Confirm_ReviewChanges" xml:space="preserve"><value>This replaces the installed lua. Review what changes:</value></data>
@@ -482,10 +482,7 @@ This removes their .lua files, cleans up cached manifests, and unregisters them 
   <data name="Plugin_Feature_AutoUpdate" xml:space="preserve"><value>Automatically keeps itself updated</value></data>
   <data name="Plugin_Feature_Millennium" xml:space="preserve"><value>Works with or without Millennium</value></data>
 
-  <!-- ── Builds page (multi-build switching) ──
-       NOT YET TRANSLATED. These keys are English-only on purpose while the page settles; the
-       Strings.<tag>.resx files fall back to English for anything missing. See Resources/README.md
-       (“Pending translation”) for the list to hand to the translation pass. -->
+  
   <data name="Nav_Builds" xml:space="preserve"><value>Depots</value></data>
   <data name="Builds_Title" xml:space="preserve"><value>Depots</value></data>
   <data name="Builds_Subtitle" xml:space="preserve"><value>Keep multiple versions of a game's lua and switch which one Steam uses.</value></data>
@@ -532,7 +529,7 @@ This removes their .lua files, cleans up cached manifests, and unregisters them 
   <data name="Builds_Depot_NoMatch" xml:space="preserve"><value>No depots match your search.</value></data>
   <data name="Builds_Depot_InactiveNote" xml:space="preserve"><value>You’re editing a preset that isn’t applied. Changes save straight into it, and Steam keeps using the applied preset until you hit Apply.</value></data>
 
-  <!-- ── Launch options (appinfo.vdf editing) ──  NOT YET TRANSLATED, see Resources/README.md -->
+  
   <data name="Manage_Action_LaunchOptions" xml:space="preserve"><value>Launch options…</value></data>
   <data name="Launch_Title" xml:space="preserve"><value>Launch options</value></data>
   <data name="Launch_Loading" xml:space="preserve"><value>Reading Steam's app cache…</value></data>
@@ -568,7 +565,7 @@ This removes their .lua files, cleans up cached manifests, and unregisters them 
   <data name="Launch_Drift_Body" xml:space="preserve"><value>Steam has overwritten your launch options for {0} game(s). Re-applying closes and reopens Steam.</value></data>
   <data name="Launch_Drift_Action" xml:space="preserve"><value>Re-apply</value></data>
 
-  <!-- ── Service error messages (surfaced to the user via toasts / MessageBox) ── -->
+  
   <data name="Err_SteamNotFound" xml:space="preserve"><value>Steam location not found. Set it in Settings.</value></data>
   <data name="Err_GithubUnreachable" xml:space="preserve"><value>Couldn't reach GitHub. Check your connection and try again.</value></data>
   <data name="Err_UpdateServerUnreachable" xml:space="preserve"><value>Couldn't reach the update server. Check your connection and try again.</value></data>
@@ -703,4 +700,4 @@ Cancel - keep downloading</value></data>
   <data name="CloudSaves_NoSavesFound" xml:space="preserve"><value>No game saves detected yet.</value></data>
   <data name="CloudSaves_NoSnapshots" xml:space="preserve"><value>No snapshots yet for this game.</value></data>
   <data name="Add_BypassNotice" xml:space="preserve"><value>Some games might need bypass in order to work, to get them simply go to Fixes tab on the side menu, search for your game then select it, and simply just click the Fix button. Rest is just enjoying the game.</value></data>
-</root>
+<data name="Launch_Edit" xml:space="preserve"><value>Edit</value></data><data name="GameTools_RestartReason_Playtime" xml:space="preserve"><value>Steam only reads playtime when it starts</value></data><data name="Launch_AllOverrides_Empty" xml:space="preserve"><value>No game has changed launch options yet.</value></data><data name="GameTools_Hidden" xml:space="preserve"><value>Hidden achievement</value></data><data name="GameTools_Protected" xml:space="preserve"><value>Only the game itself can change this.</value></data><data name="GameTools_SearchAchievements" xml:space="preserve"><value>Search achievements</value></data><data name="Launch_RestoreAll" xml:space="preserve"><value>Restore all</value></data><data name="GameTools_NoSchema" xml:space="preserve"><value>Steam hasn't downloaded this game's achievement list yet. Open Steam and come back, and DataJack will fetch it.</value></data><data name="GameTools_UnlockAll" xml:space="preserve"><value>Unlock all</value></data><data name="GameTools_LockAll" xml:space="preserve"><value>Lock all</value></data><data name="Launch_RestoreAll_Title" xml:space="preserve"><value>Restore all launch options?</value></data><data name="GameTools_RestartReason_CloudRedirect" xml:space="preserve"><value>CloudRedirect has to sync the locked achievements</value></data><data name="GameTools_Tab_Achievements" xml:space="preserve"><value>Achievements</value></data><data name="Nav_GameTools" xml:space="preserve"><value>Tools</value></data><data name="GameTools_Tab_Playtime" xml:space="preserve"><value>Playtime</value></data><data name="GameTools_NoAchievementMatch" xml:space="preserve"><value>No achievements match your search.</value></data><data name="GameTools_NoStats" xml:space="preserve"><value>This game has no stats to edit.</value></data><data name="GameTools_UnlockedAt" xml:space="preserve"><value>Unlocked {0}</value></data><data name="GameTools_Saved_File" xml:space="preserve"><value>Saved to Steam's files.</value></data><data name="GameTools_Saved_Live" xml:space="preserve"><value>Saved through Steam.</value></data><data name="GameTools_Set_Base" xml:space="preserve"><value>Base game</value></data><data name="GameTools_RestartReason_Launch" xml:space="preserve"><value>Steam only reads launch options when it starts</value></data><data name="GameTools_NoAccount" xml:space="preserve"><value>No Steam login was found on this PC.</value></data><data name="Launch_RestoreAll_Body" xml:space="preserve"><value>This puts back Steam's original launch options for all {0} games and forgets every change you made. Steam will be closed and reopened. Continue?</value></data><data name="Launch_NoOverrides" xml:space="preserve"><value>No launch options changed for this game.</value></data><data name="Launch_AllOverrides" xml:space="preserve"><value>All overrides</value></data><data name="GameTools_LiveRejected" xml:space="preserve"><value>Steam didn't accept the change ({0}). You can close Steam and write it to its files instead.</value></data><data name="GameTools_RestartRequired" xml:space="preserve"><value>Requires a Steam restart ({0})</value></data><data name="GameTools_Playtime_None" xml:space="preserve"><value>Steam has no playtime recorded for this game yet.</value></data><data name="GameTools_SaveFailed" xml:space="preserve"><value>Couldn't save: {0}</value></data><data name="GameTools_NoAchievements" xml:space="preserve"><value>This game has no achievements.</value></data><data name="GameTools_PickGame" xml:space="preserve"><value>Pick a game on the left to manage its depots, achievements, stats, launch options and playtime.</value></data><data name="GameTools_Tab_Stats" xml:space="preserve"><value>Stats</value></data><data name="GameTools_Playtime_Hours" xml:space="preserve"><value>Hours played</value></data><data name="GameTools_FetchingSchema" xml:space="preserve"><value>Getting the achievement list from Steam…</value></data><data name="GameTools_FetchFailed" xml:space="preserve"><value>Couldn't get the achievement list from Steam ({0}). Press Refresh to try again.</value></data></root>

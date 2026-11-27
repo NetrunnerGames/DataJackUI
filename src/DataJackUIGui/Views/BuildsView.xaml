@@ -279,6 +279,65 @@
                 </Border>
             </Grid>
         </DataTemplate>
+
+        <Style x:Key="UnderlineTab" TargetType="{x:Type TabItem}">
+            <Setter Property="Margin" Value="0,0,18,0" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TabItem}">
+                        <Grid
+                            Name="HeaderRoot"
+                            Background="Transparent"
+                            Cursor="Hand">
+                            <ContentPresenter
+                                Name="HeaderText"
+                                Margin="2,4,2,9"
+                                ContentSource="Header"
+                                TextElement.FontSize="13"
+                                TextElement.FontWeight="SemiBold"
+                                TextElement.Foreground="#9ca3af" />
+                            <Border
+                                Name="Bar"
+                                Height="2"
+                                VerticalAlignment="Bottom"
+                                Background="#a78bfa"
+                                CornerRadius="1"
+                                Visibility="Hidden" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger SourceName="HeaderRoot" Property="UIElement.IsMouseOver" Value="True">
+                                <Setter TargetName="HeaderText" Property="TextElement.Foreground" Value="#d1d5db" />
+                            </Trigger>
+                            <Trigger Property="TabItem.IsSelected" Value="True">
+                                <Setter TargetName="HeaderText" Property="TextElement.Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="UnderlineTabs" TargetType="{x:Type TabControl}">
+            <Setter Property="ItemContainerStyle" Value="{StaticResource UnderlineTab}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TabControl}">
+                        <DockPanel>
+                            <Border
+                                BorderBrush="#1FFFFFFF"
+                                BorderThickness="0,0,0,1"
+                                DockPanel.Dock="Top">
+                                <WrapPanel IsItemsHost="True" />
+                            </Border>
+                            <ContentPresenter ContentSource="SelectedContent" />
+                        </DockPanel>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Grid x:Name="Root" Margin="8,16,16,8">
@@ -303,12 +362,6 @@
                     FontSize="11.5"
                     Foreground="#9ca3af"
                     Text="{x:Static res:Strings.Builds_Subtitle}"
-                    TextWrapping="Wrap" />
-                <TextBlock
-                    Margin="0,4,0,0"
-                    FontSize="11.5"
-                    Foreground="#f0a868"
-                    Text="{x:Static res:Strings.Builds_PinningPauseNote}"
                     TextWrapping="Wrap" />
             </StackPanel>
             <!--
@@ -490,7 +543,6 @@
                 <Grid Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -499,629 +551,957 @@
                         ActiveGame, not SelectedGame: paging nulls the list selection, and this panel must
                         keep showing the game whose builds are open.
                     -->
-                    <StackPanel Grid.Row="0" DataContext="{Binding ActiveGame}">
-                        <TextBlock
-                            FontSize="17"
-                            FontWeight="Bold"
-                            Text="{Binding Name}"
-                            TextTrimming="CharacterEllipsis" />
-                        <TextBlock
-                            Margin="0,2,0,0"
-                            FontSize="11.5"
-                            Foreground="#9ca3af"
-                            Text="{Binding AppId, StringFormat={x:Static res:Strings.Common_AppId}}" />
-                    </StackPanel>
-                    <TextBlock
-                        Grid.Row="0"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        FontSize="11.5"
-                        Foreground="#6b7280"
-                        Text="{Binding LatestBuildLabel}"
-                        Visibility="{Binding LatestBuildLabel, Converter={StaticResource NullToCollapsed}}" />
-
-                    <!--  Switcher + actions  -->
-                    <Border
-                        Grid.Row="1"
-                        Margin="0,12,0,0"
-                        Padding="12"
-                        Background="#0DFFFFFF"
-                        BorderBrush="#1FFFFFFF"
-                        BorderThickness="1"
-                        CornerRadius="8">
-                        <StackPanel>
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" DataContext="{Binding ActiveGame}">
                             <TextBlock
-                                FontSize="12"
-                                FontWeight="SemiBold"
-                                Foreground="#d1d5db"
-                                Text="{x:Static res:Strings.Builds_ActiveBuild}" />
+                                FontSize="17"
+                                FontWeight="Bold"
+                                Text="{Binding Name}"
+                                TextTrimming="CharacterEllipsis" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="11.5"
+                                Foreground="#9ca3af"
+                                Text="{Binding AppId, StringFormat={x:Static res:Strings.Common_AppId}}" />
+                        </StackPanel>
+                        <TextBlock
+                            Grid.Column="1"
+                            Margin="12,0,0,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            FontSize="11.5"
+                            Foreground="#6b7280"
+                            Text="{Binding LatestBuildLabel}"
+                            Visibility="{Binding LatestBuildLabel, Converter={StaticResource NullToCollapsed}}" />
+                    </Grid>
 
-                            <ComboBox
-                                Margin="0,6,0,0"
-                                HorizontalContentAlignment="Stretch"
-                                ItemTemplate="{StaticResource VariantRowTemplate}"
-                                ItemsSource="{Binding Variants}"
-                                SelectedItem="{Binding SelectedVariant}" />
+                    <TabControl
+                        Grid.Row="1"
+                        SelectedIndex="{Binding SelectedTab}"
+                        Style="{StaticResource UnderlineTabs}">
+                        <TabItem Header="{x:Static res:Strings.Nav_Builds}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <!--  Switcher + actions  -->
+                                <Border
+                                    Grid.Row="0"
+                                    Margin="0,12,0,0"
+                                    Padding="12"
+                                    Background="#0DFFFFFF"
+                                    BorderBrush="#1FFFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                    <StackPanel>
+                                        <TextBlock
+                                            FontSize="12"
+                                            FontWeight="SemiBold"
+                                            Foreground="#d1d5db"
+                                            Text="{x:Static res:Strings.Builds_ActiveBuild}" />
 
-                            <!-- Status/save UI stays OUT of the page body on purpose: anything that
+                                        <ComboBox
+                                            Margin="0,6,0,0"
+                                            HorizontalContentAlignment="Stretch"
+                                            ItemTemplate="{StaticResource VariantRowTemplate}"
+                                            ItemsSource="{Binding Variants}"
+                                            SelectedItem="{Binding SelectedVariant}" />
+
+                                        <!-- Status/save UI stays OUT of the page body on purpose: anything that
                                  appears and vanishes here shoves the depot list up and down as you work.
                                  The switcher row above says which build is live, and "Save to <build>"
                                  sits in the header, where nothing below it moves.-->
 
-                            <!--  Inline rename (replaces the button row while active)  -->
-                            <Grid Margin="0,10,0,0" Visibility="{Binding IsRenaming, Converter={StaticResource BoolToVis}}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <ui:TextBox PlaceholderText="{x:Static res:Strings.Builds_RenamePlaceholder}" Text="{Binding RenameText, UpdateSourceTrigger=PropertyChanged}" />
-                                <ui:Button
-                                    Grid.Column="1"
-                                    Margin="8,0,0,0"
-                                    Appearance="Primary"
-                                    Command="{Binding CommitRenameCommand}"
-                                    Content="{x:Static res:Strings.Builds_Action_Save}" />
-                                <ui:Button
-                                    Grid.Column="2"
-                                    Margin="6,0,0,0"
-                                    Command="{Binding CancelRenameCommand}"
-                                    Content="{x:Static res:Strings.Builds_Action_Cancel}" />
-                            </Grid>
+                                        <!--  Inline rename (replaces the button row while active)  -->
+                                        <Grid Margin="0,10,0,0" Visibility="{Binding IsRenaming, Converter={StaticResource BoolToVis}}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ui:TextBox PlaceholderText="{x:Static res:Strings.Builds_RenamePlaceholder}" Text="{Binding RenameText, UpdateSourceTrigger=PropertyChanged}" />
+                                            <ui:Button
+                                                Grid.Column="1"
+                                                Margin="8,0,0,0"
+                                                Appearance="Primary"
+                                                Command="{Binding CommitRenameCommand}"
+                                                Content="{x:Static res:Strings.Builds_Action_Save}" />
+                                            <ui:Button
+                                                Grid.Column="2"
+                                                Margin="6,0,0,0"
+                                                Command="{Binding CancelRenameCommand}"
+                                                Content="{x:Static res:Strings.Builds_Action_Cancel}" />
+                                        </Grid>
 
-                            <UniformGrid
-                                Margin="0,10,0,0"
-                                Columns="4"
-                                Visibility="{Binding IsRenaming, Converter={StaticResource InverseBoolToVis}}">
-                                <ui:Button
-                                    Margin="0,0,4,0"
-                                    HorizontalAlignment="Stretch"
-                                    Appearance="Primary"
-                                    Command="{Binding ApplyCommand}"
-                                    Content="{x:Static res:Strings.Builds_Action_Apply}"
-                                    Icon="{ui:SymbolIcon Checkmark24}"
-                                    IsEnabled="{Binding CanApply}" />
-                                <ui:Button
-                                    Margin="4,0"
-                                    HorizontalAlignment="Stretch"
-                                    Command="{Binding StartRenameCommand}"
-                                    Content="{x:Static res:Strings.Builds_Action_Rename}"
-                                    Icon="{ui:SymbolIcon Rename24}"
-                                    IsEnabled="{Binding CanRename}" />
-                                <ui:Button
-                                    Margin="4,0"
-                                    HorizontalAlignment="Stretch"
-                                    Command="{Binding EditCommand}"
-                                    Content="{x:Static res:Strings.Builds_Action_Edit}"
-                                    Icon="{ui:SymbolIcon Edit24}" />
-                                <ui:Button
-                                    Margin="4,0,0,0"
-                                    HorizontalAlignment="Stretch"
-                                    Command="{Binding DeleteVariantCommand}"
-                                    Content="{x:Static res:Strings.Builds_Action_Delete}"
-                                    Foreground="#f87171"
-                                    Icon="{ui:SymbolIcon Delete24}"
-                                    IsEnabled="{Binding CanDelete}"
-                                    ToolTipService.ShowOnDisabled="True">
-                                    <!--
-                                        The tooltip EXPLAINS the disabled state, so it must only appear
-                                        while disabled (and WPF hides tooltips on disabled controls
-                                        unless ShowOnDisabled is set above).
-                                    -->
-                                    <ui:Button.Style>
-                                        <Style BasedOn="{StaticResource {x:Type ui:Button}}" TargetType="ui:Button">
-                                            <Style.Triggers>
-                                                <Trigger Property="IsEnabled" Value="False">
-                                                    <Setter Property="ToolTip" Value="{x:Static res:Strings.Builds_Delete_ActiveTip}" />
-                                                </Trigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </ui:Button.Style>
-                                </ui:Button>
-                            </UniformGrid>
-                        </StackPanel>
-                    </Border>
+                                        <UniformGrid
+                                            Margin="0,10,0,0"
+                                            Columns="4"
+                                            Visibility="{Binding IsRenaming, Converter={StaticResource InverseBoolToVis}}">
+                                            <ui:Button
+                                                Margin="0,0,4,0"
+                                                HorizontalAlignment="Stretch"
+                                                Appearance="Primary"
+                                                Command="{Binding ApplyCommand}"
+                                                Content="{x:Static res:Strings.Builds_Action_Apply}"
+                                                Icon="{ui:SymbolIcon Checkmark24}"
+                                                IsEnabled="{Binding CanApply}" />
+                                            <ui:Button
+                                                Margin="4,0"
+                                                HorizontalAlignment="Stretch"
+                                                Command="{Binding StartRenameCommand}"
+                                                Content="{x:Static res:Strings.Builds_Action_Rename}"
+                                                Icon="{ui:SymbolIcon Rename24}"
+                                                IsEnabled="{Binding CanRename}" />
+                                            <ui:Button
+                                                Margin="4,0"
+                                                HorizontalAlignment="Stretch"
+                                                Command="{Binding EditCommand}"
+                                                Content="{x:Static res:Strings.Builds_Action_Edit}"
+                                                Icon="{ui:SymbolIcon Edit24}" />
+                                            <ui:Button
+                                                Margin="4,0,0,0"
+                                                HorizontalAlignment="Stretch"
+                                                Command="{Binding DeleteVariantCommand}"
+                                                Content="{x:Static res:Strings.Builds_Action_Delete}"
+                                                Foreground="#f87171"
+                                                Icon="{ui:SymbolIcon Delete24}"
+                                                IsEnabled="{Binding CanDelete}"
+                                                ToolTipService.ShowOnDisabled="True">
+                                                <!--
+                                                    The tooltip EXPLAINS the disabled state, so it must only appear
+                                                    while disabled (and WPF hides tooltips on disabled controls
+                                                    unless ShowOnDisabled is set above).
+                                                -->
+                                                <ui:Button.Style>
+                                                    <Style BasedOn="{StaticResource {x:Type ui:Button}}" TargetType="ui:Button">
+                                                        <Style.Triggers>
+                                                            <Trigger Property="IsEnabled" Value="False">
+                                                                <Setter Property="ToolTip" Value="{x:Static res:Strings.Builds_Delete_ActiveTip}" />
+                                                            </Trigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ui:Button.Style>
+                                            </ui:Button>
+                                        </UniformGrid>
+                                    </StackPanel>
+                                </Border>
 
-                    <!--  Editor (replaces the depot table while open)  -->
-                    <Grid
-                        Grid.Row="2"
-                        Margin="0,12,0,0"
-                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <TextBlock
-                            FontSize="12"
-                            FontWeight="SemiBold"
-                            Foreground="#d1d5db"
-                            Text="{x:Static res:Strings.Builds_Editor_Title}" />
-                        <TextBox
-                            Grid.Row="1"
-                            Margin="0,6,0,0"
-                            AcceptsReturn="True"
-                            AcceptsTab="True"
-                            Background="#14000000"
-                            FontFamily="Consolas"
-                            FontSize="12"
-                            HorizontalScrollBarVisibility="Auto"
-                            Text="{Binding EditorText, UpdateSourceTrigger=PropertyChanged}"
-                            VerticalScrollBarVisibility="Auto" />
-                        <StackPanel
-                            Grid.Row="2"
-                            Margin="0,10,0,0"
-                            HorizontalAlignment="Right"
-                            Orientation="Horizontal">
-                            <ui:Button Command="{Binding CancelEditCommand}" Content="{x:Static res:Strings.Builds_Action_Cancel}" />
-                            <ui:Button
-                                Margin="8,0,0,0"
-                                Command="{Binding SaveAsPresetCommand}"
-                                Content="{x:Static res:Strings.Builds_Action_SaveAsPreset}"
-                                Icon="{ui:SymbolIcon Bookmark24}" />
-                            <ui:Button
-                                Margin="8,0,0,0"
-                                Appearance="Primary"
-                                Command="{Binding SaveEditCommand}"
-                                Content="{x:Static res:Strings.Builds_Action_Save}"
-                                Icon="{ui:SymbolIcon Save24}" />
-                        </StackPanel>
-                    </Grid>
-
-                    <!--
-                        Depot/DLC breakdown for the SELECTED variant (moved here from the Manage flyout).
-                        The search box is OUTSIDE the ScrollViewer so it stays put on a long list.
-                    -->
-                    <Grid
-                        Grid.Row="2"
-                        Margin="0,12,0,0"
-                        Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <!--  Lock Build ID / Depot Manifest card  -->
-                        <Border
-                            Grid.Row="0"
-                            Margin="0,0,12,10"
-                            Padding="10"
-                            Background="#08FFFFFF"
-                            BorderBrush="#14FFFFFF"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Visibility="{Binding IsBrowseMode, Converter={StaticResource BoolToVis}}">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                                <!--  Editor (replaces the depot table while open)  -->
+                                <Grid
+                                    Grid.Row="1"
+                                    Margin="0,12,0,0"
+                                    Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
                                     <TextBlock
-                                        FontSize="11.5"
+                                        FontSize="12"
                                         FontWeight="SemiBold"
                                         Foreground="#d1d5db"
-                                        Text="Lock Build ID &amp; Fetch Manifests (Hubcap)" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        FontSize="11"
-                                        Foreground="#8b96f0"
-                                        Text="{Binding HubcapSingleUsageLabel}"
-                                        Visibility="{Binding HubcapSingleUsageLabel, Converter={StaticResource NullToCollapsed}}" />
-                                </Grid>
-                                <!--  Row 1: Lock by Build ID  -->
-                                <Grid Margin="0,6,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <ui:TextBox
-                                        Margin="0,0,6,0"
-                                        PlaceholderText="Build ID (e.g. 24410208)"
-                                        Text="{Binding CustomBuildId, UpdateSourceTrigger=PropertyChanged}" />
-                                    <ui:Button
-                                        Grid.Column="1"
-                                        Appearance="Primary"
-                                        Command="{Binding LockBuildIdCommand}"
-                                        Content="Lock Build ID"
-                                        Icon="{ui:SymbolIcon ArrowDownload24}"
-                                        IsEnabled="{Binding CanLockBuildId}" />
-                                    <ui:ProgressRing
-                                        Grid.Column="2"
-                                        Width="16"
-                                        Height="16"
-                                        Margin="8,0,0,0"
-                                        IsIndeterminate="True"
-                                        Visibility="{Binding IsLockingBuildId, Converter={StaticResource BoolToVis}}" />
-                                </Grid>
-                                <!--  Row 2: Manual Single Depot Override  -->
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <ui:TextBox
-                                        Margin="0,0,6,0"
-                                        PlaceholderText="Depot ID (e.g. 228983)"
-                                        Text="{Binding CustomDepotId, UpdateSourceTrigger=PropertyChanged}" />
-                                    <ui:TextBox
-                                        Grid.Column="1"
-                                        Margin="0,0,6,0"
-                                        PlaceholderText="Manifest ID"
-                                        Text="{Binding CustomManifestId, UpdateSourceTrigger=PropertyChanged}" />
-                                    <ui:Button
-                                        Grid.Column="2"
-                                        Command="{Binding LockCustomManifestCommand}"
-                                        Content="Lock Single Depot"
-                                        Icon="{ui:SymbolIcon LockClosed24}"
-                                        IsEnabled="{Binding CanLockCustomManifest}" />
-                                    <ui:ProgressRing
-                                        Grid.Column="3"
-                                        Width="16"
-                                        Height="16"
-                                        Margin="8,0,0,0"
-                                        IsIndeterminate="True"
-                                        Visibility="{Binding IsLockingCustomManifest, Converter={StaticResource BoolToVis}}" />
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <ui:TextBox
-                            Grid.Row="1"
-                            Margin="0,0,12,0"
-                            Icon="{ui:SymbolIcon Search24}"
-                            PlaceholderText="{x:Static res:Strings.Builds_Depot_Search}"
-                            Text="{Binding DepotSearchText, UpdateSourceTrigger=PropertyChanged}"
-                            Visibility="{Binding IsBrowseMode, Converter={StaticResource BoolToVis}}" />
-
-                        <TextBlock
-                            Grid.Row="2"
-                            Margin="2,12,0,0"
-                            VerticalAlignment="Top"
-                            FontSize="11.5"
-                            Foreground="#6b7280"
-                            Text="{x:Static res:Strings.Builds_Depot_NoMatch}"
-                            TextWrapping="Wrap"
-                            Visibility="{Binding HasNoDepotMatches, Converter={StaticResource BoolToVis}}" />
-
-                        <ScrollViewer
-                            Grid.Row="2"
-                            Margin="0,8,0,0"
-                            VerticalScrollBarVisibility="Auto"
-                            Visibility="{Binding IsBrowseMode, Converter={StaticResource BoolToVis}}">
-                            <!--
-                                Right margin keeps the scrollbar in its own lane instead of sitting on top of
-                                the Lock tickbox.
-                            -->
-                            <StackPanel Margin="0,0,12,0">
-                                <StackPanel
-                                    Margin="0,4,0,0"
-                                    Orientation="Horizontal"
-                                    Visibility="{Binding IsLoadingDepots, Converter={StaticResource BoolToVis}}">
-                                    <ui:ProgressRing
-                                        Width="16"
-                                        Height="16"
-                                        IsIndeterminate="True" />
-                                    <TextBlock
-                                        Margin="8,0,0,0"
-                                        VerticalAlignment="Center"
+                                        Text="{x:Static res:Strings.Builds_Editor_Title}" />
+                                    <TextBox
+                                        Grid.Row="1"
+                                        Margin="0,6,0,0"
+                                        AcceptsReturn="True"
+                                        AcceptsTab="True"
+                                        Background="#14000000"
+                                        FontFamily="Consolas"
                                         FontSize="12"
-                                        Foreground="#9ca3af"
-                                        Text="{x:Static res:Strings.Manage_LoadingDepotInfo}" />
-                                </StackPanel>
-                                <TextBlock
-                                    FontSize="12"
-                                    Foreground="#f87171"
-                                    Text="{Binding DepotError}"
-                                    TextWrapping="Wrap"
-                                    Visibility="{Binding DepotError, Converter={StaticResource NullToCollapsed}}" />
+                                        HorizontalScrollBarVisibility="Auto"
+                                        Text="{Binding EditorText, UpdateSourceTrigger=PropertyChanged}"
+                                        VerticalScrollBarVisibility="Auto" />
+                                    <StackPanel
+                                        Grid.Row="2"
+                                        Margin="0,10,0,0"
+                                        HorizontalAlignment="Right"
+                                        Orientation="Horizontal">
+                                        <ui:Button Command="{Binding CancelEditCommand}" Content="{x:Static res:Strings.Builds_Action_Cancel}" />
+                                        <ui:Button
+                                            Margin="8,0,0,0"
+                                            Command="{Binding SaveAsPresetCommand}"
+                                            Content="{x:Static res:Strings.Builds_Action_SaveAsPreset}"
+                                            Icon="{ui:SymbolIcon Bookmark24}" />
+                                        <ui:Button
+                                            Margin="8,0,0,0"
+                                            Appearance="Primary"
+                                            Command="{Binding SaveEditCommand}"
+                                            Content="{x:Static res:Strings.Builds_Action_Save}"
+                                            Icon="{ui:SymbolIcon Save24}" />
+                                    </StackPanel>
+                                </Grid>
 
                                 <!--
-                                    Editing a build that isn't applied still works, it just lands differently
-                                    (saved straight into that build; Steam keeps running the applied one).
+                                    Depot/DLC breakdown for the SELECTED variant (moved here from the Manage flyout).
+                                    The search box is OUTSIDE the ScrollViewer so it stays put on a long list.
                                 -->
-                                <TextBlock
-                                    Margin="0,0,0,6"
-                                    FontSize="10.5"
-                                    Foreground="#8b96f0"
-                                    Text="{x:Static res:Strings.Builds_Depot_InactiveNote}"
-                                    TextWrapping="Wrap"
-                                    Visibility="{Binding EditingInactiveBuild, Converter={StaticResource BoolToVis}}" />
+                                <Grid
+                                    Grid.Row="2"
+                                    Margin="0,12,0,0"
+                                    Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
 
-                                <!--  In lua: depots/DLC this build includes  -->
-                                <StackPanel Visibility="{Binding HasInLua, Converter={StaticResource BoolToVis}}">
-                                    <Button
-                                        Padding="0"
-                                        HorizontalContentAlignment="Left"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Command="{Binding ToggleInLuaCommand}"
-                                        Cursor="Hand">
-                                        <TextBlock
-                                            FontSize="13"
-                                            FontWeight="SemiBold"
-                                            Foreground="#d1d5db">
-                                            <Run Text="{Binding InLuaToggleLabel, Mode=OneWay}" />
-                                            <Run Foreground="#6b7280" Text="{Binding InLuaCount, StringFormat='({0})', Mode=OneWay}" />
-                                        </TextBlock>
-                                    </Button>
-                                    <ItemsControl
+                                    <!--  Lock Build ID / Depot Manifest card  -->
+                                    <Border
+                                        Grid.Row="0"
+                                        Margin="0,0,12,10"
+                                        Padding="10"
+                                        Background="#08FFFFFF"
+                                        BorderBrush="#14FFFFFF"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Visibility="{Binding IsBrowseMode, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    FontSize="11.5"
+                                                    FontWeight="SemiBold"
+                                                    Foreground="#d1d5db"
+                                                    Text="Lock Build ID &amp; Depot Manifests" />
+                                                <TextBlock
+                                                    Grid.Column="1"
+                                                    FontSize="11"
+                                                    Foreground="#8b96f0"
+                                                    Text="{Binding HubcapSingleUsageLabel}"
+                                                    Visibility="Collapsed" />
+                                            </Grid>
+                                            <!--  Row 1: Lock by Build ID  -->
+                                            <Grid Margin="0,6,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <ui:TextBox
+                                                    Margin="0,0,6,0"
+                                                    PlaceholderText="Build ID (e.g. 24410208)"
+                                                    Text="{Binding CustomBuildId, UpdateSourceTrigger=PropertyChanged}" />
+                                                <ui:Button
+                                                    Grid.Column="1"
+                                                    Appearance="Primary"
+                                                    Command="{Binding LockBuildIdCommand}"
+                                                    Content="Lock Build ID"
+                                                    Icon="{ui:SymbolIcon ArrowDownload24}"
+                                                    IsEnabled="{Binding CanLockBuildId}" />
+                                                <ui:ProgressRing
+                                                    Grid.Column="2"
+                                                    Width="16"
+                                                    Height="16"
+                                                    Margin="8,0,0,0"
+                                                    IsIndeterminate="True"
+                                                    Visibility="{Binding IsLockingBuildId, Converter={StaticResource BoolToVis}}" />
+                                            </Grid>
+                                            <!--  Row 2: Manual Single Depot Override  -->
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <ui:TextBox
+                                                    Margin="0,0,6,0"
+                                                    PlaceholderText="Depot ID (e.g. 228983)"
+                                                    Text="{Binding CustomDepotId, UpdateSourceTrigger=PropertyChanged}" />
+                                                <ui:TextBox
+                                                    Grid.Column="1"
+                                                    Margin="0,0,6,0"
+                                                    PlaceholderText="Manifest ID"
+                                                    Text="{Binding CustomManifestId, UpdateSourceTrigger=PropertyChanged}" />
+                                                <ui:Button
+                                                    Grid.Column="2"
+                                                    Command="{Binding LockCustomManifestCommand}"
+                                                    Content="Lock Single Depot"
+                                                    Icon="{ui:SymbolIcon LockClosed24}"
+                                                    IsEnabled="{Binding CanLockCustomManifest}" />
+                                                <ui:ProgressRing
+                                                    Grid.Column="3"
+                                                    Width="16"
+                                                    Height="16"
+                                                    Margin="8,0,0,0"
+                                                    IsIndeterminate="True"
+                                                    Visibility="{Binding IsLockingCustomManifest, Converter={StaticResource BoolToVis}}" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <ui:TextBox
+                                        Grid.Row="1"
+                                        Margin="0,0,12,0"
+                                        Icon="{ui:SymbolIcon Search24}"
+                                        PlaceholderText="{x:Static res:Strings.Builds_Depot_Search}"
+                                        Text="{Binding DepotSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                        Visibility="{Binding IsBrowseMode, Converter={StaticResource BoolToVis}}" />
+
+                                    <TextBlock
+                                        Grid.Row="2"
+                                        Margin="2,12,0,0"
+                                        VerticalAlignment="Top"
+                                        FontSize="11.5"
+                                        Foreground="#6b7280"
+                                        Text="{x:Static res:Strings.Builds_Depot_NoMatch}"
+                                        TextWrapping="Wrap"
+                                        Visibility="{Binding HasNoDepotMatches, Converter={StaticResource BoolToVis}}" />
+
+                                    <ScrollViewer
+                                        Grid.Row="2"
                                         Margin="0,8,0,0"
-                                        ItemTemplate="{StaticResource DepotRowTemplate}"
-                                        ItemsSource="{Binding InLua}"
-                                        Visibility="{Binding IsInLuaExpanded, Converter={StaticResource BoolToVis}}" />
-                                </StackPanel>
+                                        VerticalScrollBarVisibility="Auto"
+                                        Visibility="{Binding IsBrowseMode, Converter={StaticResource BoolToVis}}">
+                                        <!--
+                                            Right margin keeps the scrollbar in its own lane instead of sitting on top of
+                                            the Lock tickbox.
+                                        -->
+                                        <StackPanel Margin="0,0,12,0">
+                                            <StackPanel
+                                                Margin="0,4,0,0"
+                                                Orientation="Horizontal"
+                                                Visibility="{Binding IsLoadingDepots, Converter={StaticResource BoolToVis}}">
+                                                <ui:ProgressRing
+                                                    Width="16"
+                                                    Height="16"
+                                                    IsIndeterminate="True" />
+                                                <TextBlock
+                                                    Margin="8,0,0,0"
+                                                    VerticalAlignment="Center"
+                                                    FontSize="12"
+                                                    Foreground="#9ca3af"
+                                                    Text="{x:Static res:Strings.Manage_LoadingDepotInfo}" />
+                                            </StackPanel>
+                                            <TextBlock
+                                                FontSize="12"
+                                                Foreground="#f87171"
+                                                Text="{Binding DepotError}"
+                                                TextWrapping="Wrap"
+                                                Visibility="{Binding DepotError, Converter={StaticResource NullToCollapsed}}" />
 
-                                <!--  Missing: real depots/DLC on Steam this lua omits  -->
-                                <StackPanel Margin="0,8,0,0" Visibility="{Binding HasMissing, Converter={StaticResource BoolToVis}}">
-                                    <Button
-                                        Padding="0"
-                                        HorizontalContentAlignment="Left"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Command="{Binding ToggleMissingCommand}"
-                                        Cursor="Hand">
-                                        <TextBlock
-                                            FontSize="13"
-                                            FontWeight="SemiBold"
-                                            Foreground="#f0a868">
-                                            <Run Text="{Binding MissingToggleLabel, Mode=OneWay}" />
-                                            <Run Foreground="#6b7280" Text="{Binding MissingCount, StringFormat='({0})', Mode=OneWay}" />
-                                        </TextBlock>
-                                    </Button>
-                                    <StackPanel Visibility="{Binding IsMissingExpanded, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock
-                                            Margin="0,2,0,0"
-                                            FontSize="10.5"
-                                            Foreground="#6b7280"
-                                            Text="{x:Static res:Strings.Manage_MissingHint}"
-                                            TextWrapping="Wrap" />
-                                        <ItemsControl
-                                            Margin="0,8,0,0"
-                                            ItemTemplate="{StaticResource DepotRowTemplate}"
-                                            ItemsSource="{Binding Missing}" />
-                                    </StackPanel>
-                                </StackPanel>
+                                            <!--
+                                                Editing a build that isn't applied still works, it just lands differently
+                                                (saved straight into that build; Steam keeps running the applied one).
+                                            -->
+                                            <TextBlock
+                                                Margin="0,0,0,6"
+                                                FontSize="10.5"
+                                                Foreground="#8b96f0"
+                                                Text="{x:Static res:Strings.Builds_Depot_InactiveNote}"
+                                                TextWrapping="Wrap"
+                                                Visibility="{Binding EditingInactiveBuild, Converter={StaticResource BoolToVis}}" />
 
-                                <!--  Unknown: unnamed DLC, 0-byte/broken depots, shared redists  -->
-                                <StackPanel Margin="0,8,0,12" Visibility="{Binding HasUnknown, Converter={StaticResource BoolToVis}}">
-                                    <Button
-                                        Padding="0"
-                                        HorizontalContentAlignment="Left"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Command="{Binding ToggleUnknownCommand}"
-                                        Cursor="Hand">
-                                        <TextBlock
-                                            FontSize="13"
-                                            FontWeight="SemiBold"
-                                            Foreground="#9ca3af">
-                                            <Run Text="{Binding UnknownToggleLabel, Mode=OneWay}" />
-                                            <Run Foreground="#6b7280" Text="{Binding UnknownCount, StringFormat='({0})', Mode=OneWay}" />
-                                        </TextBlock>
-                                    </Button>
-                                    <StackPanel Visibility="{Binding IsUnknownExpanded, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock
-                                            Margin="0,2,0,0"
-                                            FontSize="10.5"
-                                            Foreground="#6b7280"
-                                            Text="{x:Static res:Strings.Manage_UnknownHint}"
-                                            TextWrapping="Wrap" />
-                                        <ItemsControl
-                                            Margin="0,8,0,0"
-                                            ItemTemplate="{StaticResource DepotRowTemplate}"
-                                            ItemsSource="{Binding Unknown}" />
-                                    </StackPanel>
-                                </StackPanel>
-                            </StackPanel>
-                        </ScrollViewer>
+                                            <!--  In lua: depots/DLC this build includes  -->
+                                            <StackPanel Visibility="{Binding HasInLua, Converter={StaticResource BoolToVis}}">
+                                                <Button
+                                                    Padding="0"
+                                                    HorizontalContentAlignment="Left"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Command="{Binding ToggleInLuaCommand}"
+                                                    Cursor="Hand">
+                                                    <TextBlock
+                                                        FontSize="13"
+                                                        FontWeight="SemiBold"
+                                                        Foreground="#d1d5db">
+                                                        <Run Text="{Binding InLuaToggleLabel, Mode=OneWay}" />
+                                                        <Run Foreground="#6b7280" Text="{Binding InLuaCount, StringFormat='({0})', Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </Button>
+                                                <ItemsControl
+                                                    Margin="0,8,0,0"
+                                                    ItemTemplate="{StaticResource DepotRowTemplate}"
+                                                    ItemsSource="{Binding InLua}"
+                                                    Visibility="{Binding IsInLuaExpanded, Converter={StaticResource BoolToVis}}" />
+                                            </StackPanel>
 
-                        <!--
-                            Select-depots mode. Overlays both rows of this grid; a game usually ships several
-                            depots, so the Download button opens this rather than guessing which one.
-                        -->
-                        <Grid
-                            Grid.Row="0"
-                            Grid.RowSpan="3"
-                            Margin="0,0,12,0"
-                            Visibility="{Binding IsSelectMode, Converter={StaticResource BoolToVis}}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
+                                            <!--  Missing: real depots/DLC on Steam this lua omits  -->
+                                            <StackPanel Margin="0,8,0,0" Visibility="{Binding HasMissing, Converter={StaticResource BoolToVis}}">
+                                                <Button
+                                                    Padding="0"
+                                                    HorizontalContentAlignment="Left"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Command="{Binding ToggleMissingCommand}"
+                                                    Cursor="Hand">
+                                                    <TextBlock
+                                                        FontSize="13"
+                                                        FontWeight="SemiBold"
+                                                        Foreground="#f0a868">
+                                                        <Run Text="{Binding MissingToggleLabel, Mode=OneWay}" />
+                                                        <Run Foreground="#6b7280" Text="{Binding MissingCount, StringFormat='({0})', Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </Button>
+                                                <StackPanel Visibility="{Binding IsMissingExpanded, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock
+                                                        Margin="0,2,0,0"
+                                                        FontSize="10.5"
+                                                        Foreground="#6b7280"
+                                                        Text="{x:Static res:Strings.Manage_MissingHint}"
+                                                        TextWrapping="Wrap" />
+                                                    <ItemsControl
+                                                        Margin="0,8,0,0"
+                                                        ItemTemplate="{StaticResource DepotRowTemplate}"
+                                                        ItemsSource="{Binding Missing}" />
+                                                </StackPanel>
+                                            </StackPanel>
 
-                            <Grid>
-                                <TextBlock
-                                    VerticalAlignment="Center"
-                                    FontSize="13"
-                                    FontWeight="SemiBold"
-                                    Text="{x:Static res:Strings.Builds_Select_Title}" />
-                                <ui:Button
-                                    HorizontalAlignment="Right"
-                                    Appearance="Secondary"
-                                    Command="{Binding SelectAllDepotsCommand}"
-                                    Content="{x:Static res:Strings.Builds_Select_All}" />
+                                            <!--  Unknown: unnamed DLC, 0-byte/broken depots, shared redists  -->
+                                            <StackPanel Margin="0,8,0,12" Visibility="{Binding HasUnknown, Converter={StaticResource BoolToVis}}">
+                                                <Button
+                                                    Padding="0"
+                                                    HorizontalContentAlignment="Left"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Command="{Binding ToggleUnknownCommand}"
+                                                    Cursor="Hand">
+                                                    <TextBlock
+                                                        FontSize="13"
+                                                        FontWeight="SemiBold"
+                                                        Foreground="#9ca3af">
+                                                        <Run Text="{Binding UnknownToggleLabel, Mode=OneWay}" />
+                                                        <Run Foreground="#6b7280" Text="{Binding UnknownCount, StringFormat='({0})', Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </Button>
+                                                <StackPanel Visibility="{Binding IsUnknownExpanded, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock
+                                                        Margin="0,2,0,0"
+                                                        FontSize="10.5"
+                                                        Foreground="#6b7280"
+                                                        Text="{x:Static res:Strings.Manage_UnknownHint}"
+                                                        TextWrapping="Wrap" />
+                                                    <ItemsControl
+                                                        Margin="0,8,0,0"
+                                                        ItemTemplate="{StaticResource DepotRowTemplate}"
+                                                        ItemsSource="{Binding Unknown}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </ScrollViewer>
+
+                                    <!--
+                                        Select-depots mode. Overlays both rows of this grid; a game usually ships several
+                                        depots, so the Download button opens this rather than guessing which one.
+                                    -->
+                                    <Grid
+                                        Grid.Row="0"
+                                        Grid.RowSpan="3"
+                                        Margin="0,0,12,0"
+                                        Visibility="{Binding IsSelectMode, Converter={StaticResource BoolToVis}}">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <Grid>
+                                            <TextBlock
+                                                VerticalAlignment="Center"
+                                                FontSize="13"
+                                                FontWeight="SemiBold"
+                                                Text="{x:Static res:Strings.Builds_Select_Title}" />
+                                            <ui:Button
+                                                HorizontalAlignment="Right"
+                                                Appearance="Secondary"
+                                                Command="{Binding SelectAllDepotsCommand}"
+                                                Content="{x:Static res:Strings.Builds_Select_All}" />
+                                        </Grid>
+
+                                        <ScrollViewer
+                                            Grid.Row="1"
+                                            Margin="0,10,0,0"
+                                            VerticalScrollBarVisibility="Auto">
+                                            <!--  Right margin keeps the scrollbar in its own lane instead of sitting on the rows.  -->
+                                            <ItemsControl Margin="0,0,12,0" ItemsSource="{Binding DepotPicks}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border
+                                                            Margin="0,0,0,6"
+                                                            Padding="10,8"
+                                                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                                            CornerRadius="6">
+                                                            <StackPanel>
+                                                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding CanDownload}">
+                                                                    <StackPanel>
+                                                                        <!--
+                                                                            Same DLC/SHARED tags as the browse table.
+                                                                            Without them a shared runtime looks like any
+                                                                            other row here, just silently unticked, with
+                                                                            nothing saying why it was left off.
+                                                                        -->
+                                                                        <Grid>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                                <ColumnDefinition Width="*" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock
+                                                                                FontSize="12.5"
+                                                                                Text="{Binding Title}"
+                                                                                TextTrimming="CharacterEllipsis" />
+                                                                            <Border
+                                                                                Grid.Column="1"
+                                                                                Margin="6,0,0,0"
+                                                                                Padding="5,1"
+                                                                                VerticalAlignment="Center"
+                                                                                Background="#2a2440"
+                                                                                CornerRadius="4"
+                                                                                Visibility="{Binding IsDlc, Converter={StaticResource BoolToVis}}">
+                                                                                <TextBlock
+                                                                                    FontSize="9.5"
+                                                                                    FontWeight="SemiBold"
+                                                                                    Foreground="#c4b5fd"
+                                                                                    Text="DLC" />
+                                                                            </Border>
+                                                                            <Border
+                                                                                Grid.Column="1"
+                                                                                Margin="6,0,0,0"
+                                                                                Padding="5,1"
+                                                                                VerticalAlignment="Center"
+                                                                                Background="#3a3320"
+                                                                                CornerRadius="4"
+                                                                                Visibility="{Binding IsShared, Converter={StaticResource BoolToVis}}">
+                                                                                <TextBlock
+                                                                                    FontSize="9.5"
+                                                                                    FontWeight="SemiBold"
+                                                                                    Foreground="#d6b36b"
+                                                                                    Text="{x:Static res:Strings.Confirm_Shared}" />
+                                                                            </Border>
+                                                                        </Grid>
+                                                                        <TextBlock
+                                                                            FontSize="11"
+                                                                            Foreground="#6b7280"
+                                                                            Text="{Binding Meta}" />
+                                                                        <!--
+                                                                            Says why a tickable row starts unticked. Both
+                                                                            are downloadable, just not by default: shared
+                                                                            runtimes are usually already installed, and an
+                                                                            other-platform depot isn't for this machine.
+                                                                        -->
+                                                                        <TextBlock
+                                                                            Margin="0,2,0,0"
+                                                                            FontSize="10.5"
+                                                                            Foreground="#6b7280"
+                                                                            Text="{x:Static res:Strings.Builds_Select_SharedHint}"
+                                                                            TextWrapping="Wrap"
+                                                                            Visibility="{Binding IsShared, Converter={StaticResource BoolToVis}}" />
+                                                                    </StackPanel>
+                                                                </CheckBox>
+                                                                <!--
+                                                                    Shown inline rather than as a tooltip: WPF suppresses
+                                                                    tooltips on disabled controls, and this is the whole
+                                                                    reason the row can't be ticked. The text is per-row
+                                                                    now (no version declared vs. sign-in needed).
+                                                                -->
+                                                                <TextBlock
+                                                                    Margin="0,4,0,0"
+                                                                    FontSize="10.5"
+                                                                    Foreground="#f0b48b"
+                                                                    Text="{Binding BlockReason}"
+                                                                    TextWrapping="Wrap"
+                                                                    Visibility="{Binding CanDownload, Converter={StaticResource InverseBoolToVis}}" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+
+                                        <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                                            <!--
+                                                Destination is picked HERE, not after clicking Download, so the space
+                                                line below can report against the drive that will receive the files.
+                                            -->
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock
+                                                    VerticalAlignment="Center"
+                                                    FontSize="11.5"
+                                                    Foreground="#6b7280"
+                                                    Text="{x:Static res:Strings.Builds_Select_SaveTo}" />
+                                                <TextBlock
+                                                    MaxWidth="420"
+                                                    Margin="6,0,0,0"
+                                                    VerticalAlignment="Center"
+                                                    FontSize="11.5"
+                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                    Text="{Binding DepotOutDir}"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    ToolTip="{Binding DepotOutDir}" />
+                                                <ui:Button
+                                                    Margin="8,0,0,0"
+                                                    Padding="8,2"
+                                                    Command="{Binding ChangeDepotFolderCommand}"
+                                                    Content="{x:Static res:Strings.Settings_Change}"
+                                                    FontSize="11" />
+                                            </StackPanel>
+
+                                            <!--
+                                                Grey when it fits, red when it doesn't. Deliberately does NOT disable
+                                                Download: free space can change, and RunDepotsAsync re-checks before
+                                                allocating anything.
+                                            -->
+                                            <TextBlock
+                                                Margin="0,6,0,0"
+                                                FontSize="11.5"
+                                                Text="{Binding SpaceLabel}"
+                                                TextWrapping="Wrap">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#6b7280" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasEnoughSpace}" Value="False">
+                                                                <Setter Property="Foreground" Value="#f87171" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+
+                                            <StackPanel
+                                                Margin="0,10,0,0"
+                                                HorizontalAlignment="Right"
+                                                Orientation="Horizontal">
+                                                <TextBlock
+                                                    Margin="0,0,10,0"
+                                                    VerticalAlignment="Center"
+                                                    FontSize="11.5"
+                                                    Foreground="#6b7280"
+                                                    Text="{x:Static res:Strings.Builds_Select_None}"
+                                                    Visibility="{Binding HasDepotSelection, Converter={StaticResource InverseBoolToVis}}" />
+                                                <ui:Button Command="{Binding CancelDepotDownloadCommand}" Content="{x:Static res:Strings.Builds_Action_Cancel}" />
+                                                <ui:Button
+                                                    Margin="8,0,0,0"
+                                                    Appearance="Primary"
+                                                    Command="{Binding ConfirmDepotDownloadCommand}"
+                                                    Content="{Binding DownloadConfirmLabel}"
+                                                    Icon="{ui:SymbolIcon ArrowDownload24}"
+                                                    IsEnabled="{Binding HasDepotSelection}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
                             </Grid>
-
-                            <ScrollViewer
-                                Grid.Row="1"
-                                Margin="0,10,0,0"
-                                VerticalScrollBarVisibility="Auto">
-                                <!--  Right margin keeps the scrollbar in its own lane instead of sitting on the rows.  -->
-                                <ItemsControl Margin="0,0,12,0" ItemsSource="{Binding DepotPicks}">
+                        </TabItem>
+                        <TabItem Header="{x:Static res:Strings.GameTools_Tab_Achievements}">
+                            <DockPanel Margin="0,12,0,0" DataContext="{Binding Tools}">
+                                <Grid DockPanel.Dock="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        Foreground="#e8c07a"
+                                        Text="{Binding StatsRestartNote}"
+                                        Visibility="{Binding StatsRestartNote, Converter={StaticResource NullToCollapsed}}" />
+                                    <StackPanel
+                                        Grid.Column="1"
+                                        Margin="12,0,0,0"
+                                        Orientation="Horizontal">
+                                        <ui:Button Command="{Binding UnlockAllCommand}" Content="{x:Static res:Strings.GameTools_UnlockAll}" />
+                                        <ui:Button
+                                            Margin="8,0,0,0"
+                                            Command="{Binding LockAllCommand}"
+                                            Content="{x:Static res:Strings.GameTools_LockAll}" />
+                                        <ui:Button
+                                            Margin="8,0,0,0"
+                                            Command="{Binding RevertStatsCommand}"
+                                            Content="{x:Static res:Strings.Builds_Action_Cancel}" />
+                                        <ui:Button
+                                            Margin="8,0,0,0"
+                                            Appearance="Primary"
+                                            Command="{Binding SaveStatsCommand}"
+                                            Content="{x:Static res:Strings.Builds_Action_Save}" />
+                                    </StackPanel>
+                                </Grid>
+                                <ui:TextBox
+                                    Margin="0,12,0,0"
+                                    DockPanel.Dock="Top"
+                                    Icon="{ui:SymbolIcon Search24}"
+                                    PlaceholderText="{x:Static res:Strings.GameTools_SearchAchievements}"
+                                    Text="{Binding AchievementSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                    Visibility="{Binding HasAchievements, Converter={StaticResource BoolToVis}}" />
+                                <TextBlock
+                                    Margin="0,24,16,0"
+                                    DockPanel.Dock="Top"
+                                    Text="{Binding AchievementsMessage}"
+                                    TextWrapping="Wrap"
+                                    Visibility="{Binding AchievementsMessage, Converter={StaticResource NullToCollapsed}}" />
+                                <TextBlock
+                                    Margin="2,12,0,0"
+                                    DockPanel.Dock="Top"
+                                    Text="{x:Static res:Strings.GameTools_NoAchievementMatch}"
+                                    Visibility="{Binding HasNoAchievementMatches, Converter={StaticResource BoolToVis}}" />
+                                <ListBox
+                                    Margin="0,12,0,0"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    ItemsSource="{Binding Achievements}"
+                                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                    VirtualizingPanel.IsVirtualizing="True"
+                                    VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                                    VirtualizingPanel.ScrollUnit="Pixel">
+                                    <ItemsControl.GroupStyle>
+                                        <GroupStyle>
+                                            <GroupStyle.ContainerStyle>
+                                                <Style TargetType="{x:Type GroupItem}">
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                                <StackPanel>
+                                                                    <Button
+                                                                        Margin="0,6,0,10"
+                                                                        Padding="0"
+                                                                        HorizontalAlignment="Left"
+                                                                        HorizontalContentAlignment="Left"
+                                                                        Background="Transparent"
+                                                                        BorderThickness="0"
+                                                                        Command="{Binding Name.ToggleCommand}"
+                                                                        Cursor="Hand"
+                                                                        Visibility="{Binding DataContext.ShowsSets, Converter={StaticResource BoolToVis}, RelativeSource={RelativeSource AncestorType=ListBox}}">
+                                                                        <TextBlock
+                                                                            FontSize="13"
+                                                                            FontWeight="SemiBold"
+                                                                            Foreground="#d1d5db">
+                                                                            <Run Text="{Binding Name.ToggleLabel, Mode=OneWay}" /> <Run Foreground="#6b7280" Text="{Binding Name.Summary, StringFormat=({0}), Mode=OneWay}" />
+                                                                        </TextBlock>
+                                                                    </Button>
+                                                                    <ItemsPresenter Visibility="{Binding Name.IsExpanded, Converter={StaticResource BoolToVis}}" />
+                                                                </StackPanel>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </GroupStyle.ContainerStyle>
+                                        </GroupStyle>
+                                    </ItemsControl.GroupStyle>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border
                                                 Margin="0,0,0,6"
                                                 Padding="10,8"
-                                                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                                                CornerRadius="6">
-                                                <StackPanel>
-                                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding CanDownload}">
-                                                        <StackPanel>
-                                                            <!--
-                                                                Same DLC/SHARED tags as the browse table.
-                                                                Without them a shared runtime looks like any
-                                                                other row here, just silently unticked, with
-                                                                nothing saying why it was left off.
-                                                            -->
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                    <ColumnDefinition Width="*" />
-                                                                </Grid.ColumnDefinitions>
+                                                Background="#0DFFFFFF"
+                                                BorderBrush="#1FFFFFFF"
+                                                BorderThickness="1"
+                                                CornerRadius="8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="48" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <CheckBox VerticalAlignment="Center" IsChecked="{Binding Unlocked}" />
+                                                    <Image
+                                                        Grid.Column="1"
+                                                        Width="36"
+                                                        Height="36"
+                                                        Margin="8,0"
+                                                        VerticalAlignment="Center"
+                                                        Source="{Binding IconPath}" />
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock
+                                                                FontSize="13"
+                                                                FontWeight="SemiBold"
+                                                                Text="{Binding Name}"
+                                                                TextTrimming="CharacterEllipsis" />
+                                                            <Border
+                                                                Margin="8,0,0,0"
+                                                                Padding="5,1"
+                                                                VerticalAlignment="Center"
+                                                                Background="#242938"
+                                                                CornerRadius="4"
+                                                                Visibility="{Binding Hidden, Converter={StaticResource BoolToVis}}">
                                                                 <TextBlock
-                                                                    FontSize="12.5"
-                                                                    Text="{Binding Title}"
-                                                                    TextTrimming="CharacterEllipsis" />
-                                                                <Border
-                                                                    Grid.Column="1"
-                                                                    Margin="6,0,0,0"
-                                                                    Padding="5,1"
-                                                                    VerticalAlignment="Center"
-                                                                    Background="#2a2440"
-                                                                    CornerRadius="4"
-                                                                    Visibility="{Binding IsDlc, Converter={StaticResource BoolToVis}}">
-                                                                    <TextBlock
-                                                                        FontSize="9.5"
-                                                                        FontWeight="SemiBold"
-                                                                        Foreground="#c4b5fd"
-                                                                        Text="DLC" />
-                                                                </Border>
-                                                                <Border
-                                                                    Grid.Column="1"
-                                                                    Margin="6,0,0,0"
-                                                                    Padding="5,1"
-                                                                    VerticalAlignment="Center"
-                                                                    Background="#3a3320"
-                                                                    CornerRadius="4"
-                                                                    Visibility="{Binding IsShared, Converter={StaticResource BoolToVis}}">
-                                                                    <TextBlock
-                                                                        FontSize="9.5"
-                                                                        FontWeight="SemiBold"
-                                                                        Foreground="#d6b36b"
-                                                                        Text="{x:Static res:Strings.Confirm_Shared}" />
-                                                                </Border>
-                                                            </Grid>
-                                                            <TextBlock
-                                                                FontSize="11"
-                                                                Foreground="#6b7280"
-                                                                Text="{Binding Meta}" />
-                                                            <!--
-                                                                Says why a tickable row starts unticked. Both
-                                                                are downloadable, just not by default: shared
-                                                                runtimes are usually already installed, and an
-                                                                other-platform depot isn't for this machine.
-                                                            -->
-                                                            <TextBlock
-                                                                Margin="0,2,0,0"
-                                                                FontSize="10.5"
-                                                                Foreground="#6b7280"
-                                                                Text="{x:Static res:Strings.Builds_Select_SharedHint}"
-                                                                TextWrapping="Wrap"
-                                                                Visibility="{Binding IsShared, Converter={StaticResource BoolToVis}}" />
+                                                                    FontSize="9.5"
+                                                                    FontWeight="SemiBold"
+                                                                    Foreground="#9ca3af"
+                                                                    Text="{x:Static res:Strings.GameTools_Hidden}" />
+                                                            </Border>
                                                         </StackPanel>
-                                                    </CheckBox>
-                                                    <!--
-                                                        Shown inline rather than as a tooltip: WPF suppresses
-                                                        tooltips on disabled controls, and this is the whole
-                                                        reason the row can't be ticked. The text is per-row
-                                                        now (no version declared vs. sign-in needed).
-                                                    -->
+                                                        <TextBlock
+                                                            Margin="0,2,0,0"
+                                                            FontSize="11.5"
+                                                            Foreground="#9ca3af"
+                                                            Text="{Binding Description}"
+                                                            TextWrapping="Wrap" />
+                                                        <ProgressBar
+                                                            Height="4"
+                                                            Margin="0,6,0,0"
+                                                            Maximum="{Binding ProgressMax}"
+                                                            Minimum="{Binding ProgressMin}"
+                                                            Visibility="{Binding ShowProgress, Converter={StaticResource BoolToVis}}"
+                                                            Value="{Binding ProgressValue}" />
+                                                    </StackPanel>
                                                     <TextBlock
-                                                        Margin="0,4,0,0"
-                                                        FontSize="10.5"
-                                                        Foreground="#f0b48b"
-                                                        Text="{Binding BlockReason}"
-                                                        TextWrapping="Wrap"
-                                                        Visibility="{Binding CanDownload, Converter={StaticResource InverseBoolToVis}}" />
-                                                </StackPanel>
+                                                        Grid.Column="3"
+                                                        Margin="12,0,0,0"
+                                                        VerticalAlignment="Center"
+                                                        FontSize="11"
+                                                        Foreground="#6b7280"
+                                                        Text="{Binding UnlockedAtText}"
+                                                        Visibility="{Binding UnlockedAtText, Converter={StaticResource NullToCollapsed}}" />
+                                                </Grid>
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-
-                            <StackPanel Grid.Row="2" Margin="0,10,0,0">
-                                <!--
-                                    Destination is picked HERE, not after clicking Download, so the space
-                                    line below can report against the drive that will receive the files.
-                                -->
-                                <StackPanel Orientation="Horizontal">
+                                </ListBox>
+                            </DockPanel>
+                        </TabItem>
+                        <TabItem Header="{x:Static res:Strings.GameTools_Tab_Stats}">
+                            <DockPanel Margin="0,12,0,0" DataContext="{Binding Tools}">
+                                <Grid DockPanel.Dock="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
                                     <TextBlock
                                         VerticalAlignment="Center"
-                                        FontSize="11.5"
-                                        Foreground="#6b7280"
-                                        Text="{x:Static res:Strings.Builds_Select_SaveTo}" />
-                                    <TextBlock
-                                        MaxWidth="420"
-                                        Margin="6,0,0,0"
-                                        VerticalAlignment="Center"
-                                        FontSize="11.5"
-                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                        Text="{Binding DepotOutDir}"
-                                        TextTrimming="CharacterEllipsis"
-                                        ToolTip="{Binding DepotOutDir}" />
+                                        Foreground="#e8c07a"
+                                        Text="{Binding StatsRestartNote}"
+                                        Visibility="{Binding StatsRestartNote, Converter={StaticResource NullToCollapsed}}" />
+                                    <StackPanel
+                                        Grid.Column="1"
+                                        Margin="12,0,0,0"
+                                        Orientation="Horizontal">
+                                        <ui:Button Command="{Binding RevertStatsCommand}" Content="{x:Static res:Strings.Builds_Action_Cancel}" />
+                                        <ui:Button
+                                            Margin="8,0,0,0"
+                                            Appearance="Primary"
+                                            Command="{Binding SaveStatsCommand}"
+                                            Content="{x:Static res:Strings.Builds_Action_Save}" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock
+                                    Margin="0,24,16,0"
+                                    DockPanel.Dock="Top"
+                                    Text="{Binding StatsMessage}"
+                                    TextWrapping="Wrap"
+                                    Visibility="{Binding StatsMessage, Converter={StaticResource NullToCollapsed}}" />
+                                <ListBox
+                                    Margin="0,12,0,0"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    ItemsSource="{Binding Stats}"
+                                    ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="160" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock
+                                                        FontSize="13"
+                                                        FontWeight="SemiBold"
+                                                        Text="{Binding DisplayName}" />
+                                                    <TextBlock
+                                                        FontSize="11"
+                                                        Foreground="#6b7280"
+                                                        Text="{Binding ApiName}" />
+                                                </StackPanel>
+                                                <ui:TextBox
+                                                    Grid.Column="1"
+                                                    IsReadOnly="{Binding IsReadOnly}"
+                                                    Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ListBox>
+                            </DockPanel>
+                        </TabItem>
+                        <TabItem Header="{x:Static res:Strings.Launch_Title}">
+                            <DockPanel Margin="0,12,0,0" DataContext="{Binding Tools}">
+                                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+                                    <ui:Button
+                                        Appearance="Primary"
+                                        Command="{Binding EditLaunchOptionsCommand}"
+                                        Content="{x:Static res:Strings.Launch_Edit}" />
                                     <ui:Button
                                         Margin="8,0,0,0"
-                                        Padding="8,2"
-                                        Command="{Binding ChangeDepotFolderCommand}"
-                                        Content="{x:Static res:Strings.Settings_Change}"
-                                        FontSize="11" />
+                                        Command="{Binding ShowAllLaunchOverridesCommand}"
+                                        Content="{x:Static res:Strings.Launch_AllOverrides}" />
                                 </StackPanel>
-
-                                <!--
-                                    Grey when it fits, red when it doesn't. Deliberately does NOT disable
-                                    Download: free space can change, and RunDepotsAsync re-checks before
-                                    allocating anything.
-                                -->
                                 <TextBlock
-                                    Margin="0,6,0,0"
-                                    FontSize="11.5"
-                                    Text="{Binding SpaceLabel}"
-                                    TextWrapping="Wrap">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="#6b7280" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasEnoughSpace}" Value="False">
-                                                    <Setter Property="Foreground" Value="#f87171" />
-                                                    <Setter Property="FontWeight" Value="SemiBold" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-
-                                <StackPanel
-                                    Margin="0,10,0,0"
-                                    HorizontalAlignment="Right"
-                                    Orientation="Horizontal">
-                                    <TextBlock
-                                        Margin="0,0,10,0"
-                                        VerticalAlignment="Center"
-                                        FontSize="11.5"
-                                        Foreground="#6b7280"
-                                        Text="{x:Static res:Strings.Builds_Select_None}"
-                                        Visibility="{Binding HasDepotSelection, Converter={StaticResource InverseBoolToVis}}" />
-                                    <ui:Button Command="{Binding CancelDepotDownloadCommand}" Content="{x:Static res:Strings.Builds_Action_Cancel}" />
+                                    Margin="0,14,0,0"
+                                    DockPanel.Dock="Top"
+                                    Text="{x:Static res:Strings.Launch_NoOverrides}"
+                                    Visibility="{Binding HasLaunchOverrides, Converter={StaticResource InverseBoolToVis}}" />
+                                <Border
+                                    Margin="0,12,0,0"
+                                    Padding="12,8"
+                                    VerticalAlignment="Top"
+                                    Background="#0DFFFFFF"
+                                    BorderBrush="#1FFFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Visibility="{Binding HasLaunchOverrides, Converter={StaticResource BoolToVis}}">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding LaunchOverrides}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,4">
+                                                        <TextBlock
+                                                            FontSize="12.5"
+                                                            Text="{Binding Title}"
+                                                            TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock
+                                                            FontSize="10.5"
+                                                            Foreground="#6b7280"
+                                                            Text="{Binding Subtitle}"
+                                                            TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Border>
+                            </DockPanel>
+                        </TabItem>
+                        <TabItem Header="{x:Static res:Strings.GameTools_Tab_Playtime}">
+                            <StackPanel
+                                MinWidth="320"
+                                Margin="0,16,0,0"
+                                HorizontalAlignment="Left"
+                                DataContext="{Binding Tools}">
+                                <TextBlock
+                                    FontSize="13"
+                                    FontWeight="Medium"
+                                    Text="{x:Static res:Strings.GameTools_Playtime_Hours}" />
+                                <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                                    <ui:TextBox Width="160" Text="{Binding PlaytimeHours, UpdateSourceTrigger=PropertyChanged}" />
                                     <ui:Button
                                         Margin="8,0,0,0"
                                         Appearance="Primary"
-                                        Command="{Binding ConfirmDepotDownloadCommand}"
-                                        Content="{Binding DownloadConfirmLabel}"
-                                        Icon="{ui:SymbolIcon ArrowDownload24}"
-                                        IsEnabled="{Binding HasDepotSelection}" />
+                                        Command="{Binding SavePlaytimeCommand}"
+                                        Content="{x:Static res:Strings.Builds_Action_Save}" />
                                 </StackPanel>
+                                <TextBlock
+                                    Margin="0,8,0,0"
+                                    Text="{Binding PlaytimeMessage}"
+                                    Visibility="{Binding PlaytimeMessage, Converter={StaticResource NullToCollapsed}}" />
+                                <TextBlock
+                                    Margin="0,8,0,0"
+                                    Foreground="#e8c07a"
+                                    Text="{Binding PlaytimeRestartNote}"
+                                    Visibility="{Binding PlaytimeRestartNote, Converter={StaticResource NullToCollapsed}}" />
                             </StackPanel>
-                        </Grid>
-                    </Grid>
+                        </TabItem>
+                    </TabControl>
+
                 </Grid>
             </Grid>
         </Grid>

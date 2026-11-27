@@ -103,12 +103,6 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             "\uE90F",
             () => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToFixes(); })));
 
-        // Steam Mode & Redirection (Sliders/Tune: 0xE7AC)
-        menu.Items.Add(CreateMenuItem(
-            DataJackUIGui.Resources.Strings.Tray_Mode,
-            "\uE7AC",
-            () => Dispatcher.Invoke(() => { RestoreFromTray(); NavigateToMode(); })));
-
         // Jack-in Plugin (Puzzle: 0xEA86)
         menu.Items.Add(CreateMenuItem(
             DataJackUIGui.Resources.Strings.Tray_Plugin,
@@ -245,5 +239,10 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private void RestartSteam_Click(object sender, RoutedEventArgs e)
     {
         if (DataContext is MainViewModel vm) vm.RestartSteamCommand.Execute(null);
+    }
+
+    private void FixZeroByte_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm) _ = vm.FixZeroByteCacheAsync();
     }
 }

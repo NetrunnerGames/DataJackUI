@@ -26,6 +26,20 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        if (args != null && args.Length > 0 && args[0].Equals("--stats-helper", StringComparison.OrdinalIgnoreCase))
+        {
+            if (args.Length == 2 && long.TryParse(args[1], out var appId))
+            {
+                Environment.ExitCode = DataJackUIGui.Services.GameData.StatsHelper.Run(appId);
+            }
+            else
+            {
+                Console.Out.WriteLine(System.Text.Json.JsonSerializer.Serialize(new DataJackUIGui.Services.GameData.StatsHelperResponse(false, "Invalid --stats-helper arguments.", null)));
+                Environment.ExitCode = 1;
+            }
+            return;
+        }
+
         // MUST run before any WPF/UI work: handles Velopack install/update hooks,
         // and automatically applies any downloaded update on startup.
         VelopackApp.Build()

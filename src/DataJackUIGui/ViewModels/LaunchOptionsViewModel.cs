@@ -75,6 +75,7 @@ public partial class LaunchOptionsViewModel : ObservableObject
 {
     private readonly LaunchOptionsService _launch;
     private readonly ToastService _toast;
+    private readonly SteamLibraryService? _library;
 
     private LaunchState? _state;
 
@@ -128,10 +129,11 @@ public partial class LaunchOptionsViewModel : ObservableObject
     /// <summary>Set by the view so the dialog can close itself.</summary>
     public Action<bool>? CloseWith { get; set; }
 
-    public LaunchOptionsViewModel(LaunchOptionsService launch, ToastService toast)
+    public LaunchOptionsViewModel(LaunchOptionsService launch, ToastService toast, SteamLibraryService? library = null)
     {
         _launch = launch;
         _toast = toast;
+        _library = library;
         Entries.CollectionChanged += OnEntriesChanged;
     }
 
@@ -312,6 +314,13 @@ public partial class LaunchOptionsViewModel : ObservableObject
         _launch.Store.Remove((int)AppId);
         IsModded = false;
         CloseWith?.Invoke(true);
+    }
+
+    [RelayCommand]
+    private void ShowInFolder()
+    {
+        if (!SteamService.ShowInExplorer(_library?.GetInstallDir(AppId)))
+            _toast.Show(Resources.Strings.Common_ShowInFolder, Resources.Strings.Manage_Steamless_NoInstall, error: true);
     }
 
     [RelayCommand]

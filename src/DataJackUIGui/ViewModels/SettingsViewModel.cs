@@ -145,6 +145,53 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _toolsPath = "";
     partial void OnToolsPathChanged(string value) => _settings.ToolsPath = value;
 
+    // ── Cloud Saves backup folder ──────────────────────────────────────
+    [ObservableProperty] private string _cloudSavesBackupPath = "";
+    [ObservableProperty] private bool _hasCustomCloudSavesBackupPath;
+
+    partial void OnCloudSavesBackupPathChanged(string value)
+    {
+        _settings.CloudSavesLocalPath = string.IsNullOrWhiteSpace(value) ? null : value;
+        HasCustomCloudSavesBackupPath = !string.IsNullOrWhiteSpace(_settings.CloudSavesLocalPath);
+    }
+
+    [RelayCommand]
+    private void BrowseCloudSavesBackupFolder()
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select Destination Folder for Local Backups",
+            InitialDirectory = Directory.Exists(EffectiveCloudSavesBackupPath) ? EffectiveCloudSavesBackupPath : ""
+        };
+        if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName))
+        {
+            CloudSavesBackupPath = dialog.FolderName;
+        }
+    }
+
+    [RelayCommand]
+    private void ResetCloudSavesBackupFolder()
+    {
+        CloudSavesBackupPath = "";
+    }
+
+    [RelayCommand]
+    private void OpenCloudSavesBackupFolder()
+    {
+        string dir = EffectiveCloudSavesBackupPath;
+        try
+        {
+            Directory.CreateDirectory(dir);
+            Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    public string EffectiveCloudSavesBackupPath =>
+        !string.IsNullOrWhiteSpace(_settings.CloudSavesLocalPath)
+            ? _settings.CloudSavesLocalPath
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUI", "save_backups");
+
     // ── Language ────────────────────────────────────────────────────
     /// <summary>Available UI languages (native endonyms, matching Steam's list). "System default"
     /// (null tag) follows Windows. Languages whose .resx isn't present fall back to English.</summary>
@@ -256,6 +303,8 @@ public partial class SettingsViewModel : ObservableObject
         _minimizeToTray = settings.MinimizeToTray;
         _steamWebApiKey = settings.SteamWebApiKey ?? "";
         _toolsPath = settings.ToolsPath ?? "";
+        _cloudSavesBackupPath = settings.CloudSavesLocalPath ?? "";
+        _hasCustomCloudSavesBackupPath = !string.IsNullOrWhiteSpace(settings.CloudSavesLocalPath);
         _hubcapIsKeyConfigured = !string.IsNullOrEmpty(settings.HubcapApiKey);
 
         // Select the saved language (or "System default") without firing the restart prompt.

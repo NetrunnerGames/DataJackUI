@@ -127,6 +127,19 @@ public class LaunchOptionsService
     /// relaunches. <paramref name="restartSteam"/> controls whether it's brought back up.
     /// </para>
     /// </summary>
+    public ApplyResult RestoreAll(bool restartSteam = true)
+    {
+        var all = _store.All.DistinctBy(m => m.AppId).ToList();
+        if (all.Count == 0) return new ApplyResult(true, null, false);
+
+        var apply = Apply(all.ToDictionary(m => m.AppId, m => (IReadOnlyList<LaunchOption>)m.Original), restartSteam);
+        if (apply.Ok)
+        {
+            foreach (var m in all) _store.Remove(m.AppId);
+        }
+        return apply;
+    }
+
     public ApplyResult Apply(IReadOnlyDictionary<int, IReadOnlyList<LaunchOption>> edits, bool restartSteam)
     {
         if (AppInfoPath is not { } path || !File.Exists(path))

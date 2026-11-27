@@ -88,11 +88,6 @@
                                 <ui:SymbolIcon Symbol="BranchFork24" />
                             </ui:NavigationViewItem.Icon>
                         </ui:NavigationViewItem>
-                        <ui:NavigationViewItem Content="{x:Static res:Strings.Nav_Mode}" TargetPageType="{x:Type views:ModeView}">
-                            <ui:NavigationViewItem.Icon>
-                                <ui:SymbolIcon Symbol="Options24" />
-                            </ui:NavigationViewItem.Icon>
-                        </ui:NavigationViewItem>
                         <ui:NavigationViewItem Content="{x:Static res:Strings.Nav_Fixes}" TargetPageType="{x:Type views:FixesView}">
                             <ui:NavigationViewItem.Icon>
                                 <ui:SymbolIcon Symbol="ShieldTask24" />
@@ -124,6 +119,11 @@
                         <ui:NavigationViewItem Click="RestartSteam_Click" Content="{x:Static res:Strings.Nav_RestartSteam}">
                             <ui:NavigationViewItem.Icon>
                                 <ui:SymbolIcon Symbol="ArrowClockwise24" />
+                            </ui:NavigationViewItem.Icon>
+                        </ui:NavigationViewItem>
+                        <ui:NavigationViewItem Click="FixZeroByte_Click" Content="Fix 0B Downloads">
+                            <ui:NavigationViewItem.Icon>
+                                <ui:SymbolIcon Symbol="ArrowReset24" />
                             </ui:NavigationViewItem.Icon>
                         </ui:NavigationViewItem>
                         <ui:NavigationViewItem Content="{x:Static res:Strings.Nav_Downloads}" TargetPageType="{x:Type views:DownloadsView}">

@@ -383,138 +383,6 @@
                     </StackPanel>
                 </Border>
 
-                <!--  Hubcap API key  -->
-                <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_Hubcap}" />
-                <Border Style="{StaticResource SettingsCard}">
-                    <StackPanel Margin="14,12">
-                        <!--  Active key: stats card  -->
-                        <StackPanel Visibility="{Binding HubcapIsKeyConfigured, Converter={StaticResource BoolToVis}}">
-                            <!--  Active badge + Refresh  -->
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <ui:Button
-                                    HorizontalAlignment="Left"
-                                    Appearance="Secondary"
-                                    Command="{Binding RefreshHubcapStatsCommand}"
-                                    Content="{x:Static res:Strings.Settings_HubcapRefresh}"
-                                    Icon="{ui:SymbolIcon ArrowSync24}" />
-                                <ui:Button
-                                    Grid.Column="1"
-                                    Command="{Binding ClearHubcapKeyCommand}"
-                                    Content="{x:Static res:Strings.Settings_HubcapClear}"
-                                    Icon="{ui:SymbolIcon Dismiss24}" />
-                            </Grid>
-                            <!--  Usage progress card  -->
-                            <Border
-                                Margin="0,0,0,10"
-                                Padding="12"
-                                Background="#08FFFFFF"
-                                BorderBrush="#12FFFFFF"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Visibility="{Binding ShowHubcapStats, Converter={StaticResource BoolToVis}}">
-                                <StackPanel>
-                                    <!--
-                                        Real ProgressBar (Fluent-styled, same as PluginView/ModeView/FixesView).
-                                        HubcapUsagePercent is 0.0–1.0, so Maximum="1"; ProgressBar clamps past it.
-                                        Indeterminate (animated) until stats load, so the card is never blank.
-                                    -->
-                                    <ProgressBar
-                                        Height="6"
-                                        IsIndeterminate="{Binding HubcapStatsPending}"
-                                        Maximum="1"
-                                        Minimum="0"
-                                        Value="{Binding HubcapUsagePercent, Mode=OneWay}" />
-                                    <TextBlock
-                                        Margin="0,8,0,0"
-                                        FontSize="13"
-                                        Text="{Binding HubcapStatsText}"
-                                        TextWrapping="Wrap" />
-                                    <TextBlock
-                                        Margin="0,4,0,0"
-                                        FontSize="12"
-                                        Foreground="#8b96f0"
-                                        Text="{Binding HubcapSingleUsageText}"
-                                        TextWrapping="Wrap"
-                                        Visibility="{Binding HubcapSingleUsageText, Converter={StaticResource NullToCollapsed}}" />
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-
-                        <!--
-                            Key input: only while NO key is saved. Once configured, the Refresh/Clear buttons +
-                            usage card above are the whole story; "Clear" is how you swap keys (it resets
-                            HubcapIsKeyConfigured, bringing this block back). The onboarding copy below reads
-                            wrong when a key already exists, hence the collapse.
-                        -->
-                        <StackPanel Visibility="{Binding HubcapIsKeyConfigured, Converter={StaticResource InverseBoolToVis}}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Margin="0,0,12,0">
-                                    <TextBlock
-                                        FontSize="13"
-                                        FontWeight="Medium"
-                                        Text="{x:Static res:Strings.Settings_HubcapKey}" />
-                                    <TextBlock
-                                        Margin="0,4,0,0"
-                                        FontSize="12"
-                                        Foreground="#6b7280"
-                                        Text="{x:Static res:Strings.Settings_HubcapKey_Hint}"
-                                        TextWrapping="Wrap" />
-                                </StackPanel>
-                                <ui:Button
-                                    Grid.Column="1"
-                                    VerticalAlignment="Top"
-                                    Command="{Binding OpenHubcapKeyPageCommand}"
-                                    Content="Get API Key"
-                                    Icon="{ui:SymbolIcon Open24}" />
-                            </Grid>
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <ui:TextBox
-                                    FontFamily="Consolas"
-                                    PlaceholderText="{x:Static res:Strings.Settings_HubcapKeyPlaceholder}"
-                                    Text="{Binding HubcapKeyInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <ui:Button
-                                    Grid.Column="1"
-                                    Margin="8,0,0,0"
-                                    Appearance="Primary"
-                                    Command="{Binding ValidateAndSaveHubcapKeyCommand}"
-                                    Content="{x:Static res:Strings.Settings_HubcapValidate}"
-                                    IsEnabled="{Binding CanEditHubcapKey}" />
-                            </Grid>
-                            <!--
-                                Error text (only ever set by the two ValidateAndSaveHubcapKeyAsync failure paths,
-                                so it can never be orphaned by this collapse).
-                            -->
-                            <TextBlock
-                                Margin="0,8,0,0"
-                                FontSize="12"
-                                Foreground="{Binding HubcapKeyStatusColor}"
-                                Text="{Binding HubcapKeyStatus}"
-                                TextWrapping="Wrap"
-                                Visibility="{Binding HubcapKeyStatus, Converter={StaticResource NullToCollapsed}}" />
-                            <!--  "Get a key" link  -->
-                            <TextBlock
-                                Margin="0,8,0,0"
-                                FontSize="12"
-                                Foreground="#6b7280">
-                                <Run Text="{x:Static res:Strings.Settings_HubcapGetKey}" />
-                                <Hyperlink Command="{Binding OpenHubcapCommand}" Foreground="#a78bfa">hubcapmanifest.com</Hyperlink>
-                            </TextBlock>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
                 <!--  Install behavior (Auto Update Apps + CyberJack)  -->
                 <TextBlock Style="{StaticResource SectionHeader}" Text="{x:Static res:Strings.Settings_Section_Install}" />
                 <Border Style="{StaticResource SettingsCard}">
@@ -751,6 +619,47 @@
                             FontSize="11.5"
                             Foreground="#6b7280"
                             Text="Custom directory for helper executables like DepotDownloader, Steamless, and SteamAutoCrack." />
+
+                        <!--  Cloud Saves Backup Folder  -->
+                        <Border Margin="0,14" Style="{StaticResource RowDivider}" />
+                        <TextBlock
+                            FontSize="13"
+                            FontWeight="Medium"
+                            Text="Cloud Saves Backup Folder" />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox
+                                PlaceholderText="Default (%APPDATA%\DataJackUI\save_backups)"
+                                Text="{Binding CloudSavesBackupPath, UpdateSourceTrigger=PropertyChanged}"
+                                ToolTip="{Binding EffectiveCloudSavesBackupPath}" />
+                            <ui:Button
+                                Grid.Column="1"
+                                Margin="8,0,0,0"
+                                Command="{Binding BrowseCloudSavesBackupFolderCommand}"
+                                Content="Change" />
+                            <ui:Button
+                                Grid.Column="2"
+                                Margin="8,0,0,0"
+                                Command="{Binding OpenCloudSavesBackupFolderCommand}"
+                                Content="{x:Static res:Strings.Settings_Open}"
+                                Icon="{ui:SymbolIcon FolderOpen24}" />
+                            <ui:Button
+                                Grid.Column="3"
+                                Margin="8,0,0,0"
+                                Command="{Binding ResetCloudSavesBackupFolderCommand}"
+                                Content="Reset"
+                                Visibility="{Binding HasCustomCloudSavesBackupPath, Converter={StaticResource BoolToVis}}" />
+                        </Grid>
+                        <TextBlock
+                            Margin="0,4,0,0"
+                            FontSize="11.5"
+                            Foreground="#6b7280"
+                            Text="Folder where local game save snapshots and backups are stored on disk." />
                     </StackPanel>
                 </Border>
 
