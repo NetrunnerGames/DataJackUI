@@ -19,7 +19,6 @@ public class PluginAddService(
     DownloadQueue queue,
     ManifestJobFactory jobs)
 {
-
     public class SourceRow
     {
         public string Name { get; set; } = "";
