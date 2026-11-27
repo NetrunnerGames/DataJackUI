@@ -15,35 +15,35 @@ internal static class StreamHelpers
     public static int ReadValueS32(this Stream stream)
     {
         byte[] array = new byte[4];
-        stream.Read(array, 0, 4);
+        stream.ReadExactly(array, 0, 4);
         return BitConverter.ToInt32(array, 0);
     }
 
     public static uint ReadValueU32(this Stream stream)
     {
         byte[] array = new byte[4];
-        stream.Read(array, 0, 4);
+        stream.ReadExactly(array, 0, 4);
         return BitConverter.ToUInt32(array, 0);
     }
 
     public static ulong ReadValueU64(this Stream stream)
     {
         byte[] array = new byte[8];
-        stream.Read(array, 0, 8);
+        stream.ReadExactly(array, 0, 8);
         return BitConverter.ToUInt64(array, 0);
     }
 
     public static long ReadValueS64(this Stream stream)
     {
         byte[] array = new byte[8];
-        stream.Read(array, 0, 8);
+        stream.ReadExactly(array, 0, 8);
         return BitConverter.ToInt64(array, 0);
     }
 
     public static float ReadValueF32(this Stream stream)
     {
         byte[] array = new byte[4];
-        stream.Read(array, 0, 4);
+        stream.ReadExactly(array, 0, 4);
         return BitConverter.ToSingle(array, 0);
     }
 
@@ -57,7 +57,7 @@ internal static class StreamHelpers
         {
             if (num + byteCount > array.Length)
             {
-                Array.Resize(ref array, array.Length + 128 * byteCount);
+                Array.Resize(ref array, array.Length + (128 * byteCount));
             }
             int bytesRead = stream.Read(array, num, byteCount);
             if (bytesRead < byteCount)

@@ -13,8 +13,6 @@ public class PlaytimeService
 {
     private readonly record struct Token(char Kind, int Start, int Length);
 
-
-
     private static readonly string[] AppsPath = new string[5] { "UserLocalConfigStore", "Software", "Valve", "Steam", "apps" };
 
     private readonly Func<string?> _steamPath;

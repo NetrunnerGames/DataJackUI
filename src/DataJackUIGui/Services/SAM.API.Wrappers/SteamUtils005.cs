@@ -40,10 +40,7 @@ public class SteamUtils005 : NativeWrapper<ISteamUtils005>
 
     public bool GetImageRGBA(int index, byte[] data)
     {
-        if (data == null)
-        {
-            throw new ArgumentNullException("data");
-        }
+        ArgumentNullException.ThrowIfNull(data);
         return GetFunction<NativeGetImageRGBA>(Functions.GetImageRGBA)(ObjectAddress, index, data, data.Length);
     }
 
