@@ -16,6 +16,13 @@ public static partial class SteamAccount
     [GeneratedRegex("\"(\\w+)\"\\s*\"([^\"]*)\"")]
     private static partial Regex Pair();
 
+    /// <summary>
+    /// Reads Steam's local <c>config\loginusers.vdf</c> to resolve the currently active Steam Account ID
+    /// as a 32-bit unsigned integer (<see cref="uint"/>). Steam names each user's local
+    /// <c>userdata\&lt;AccountID&gt;\</c> directory using this 32-bit Account ID (derived from the lower
+    /// 32 bits of the 64-bit SteamID), which is required to locate local stats, achievement caches,
+    /// and playtime configuration files.
+    /// </summary>
     public static uint? Current(string? steamPath)
     {
         if (steamPath == null)

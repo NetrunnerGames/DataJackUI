@@ -56,6 +56,8 @@ public class GameStatsService
         }
     }
 
+    // Resolves the active 32-bit Steam Account ID from loginusers.vdf so we can locate
+    // Steam\userdata\<AccountID>\ for reading/writing local achievement and stat caches.
     private uint? Account => SteamAccount.Current(_steamPath());
 
     public GameStatsService(SteamService steam, StatsHelperClient live)

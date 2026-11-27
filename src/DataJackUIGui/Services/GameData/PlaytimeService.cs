@@ -28,6 +28,8 @@ public class PlaytimeService
             string? text = _steamPath();
             if (text != null)
             {
+                // Resolve the active 32-bit Steam Account ID to locate userdata\<AccountID>\config\localconfig.vdf,
+                // where Steam stores per-game local playtime records.
                 uint? num = SteamAccount.Current(text);
                 if (num.HasValue)
                 {
