@@ -181,7 +181,6 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
     private readonly SteamDepotInfo _depotInfo;
     private readonly ToastService _toast;
     private readonly SettingsService _settings;
-    private readonly HubcapService _hubcap;
 
     private List<LuaTileViewModel> _allGames = [];
 
@@ -207,7 +206,7 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         SteamAppInfoCache appInfo, CoverCache covers, SteamDepotInfo depotInfo, ToastService toast,
         SettingsService settings, DepotDownloaderService depotTool, DownloadQueue queue,
         ManifestJobFactory jobs, SteamLibraryService library, HardwareAppIdService hardware,
-        HubcapService hubcap, GameToolsViewModel tools)
+        GameToolsViewModel tools)
     {
         Tools = tools;
         _depotTool = depotTool;
@@ -223,7 +222,6 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         _depotInfo = depotInfo;
         _toast = toast;
         _settings = settings;
-        _hubcap = hubcap;
 
         // The base offers 12/24/48/All, sized for the full-width Manage and Fixes grids. This list is a
         // narrow sidebar of single-line rows, so it gets its own steps. PageSizeOptions is a per-instance
@@ -291,7 +289,6 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         CustomDepotId = "";
         CustomManifestId = "";
         RefreshVariants();
-        _ = RefreshHubcapUsageAsync();
         _ = LoadDepotsAsync();
     }
 
@@ -1251,40 +1248,6 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
             _toast.Show(Resources.Strings.Common_CopyAppId, Resources.Strings.Err_ClipboardBusy, error: true);
     }
 
-    /// <summary>Generate a single depot manifest via Hubcap directly and save it to Steam's depotcache folder.</summary>
-    [RelayCommand]
-    private async Task GenerateSingleManifest(DepotRow row)
-    {
-        if (ActiveGame is not { } game) return;
-        string? key = _settings.HubcapApiKey;
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            _toast.Show(Resources.Strings.Builds_Title, "Hubcap API Key is not configured. Please add your Hubcap API Key in Settings to generate manifest files.", error: true);
-            return;
-        }
-
-        string? manifestId = row.ManifestId ?? row.PublicManifestId ?? row.CommentedManifestId;
-        if (manifestId is null || !long.TryParse(manifestId, out long mid))
-        {
-            _toast.Show(Resources.Strings.Builds_Title, "No valid manifest ID available for this depot.", error: true);
-            return;
-        }
-
-        try
-        {
-            _toast.Show("Hubcap", $"Requesting manifest for Depot {row.Id} (Manifest {manifestId})...");
-            byte[] bytes = await _hubcap.GenerateSingleManifestAsync(row.Id, mid, key);
-            string savedPath = _hubcap.SaveSingleManifestToDepotCache(row.Id, mid, bytes, _steam);
-            _toast.Show("Hubcap", $"Manifest saved: {Path.GetFileName(savedPath)}");
-            await LoadDepotsAsync(quiet: true);
-            _ = RefreshHubcapUsageAsync();
-        }
-        catch (Exception ex)
-        {
-            _toast.Show("Hubcap Error", ex.Message, error: true);
-        }
-    }
-
     [ObservableProperty]
     private string _customBuildId = "";
 
@@ -1306,46 +1269,9 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
 
     public bool CanLockCustomManifest => !IsLockingCustomManifest;
 
-    /// <summary>Display label for Hubcap single manifest quota (e.g. "Single Quota: 15/20 remaining").</summary>
-    [ObservableProperty]
-    private string? _hubcapSingleUsageLabel;
-
-    /// <summary>
-    /// Refresh generation usage quota for single manifests from Hubcap.
-    /// Free request, does not count against usage.
-    /// </summary>
-    public async Task RefreshHubcapUsageAsync()
-    {
-        string? key = _settings.HubcapApiKey;
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            HubcapSingleUsageLabel = null;
-            return;
-        }
-
-        try
-        {
-            var usage = await _hubcap.GetGenerationUsageAsync(key);
-            if (usage?.Single is { } s)
-            {
-                string readyStatus = usage.SteamServiceReady ? "" : " · Steam Offline";
-                HubcapSingleUsageLabel = $"Single Quota: {s.Remaining}/{s.Limit} remaining{readyStatus}";
-            }
-            else
-            {
-                HubcapSingleUsageLabel = null;
-            }
-        }
-        catch
-        {
-            HubcapSingleUsageLabel = null;
-        }
-    }
-
     /// <summary>
     /// Locks the game to a specific Steam Build ID.
     /// Gathers all depot ID + manifest ID pairs for the Build ID (from vault variants, SteamDepotInfo, or Lua parser),
-    /// generates/fetches each manifest file via Hubcap API with the Settings API key into Steam's depotcache,
     /// locks the depot manifests in Lua (setManifestid), and prompts to restart Steam.
     /// </summary>
     [RelayCommand]
@@ -1361,22 +1287,6 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
         if (string.IsNullOrWhiteSpace(buildIdStr))
         {
             _toast.Show(Resources.Strings.Builds_Title, "Please enter a valid Build ID.", error: true);
-            return;
-        }
-
-        string? key = _settings.HubcapApiKey;
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            bool openSite = await UiMessageBox.ShowConfirmAsync(
-                "Hubcap API Key Required",
-                "A Hubcap API key is required to generate depot manifests from Steam.\n\nYou can generate an API key on Hubcap's website:\nhttps://hubcapmanifest.com/api-keys/stats\n(Login with Discord through their server's bot).\n\nWould you like to open the Hubcap website to get your key now?",
-                "Get API Key",
-                "Cancel");
-
-            if (openSite)
-            {
-                SteamService.OpenUrl("https://hubcapmanifest.com/api-keys/stats");
-            }
             return;
         }
 
@@ -1439,32 +1349,20 @@ public partial class BuildsViewModel : PagedListViewModel<LuaTileViewModel>
             {
                 if (long.TryParse(manifestIdStr, out long mid))
                 {
-                    try
-                    {
-                        _toast.Show("Hubcap", $"Requesting manifest for Depot {depotId} (Manifest {mid})...");
-                        byte[] bytes = await _hubcap.GenerateSingleManifestAsync(depotId, mid, key);
-                        string savedPath = _hubcap.SaveSingleManifestToDepotCache(depotId, mid, bytes, _steam);
-
-                        EditLive(text => LuaEditor.SetDepotManifest(text, depotId, mid.ToString()));
-                        successCount++;
-                    }
-                    catch (Exception ex)
-                    {
-                        _toast.Show("Hubcap Error", $"Depot {depotId}: {ex.Message}", error: true);
-                    }
+                    EditLive(text => LuaEditor.SetDepotManifest(text, depotId, mid.ToString()));
+                    successCount++;
                 }
             }
 
             await LoadDepotsAsync(quiet: true);
-            _ = RefreshHubcapUsageAsync();
 
             if (successCount > 0)
             {
-                _toast.Show("Hubcap", $"Locked {successCount} depot manifest(s) for Build {buildIdStr}!");
+                _toast.Show(Resources.Strings.Builds_Title, $"Locked {successCount} depot manifest(s) for Build {buildIdStr}!");
 
                 bool restart = await UiMessageBox.ShowConfirmAsync(
                     "Lock Build Complete",
-                    $"Successfully generated {successCount} manifest(s) via Hubcap for Build {buildIdStr} and locked {game.Name}'s Lua configuration.\n\nRestart Steam now so Steam downloads this build natively?",
+                    $"Successfully locked {successCount} depot manifest(s) for Build {buildIdStr} in {game.Name}'s Lua configuration.\n\nRestart Steam now so Steam downloads this build natively?",
                     "Restart Steam",
                     "Later");
 

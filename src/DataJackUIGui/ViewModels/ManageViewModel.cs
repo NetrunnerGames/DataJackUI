@@ -442,6 +442,20 @@ public partial class ManageViewModel : PagedListViewModel<LuaTileViewModel>
         SteamService.RevealInExplorer(tile.FilePath);
 
     [RelayCommand]
+    private void OpenGameFolder(LuaTileViewModel tile)
+    {
+        string? dir = _library.GetInstallDir(tile.AppId);
+        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dir) { UseShellExecute = true });
+        }
+        else
+        {
+            _toast.Show(tile.Name, "Game folder not found on disk (game may not be installed yet).", error: true);
+        }
+    }
+
+    [RelayCommand]
     private void CopyAppId(LuaTileViewModel tile)
     {
         if (!SteamService.CopyToClipboard(tile.AppId.ToString()))

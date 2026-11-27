@@ -469,10 +469,27 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock
-                                    FontSize="13"
-                                    FontWeight="Medium"
-                                    Text="Check for Application Updates" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Border
+                                        Margin="0,0,8,0"
+                                        Padding="6,2"
+                                        VerticalAlignment="Center"
+                                        Background="#1F06B6D4"
+                                        BorderBrush="#4006B6D4"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                        <TextBlock
+                                            FontSize="11"
+                                            FontWeight="SemiBold"
+                                            Foreground="#22d3ee"
+                                            Text="{Binding CurrentAppVersion, Mode=OneWay}" />
+                                    </Border>
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        FontSize="13"
+                                        FontWeight="Medium"
+                                        Text="Check for Application Updates" />
+                                </StackPanel>
                                 <TextBlock
                                     Margin="0,4,0,0"
                                     FontSize="12"
@@ -513,6 +530,79 @@
                                     Minimum="0"
                                     Visibility="{Binding IsDownloadingUpdate, Converter={StaticResource BoolToVis}}"
                                     Value="{Binding DownloadProgress, Mode=OneWay}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Margin="0,14" Style="{StaticResource RowDivider}" />
+
+                        <!--  Check for IceBreaker Updates  -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border
+                                        Margin="0,0,8,0"
+                                        Padding="6,2"
+                                        VerticalAlignment="Center"
+                                        Background="#1F06B6D4"
+                                        BorderBrush="#4006B6D4"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Visibility="{Binding IceBreakerVersionBadge, Converter={StaticResource NullToCollapsed}}">
+                                        <TextBlock
+                                            FontSize="11"
+                                            FontWeight="SemiBold"
+                                            Foreground="#22d3ee"
+                                            Text="{Binding IceBreakerVersionBadge}" />
+                                    </Border>
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        FontSize="13"
+                                        FontWeight="Medium"
+                                        Text="Check for IceBreaker Updates" />
+                                </StackPanel>
+                                <TextBlock
+                                    Margin="0,4,0,0"
+                                    FontSize="12"
+                                    Foreground="#6b7280"
+                                    Text="Check for new releases of IceBreaker (version.dll) directly from GitHub and update it."
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    Margin="0,4,0,0"
+                                    FontSize="12"
+                                    Foreground="{Binding IceBreakerStatusColor}"
+                                    Text="{Binding IceBreakerStatusText}"
+                                    TextWrapping="Wrap"
+                                    Visibility="{Binding IceBreakerStatusText, Converter={StaticResource NullToCollapsed}}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button
+                                        Margin="12,0,0,0"
+                                        Appearance="Primary"
+                                        Command="{Binding CheckIceBreakerUpdatesCommand}"
+                                        Content="Check for Updates"
+                                        Icon="{ui:SymbolIcon ArrowSync24}"
+                                        IsEnabled="{Binding IsCheckingIceBreaker, Converter={StaticResource InverseBool}}" />
+                                    <ui:Button
+                                        Margin="8,0,0,0"
+                                        Appearance="Secondary"
+                                        Command="{Binding UpdateIceBreakerCommand}"
+                                        Content="Update"
+                                        Icon="{ui:SymbolIcon ArrowDownload24}"
+                                        IsEnabled="{Binding IsUpdatingIceBreaker, Converter={StaticResource InverseBool}}"
+                                        Visibility="{Binding IceBreakerUpdateAvailable, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
+                                <ProgressBar
+                                    Height="4"
+                                    Margin="12,6,0,0"
+                                    Maximum="100"
+                                    Minimum="0"
+                                    Visibility="{Binding IsUpdatingIceBreaker, Converter={StaticResource BoolToVis}}"
+                                    Value="{Binding IceBreakerDownloadProgress}" />
                             </StackPanel>
                         </Grid>
                     </StackPanel>

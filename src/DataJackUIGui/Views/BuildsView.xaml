@@ -78,11 +78,6 @@
                             Header="Lock to Manifest..."
                             Icon="{ui:SymbolIcon LockClosed24}" />
                         <MenuItem
-                            Command="{Binding PlacementTarget.Tag.GenerateSingleManifestCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                            CommandParameter="{Binding}"
-                            Header="Generate Manifest via Hubcap"
-                            Icon="{ui:SymbolIcon ArrowDownload24}" />
-                        <MenuItem
                             Command="{Binding PlacementTarget.Tag.CopyAppIdCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                             Header="{x:Static res:Strings.Common_CopyAppId}"
                             Icon="{ui:SymbolIcon Copy24}" />
@@ -772,12 +767,6 @@
                                                     FontWeight="SemiBold"
                                                     Foreground="#d1d5db"
                                                     Text="Lock Build ID &amp; Depot Manifests" />
-                                                <TextBlock
-                                                    Grid.Column="1"
-                                                    FontSize="11"
-                                                    Foreground="#8b96f0"
-                                                    Text="{Binding HubcapSingleUsageLabel}"
-                                                    Visibility="Collapsed" />
                                             </Grid>
                                             <!--  Row 1: Lock by Build ID  -->
                                             <Grid Margin="0,6,0,0">

@@ -69,7 +69,6 @@ public partial class App : Application
                 services.AddSingleton<PaymentService>();
                 services.AddSingleton<DemoService>();
                 services.AddSingleton<DataJackUIApiClient>();
-                services.AddSingleton<HubcapService>();
                 services.AddSingleton<UpdateService>();
                 // Central download queue. Singleton + hosted service (same pattern as HttpServerService
                 // below): the hosted lifetime runs the scheduler pump, and view models resolve the same

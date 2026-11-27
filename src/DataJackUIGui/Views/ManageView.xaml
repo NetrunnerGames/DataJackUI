@@ -391,6 +391,12 @@
                                                 <Setter Property="Opacity" Value="0" />
                                                 <Setter Property="Background" Value="#cc14161c" />
                                                 <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DataContext.IsCloudTabSelected, ElementName=Root}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsCloudOnly}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
                                                     <DataTrigger Binding="{Binding IsMouseOver, ElementName=TileRoot}" Value="True">
                                                         <Setter Property="Opacity" Value="1" />
                                                     </DataTrigger>
@@ -426,6 +432,9 @@
                                                 <Setter Property="Opacity" Value="0" />
                                                 <Setter Property="Background" Value="#cc1f1417" />
                                                 <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DataContext.IsCloudTabSelected, ElementName=Root}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
                                                     <DataTrigger Binding="{Binding IsCloudOnly}" Value="True">
                                                         <Setter Property="Visibility" Value="Collapsed" />
                                                     </DataTrigger>
@@ -962,9 +971,9 @@
                             <ui:Button
                                 Margin="0,4,4,0"
                                 HorizontalAlignment="Stretch"
-                                Command="{Binding DataContext.RevealFileCommand, ElementName=Root}"
+                                Command="{Binding DataContext.OpenGameFolderCommand, ElementName=Root}"
                                 CommandParameter="{Binding}"
-                                Content="{x:Static res:Strings.Manage_Action_Reveal}"
+                                Content="Open Game Folder"
                                 Icon="{ui:SymbolIcon FolderOpen24}" />
                             <ui:Button
                                 Margin="4,4,0,0"

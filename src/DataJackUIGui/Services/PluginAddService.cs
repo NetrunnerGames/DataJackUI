@@ -7,20 +7,18 @@ namespace DataJackUIGui.Services;
 
 /// <summary>
 /// Headless add pipeline for the Steam store plugin. Mirrors the logic of
-/// <c>DownloadViewModel.FetchAsync</c>/<c>DownloadFromSourceAsync</c>. Dynamic sources, synthesized
-/// Hubcap/Sadie source, key-gating, usage badges, FastFetch auto-download, but uses only the underlying
+/// <c>DownloadViewModel.FetchAsync</c>/<c>DownloadFromSourceAsync</c>. Dynamic sources, usage badges,
+/// FastFetch auto-download, but uses only the underlying
 /// SERVICES (never the UI view model), so the app window stays silent. The plugin polls state via the
 /// HTTP server; when FastFetch is off it picks a source with <see cref="Pick"/>.
 /// </summary>
 public class PluginAddService(
     DataJackUIApiClient api,
-    HubcapService hubcap,
     SettingsService settings,
     AuthService auth,
     DownloadQueue queue,
     ManifestJobFactory jobs)
 {
-    private const string HubcapSourceName = "Sadie (Morrenus)";
 
     public class SourceRow
     {
@@ -104,30 +102,19 @@ public class PluginAddService(
         try
         {
             var nameTask = string.IsNullOrEmpty(state.GameName) ? SafeGetGameNameAsync(appId) : null;
-            string? key = settings.HubcapApiKey;
 
-            bool hubcapAvailable = false;
-            if (!string.IsNullOrEmpty(key))
-            {
-                var hs = await hubcap.CheckStatusAsync(key, appId.ToString());
-                hubcapAvailable = hs?.ManifestFileExists == true;
-            }
-
-            var rows = await BuildSourceRowsAsync(appId, key, hubcapAvailable);
-            var keyRows = rows.Where(r => r.NeedsKey).ToList();
-            if (keyRows.Count > 0 && string.IsNullOrEmpty(key))
-                foreach (var r in keyRows) r.Locked = true;
+            var rows = await BuildSourceRowsAsync(appId);
 
             if (nameTask is not null) state.GameName = await nameTask;
 
             if (state.FastFetch)
             {
-                await HandleFastFetchFallbackAsync(appId, state, rows, keyRows, key);
+                await HandleFastFetchFallbackAsync(appId, state, rows);
                 return;
             }
 
             PublishSources(state, rows, appId);
-            await FillBadgesAsync(rows, keyRows, key);
+            await FillBadgesAsync(rows);
         }
         catch (Exception ex)
         {
@@ -137,7 +124,7 @@ public class PluginAddService(
         }
     }
 
-    private async Task<List<SourceRow>> BuildSourceRowsAsync(long appId, string? key, bool hubcapAvailable)
+    private async Task<List<SourceRow>> BuildSourceRowsAsync(long appId)
     {
         var statuses = await api.CheckSourcesAsync(appId.ToString());
         try
@@ -148,8 +135,6 @@ public class PluginAddService(
         }
         catch { }
 
-        statuses[HubcapSourceName] = string.IsNullOrEmpty(key) ? "unknown" : (hubcapAvailable ? "available" : "unavailable");
-
         return statuses.OrderByDescending(kv => SourceMeta.GetPriority(kv.Key))
             .Select(kv =>
             {
@@ -158,10 +143,8 @@ public class PluginAddService(
             }).ToList();
     }
 
-    private async Task HandleFastFetchFallbackAsync(long appId, AddState state, List<SourceRow> rows, List<SourceRow> keyRows, string? key)
+    private async Task HandleFastFetchFallbackAsync(long appId, AddState state, List<SourceRow> rows)
     {
-        if (keyRows.Count > 0 && !string.IsNullOrEmpty(key))
-            await FillHubcapBadgeAsync(keyRows, key);
         PublishSources(state, rows, appId);
 
         var best = rows
@@ -186,32 +169,13 @@ public class PluginAddService(
         try { return (await api.GetDetailsAsync(appId.ToString()))?.Name; } catch { return null; }
     }
 
-    /// <summary>Fill the usage-counter badges on the (already-published) rows, best-effort and
-    /// concurrently: the Hubcap "12/25" badge + real lock state, and the standard "X/25" badge. A failure
+    /// <summary>Fill the usage-counter badges on the (already-published) rows, best-effort. A failure
     /// leaves the affected rows without a badge. The picker stays fully usable. Row fields are mutated in
     /// place; the status poll re-serializes them, so the badges appear on the next tick.</summary>
-    private async Task FillBadgesAsync(List<SourceRow> rows, List<SourceRow> keyRows, string? key)
+    private async Task FillBadgesAsync(List<SourceRow> rows)
     {
-        var hubcapTask = keyRows.Count > 0 && !string.IsNullOrEmpty(key)
-            ? FillHubcapBadgeAsync(keyRows, key!)
-            : Task.CompletedTask;
-        var standardTask = !auth.IsGuest ? FillStandardBadgeAsync(rows) : Task.CompletedTask;
-        await Task.WhenAll(hubcapTask, standardTask);
-    }
-
-    /// <summary>Hubcap "12/25" usage badge + lock state on the key-gated rows.</summary>
-    private async Task FillHubcapBadgeAsync(List<SourceRow> keyRows, string key)
-    {
-        try
-        {
-            var stats = await hubcap.GetStatsAsync(key);
-            foreach (var r in keyRows)
-            {
-                r.Locked = stats?.CanMakeRequests != true;
-                if (stats is not null) r.Stats = $"{stats.DailyUsage}/{stats.DailyLimit}";
-            }
-        }
-        catch { }
+        if (!auth.IsGuest)
+            await FillStandardBadgeAsync(rows);
     }
 
     /// <summary>Standard "X/25" (or "X/Unlimited" for supporters) usage badge on the non-key rows.</summary>

@@ -22,14 +22,25 @@ public partial class SettingsViewModel : ObservableObject
     private readonly SettingsService _settings;
     private readonly AuthService _auth;
     private readonly SteamService _steam;
-    private readonly HubcapService _hubcap;
     private readonly UpdateService _updateService;
+    private readonly UnlockerService? _unlocker;
 
     [ObservableProperty] private bool _isCheckingForUpdates;
     [ObservableProperty] private bool _isDownloadingUpdate;
     [ObservableProperty] private double _downloadProgress;
     [ObservableProperty] private string? _updateStatusText;
     [ObservableProperty] private string _updateStatusColor = "#9ca3af";
+
+    public string CurrentAppVersion => $"v{typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3) ?? "2.21.0"}";
+
+    // â”€â”€ IceBreaker updater â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    [ObservableProperty] private bool _isCheckingIceBreaker;
+    [ObservableProperty] private bool _isUpdatingIceBreaker;
+    [ObservableProperty] private double _iceBreakerDownloadProgress;
+    [ObservableProperty] private bool _iceBreakerUpdateAvailable;
+    [ObservableProperty] private string? _iceBreakerVersionBadge;
+    [ObservableProperty] private string? _iceBreakerStatusText;
+    [ObservableProperty] private string _iceBreakerStatusColor = "#9ca3af";
 
     [ObservableProperty] private string? _displayName;
     [ObservableProperty] private string _username = "anonymous";
@@ -56,20 +67,20 @@ public partial class SettingsViewModel : ObservableObject
 
     public bool IsRealUser => !IsGuest;
 
-    // ── Login-required redirect banner ─────────────────────────────
+    // â”€â”€ Login-required redirect banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     /// <summary>Set by App when navigating here from a protected action. Null = banner hidden.</summary>
     [ObservableProperty] private string? _loginRequiredMessage;
 
     [RelayCommand]
     private void DismissLoginRequired() => LoginRequiredMessage = null;
 
-    // ── Steam location ──────────────────────────────────────────────
+    // â”€â”€ Steam location â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     [ObservableProperty] private string _steamPath = "";
     [ObservableProperty] private bool _isSteamOverridden;
     [ObservableProperty] private string _steamSource = "";
     [ObservableProperty] private string? _steamWarning;
 
-    // ── Install behavior ────────────────────────────────────────────
+    // â”€â”€ Install behavior â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     /// <summary>Auto Update Apps (Don't Lock Manifests). Persisted via SettingsService.</summary>
     [ObservableProperty] private bool _autoUpdateApps;
 
@@ -86,7 +97,7 @@ public partial class SettingsViewModel : ObservableObject
 
     partial void OnDonateKeysChanged(bool value) => _settings.DonateKeys = value;
 
-    // ── DNS resolution ────────────────────────────────────────────────
+    // â”€â”€ DNS resolution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public ObservableCollection<DnsModeOption> DnsModeOptions { get; } =
     [
         new DnsModeOption("Automatic (fallback on failure)", "Auto"),
@@ -102,11 +113,11 @@ public partial class SettingsViewModel : ObservableObject
             _settings.DnsMode = value.Tag;
     }
 
-    // ── Startup behavior ────────────────────────────────────────────
+    // â”€â”€ Startup behavior â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private const string RunKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
     private const string RunValueName = "DataJackUI";
 
-    /// <summary>Launch the app on Windows sign-in (writes HKCU …\Run). Persisted via SettingsService.</summary>
+    /// <summary>Launch the app on Windows sign-in (writes HKCU â€¦\Run). Persisted via SettingsService.</summary>
     [ObservableProperty] private bool _startWithWindows;
 
     partial void OnStartWithWindowsChanged(bool value)
@@ -138,14 +149,14 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>Set by App: restore the main window from the tray (used when Minimize-to-tray is turned off).</summary>
     public Action? RequestShowWindow { get; set; }
 
-    // ── Steam Web API Key & Helper Tools ──────────────────────────
+    // â”€â”€ Steam Web API Key & Helper Tools â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     [ObservableProperty] private string _steamWebApiKey = "";
     partial void OnSteamWebApiKeyChanged(string value) => _settings.SteamWebApiKey = value;
 
     [ObservableProperty] private string _toolsPath = "";
     partial void OnToolsPathChanged(string value) => _settings.ToolsPath = value;
 
-    // ── Cloud Saves backup folder ──────────────────────────────────────
+    // â”€â”€ Cloud Saves backup folder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     [ObservableProperty] private string _cloudSavesBackupPath = "";
     [ObservableProperty] private bool _hasCustomCloudSavesBackupPath;
 
@@ -192,7 +203,7 @@ public partial class SettingsViewModel : ObservableObject
             ? _settings.CloudSavesLocalPath
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DataJackUI", "save_backups");
 
-    // ── Language ────────────────────────────────────────────────────
+    // â”€â”€ Language â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     /// <summary>Available UI languages (native endonyms, matching Steam's list). "System default"
     /// (null tag) follows Windows. Languages whose .resx isn't present fall back to English.</summary>
     public ObservableCollection<LanguageOption> LanguageOptions { get; } =
@@ -213,68 +224,6 @@ public partial class SettingsViewModel : ObservableObject
         RequestRestartPrompt?.Invoke();
     }
 
-    // ── Hubcap API key ──────────────────────────────────────────────
-    /// <summary>The key the user is typing/pasting. Starts blank. The saved key is never shown back.</summary>
-    [ObservableProperty] private string _hubcapKeyInput = "";
-
-    /// <summary>Status line under the key box (usage/expiry on success, or an error). Null = hidden.</summary>
-    [ObservableProperty] private string? _hubcapKeyStatus;
-
-    /// <summary>Color for the status line: red on error, green on success.</summary>
-    [ObservableProperty] private string _hubcapKeyStatusColor = "#22c55e";
-    /// <summary>True when a key is saved in settings (drives the "Clear" button + "configured" label).</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowHubcapStats))]
-    [NotifyPropertyChangedFor(nameof(HubcapStatsPending))]
-    [NotifyPropertyChangedFor(nameof(HubcapStatsText))]
-    private bool _hubcapIsKeyConfigured;
-
-    /// <summary>True while validating (disables the buttons via <see cref="CanEditHubcapKey"/>).</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanEditHubcapKey))]
-    private bool _isValidatingHubcapKey;
-
-    public bool CanEditHubcapKey => !IsValidatingHubcapKey;
-
-    [ObservableProperty] private bool _isRefreshingHubcapStats;
-
-    /// <summary>Latest stats for the saved key. Null = not loaded / no key / error.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HubcapStatsDisplay))]
-    [NotifyPropertyChangedFor(nameof(HubcapStatsText))]
-    [NotifyPropertyChangedFor(nameof(HubcapStatsPending))]
-    [NotifyPropertyChangedFor(nameof(HubcapUsagePercent))]
-    [NotifyPropertyChangedFor(nameof(ShowHubcapStats))]
-    private HubcapStats? _hubcapStats;
-
-    /// <summary>"12 / 25 requests today" or "12 / 25 requests today · expires 2026-08-15".</summary>
-    public string? HubcapStatsDisplay =>
-        HubcapStats is not null ? FormatHubcapStats(HubcapStats) : null;
-
-    /// <summary>Progress bar fill 0.0–1.0.</summary>
-    public double HubcapUsagePercent =>
-        HubcapStats is { DailyLimit: > 0 } ? (double)HubcapStats.DailyUsage / HubcapStats.DailyLimit : 0;
-
-    /// <summary>Show the usage card whenever a key is configured. It renders a loading state until stats
-    /// arrive (never blank), so the section can't look broken while the fetch is in flight or after a
-    /// transient failure (the key input is collapsed once configured, so this card is the only content).</summary>
-    public bool ShowHubcapStats => HubcapIsKeyConfigured;
-
-    /// <summary>Stats not yet loaded for a configured key → show the "Loading…" placeholder + indeterminate bar.</summary>
-    public bool HubcapStatsPending => HubcapIsKeyConfigured && HubcapStats is null;
-
-    /// <summary>Placeholder text shown until real stats load.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HubcapSingleUsageText))]
-    private HubcapGenerationUsage? _hubcapGenUsage;
-
-    /// <summary>Single manifest generation quota display (e.g. "Single Manifests: 15 / 20 remaining").</summary>
-    public string? HubcapSingleUsageText =>
-        HubcapGenUsage?.Single is { } s ? $"Single Manifests: {s.Remaining} / {s.Limit} remaining" : null;
-
-    /// <summary>Placeholder text shown until real stats load.</summary>
-    public string HubcapStatsText => HubcapStatsDisplay ?? Resources.Strings.Common_Loading;
-
     /// <summary>Set by App so the guest "Sign in" button can run the Discord flow.</summary>
     public Func<Task>? RequestSignIn { get; set; }
 
@@ -286,13 +235,13 @@ public partial class SettingsViewModel : ObservableObject
     public Action? RequestRestartPrompt { get; set; }
 
     public SettingsViewModel(SettingsService settings, AuthService auth, SteamService steam,
-        HubcapService hubcap, UpdateService updateService)
+        UpdateService updateService, UnlockerService? unlocker = null)
     {
         _settings = settings;
         _auth = auth;
         _steam = steam;
-        _hubcap = hubcap;
         _updateService = updateService;
+        _unlocker = unlocker;
         _auth.AuthStateChanged += RefreshAccount;
         RefreshAccount();
         RefreshSteam();
@@ -305,7 +254,6 @@ public partial class SettingsViewModel : ObservableObject
         _toolsPath = settings.ToolsPath ?? "";
         _cloudSavesBackupPath = settings.CloudSavesLocalPath ?? "";
         _hasCustomCloudSavesBackupPath = !string.IsNullOrWhiteSpace(settings.CloudSavesLocalPath);
-        _hubcapIsKeyConfigured = !string.IsNullOrEmpty(settings.HubcapApiKey);
 
         // Select the saved language (or "System default") without firing the restart prompt.
         _suppressLanguagePrompt = true;
@@ -539,16 +487,12 @@ public partial class SettingsViewModel : ObservableObject
         Process.Start(new ProcessStartInfo(AppConfig.ApiBaseUrl) { UseShellExecute = true });
 
     [RelayCommand]
-    private void OpenHubcap() =>
-        Process.Start(new ProcessStartInfo(AppConfig.HubcapBaseUrl) { UseShellExecute = true });
-
-    [RelayCommand]
     private async Task CheckForUpdatesAsync()
     {
         IsCheckingForUpdates = true;
         IsDownloadingUpdate = false;
         DownloadProgress = 0;
-        UpdateStatusText = "Checking for DataJackUI updates…";
+        UpdateStatusText = "Checking for DataJackUI updatesâ€¦";
         UpdateStatusColor = "#9ca3af";
 
         try
@@ -557,7 +501,7 @@ public partial class SettingsViewModel : ObservableObject
             {
                 IsDownloadingUpdate = true;
                 DownloadProgress = percent;
-                UpdateStatusText = $"Downloading update… {percent}%";
+                UpdateStatusText = $"Downloading updateâ€¦ {percent}%";
             });
 
             var info = await _updateService.CheckAndAutoUpdateAsync(progress);
@@ -606,113 +550,122 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task CheckIceBreakerUpdatesAsync()
+    {
+        if (IsCheckingIceBreaker || IsUpdatingIceBreaker || _unlocker is null) return;
+
+        IsCheckingIceBreaker = true;
+        IceBreakerStatusText = "Checking for IceBreaker updatesâ€¦";
+        IceBreakerStatusColor = "#9ca3af";
+
+        try
+        {
+            var state = await _unlocker.GetStateAsync(UnlockerMode.IceBreaker, forceRefresh: true);
+
+            if (!string.IsNullOrWhiteSpace(state.LatestVersion))
+            {
+                IceBreakerVersionBadge = state.LatestVersion.StartsWith("v", StringComparison.OrdinalIgnoreCase)
+                    ? state.LatestVersion
+                    : $"v{state.LatestVersion}";
+            }
+
+            switch (state.Status)
+            {
+                case ModeStatus.NotInstalled:
+                    IceBreakerUpdateAvailable = true;
+                    IceBreakerStatusText = $"IceBreaker {IceBreakerVersionBadge ?? "latest"} is available to install.";
+                    IceBreakerStatusColor = "#22c55e";
+                    break;
+                case ModeStatus.UpdateAvailable:
+                    IceBreakerUpdateAvailable = true;
+                    IceBreakerStatusText = $"Update {IceBreakerVersionBadge} is available.";
+                    IceBreakerStatusColor = "#22c55e";
+                    break;
+                case ModeStatus.UpToDate:
+                    IceBreakerUpdateAvailable = false;
+                    IceBreakerStatusText = "IceBreaker is up to date.";
+                    IceBreakerStatusColor = "#38bdf8";
+                    break;
+                default:
+                    IceBreakerUpdateAvailable = false;
+                    IceBreakerStatusText = "Could not check IceBreaker status (verify Steam folder).";
+                    IceBreakerStatusColor = "#f87171";
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            IceBreakerStatusText = $"Update check failed: {ex.Message}";
+            IceBreakerStatusColor = "#f87171";
+        }
+        finally
+        {
+            IsCheckingIceBreaker = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task UpdateIceBreakerAsync()
+    {
+        if (IsUpdatingIceBreaker || _unlocker is null) return;
+
+        IsUpdatingIceBreaker = true;
+        IceBreakerDownloadProgress = 0;
+        IceBreakerStatusText = "Updating IceBreakerâ€¦";
+        IceBreakerStatusColor = "#9ca3af";
+
+        try
+        {
+            var progress = new Progress<double?>(p =>
+            {
+                if (p.HasValue)
+                {
+                    IceBreakerDownloadProgress = p.Value * 100.0;
+                }
+            });
+
+            var result = await _unlocker.InstallAsync(UnlockerMode.IceBreaker, progress);
+            if (result.Success)
+            {
+                IceBreakerDownloadProgress = 100;
+                IceBreakerUpdateAvailable = false;
+                var state = await _unlocker.GetStateAsync(UnlockerMode.IceBreaker);
+                if (!string.IsNullOrWhiteSpace(state.LatestVersion))
+                {
+                    IceBreakerVersionBadge = state.LatestVersion.StartsWith("v", StringComparison.OrdinalIgnoreCase)
+                        ? state.LatestVersion
+                        : $"v{state.LatestVersion}";
+                }
+                IceBreakerStatusText = "IceBreaker updated! Restart Steam to load the new DLL.";
+                IceBreakerStatusColor = "#22c55e";
+            }
+            else
+            {
+                IceBreakerStatusText = $"Update failed: {result.Error}";
+                IceBreakerStatusColor = "#f87171";
+            }
+        }
+        catch (Exception ex)
+        {
+            IceBreakerStatusText = $"Update failed: {ex.Message}";
+            IceBreakerStatusColor = "#f87171";
+        }
+        finally
+        {
+            IsUpdatingIceBreaker = false;
+        }
+    }
+
+    [RelayCommand]
     private void SignOut() => _auth.SignOut();
 
-    // ── Hubcap key management ───────────────────────────────────────
-
-    /// <summary>Called by the View when loaded. Auto-refreshes stats if a key is saved.</summary>
+    /// <summary>Called by the View when loaded.</summary>
     public void OnViewLoaded()
     {
         RefreshAccount();
-        if (HubcapIsKeyConfigured)
-            RefreshHubcapStatsCommand.Execute(null);
         // Re-sync FastFetch in case the Add screen's toggle changed it this session (both are singletons
         // that only read the setting at construction). No-op if unchanged; a real change writes back the
         // same value, so no feedback loop.
         FastFetch = _settings.FastFetch;
-    }
-
-    /// <summary>Re-fetch usage stats for the saved key. Silent no-op if no key is saved.</summary>
-    [RelayCommand]
-    private async Task RefreshHubcapStatsAsync()
-    {
-        string? key = _settings.HubcapApiKey;
-        if (string.IsNullOrEmpty(key)) return;
-
-        IsRefreshingHubcapStats = true;
-        try
-        {
-            HubcapStats = await _hubcap.GetStatsAsync(key);
-            HubcapGenUsage = await _hubcap.GetGenerationUsageAsync(key);
-        }
-        catch
-        {
-            HubcapStats = null;
-            HubcapGenUsage = null;
-        }
-        finally
-        {
-            IsRefreshingHubcapStats = false;
-        }
-    }
-
-    /// <summary>Open Hubcap's API key stats/generation page.</summary>
-    [RelayCommand]
-    private static void OpenHubcapKeyPage() =>
-        SteamService.OpenUrl("https://hubcapmanifest.com/api-keys/stats");
-
-    /// <summary>Validate the typed key (format first, then a live stats call) and, if good, save it.</summary>
-    [RelayCommand]
-    private async Task ValidateAndSaveHubcapKeyAsync()
-    {
-        string key = HubcapKeyInput.Trim();
-
-        if (!HubcapService.IsValidKeyFormat(key))
-        {
-            ShowHubcapStatus(Resources.Strings.Settings_HubcapKeyBad, isError: true);
-            return;
-        }
-
-        IsValidatingHubcapKey = true;
-        try
-        {
-            var stats = await _hubcap.GetStatsAsync(key);
-            var genUsage = await _hubcap.GetGenerationUsageAsync(key);
-            if (stats is null && genUsage is null)
-            {
-                // Could be a bad/expired key (401), or a network problem. Both surface as null.
-                ShowHubcapStatus(Resources.Strings.Settings_HubcapKeyError, isError: true);
-                return;
-            }
-
-            _settings.HubcapApiKey = key;
-            HubcapIsKeyConfigured = true;
-            HubcapKeyInput = "";
-            HubcapKeyStatus = null;
-            HubcapStats = stats;
-            HubcapGenUsage = genUsage;
-        }
-        finally
-        {
-            IsValidatingHubcapKey = false;
-        }
-    }
-
-    /// <summary>Forget the saved key and reset the status line.</summary>
-    [RelayCommand]
-    private void ClearHubcapKey()
-    {
-        _settings.HubcapApiKey = null;
-        HubcapIsKeyConfigured = false;
-        HubcapKeyInput = "";
-        HubcapKeyStatus = null;
-        HubcapStats = null;
-        HubcapGenUsage = null;
-    }
-
-    private void ShowHubcapStatus(string text, bool isError)
-    {
-        HubcapKeyStatus = text;
-        HubcapKeyStatusColor = isError ? "#f87171" : "#22c55e";
-    }
-
-    /// <summary>"4/10 today". Appends "· expires yyyy-MM-dd" when the key has an expiry.</summary>
-    private static string FormatHubcapStats(HubcapStats stats)
-    {
-        string usage = string.Format(Resources.Strings.Settings_HubcapKeyOk, stats.DailyUsage, stats.DailyLimit);
-        if (DateTimeOffset.TryParse(stats.ApiKeyExpiresAt, out var expiry))
-            return string.Format(Resources.Strings.Settings_HubcapKeyOkExpiry, stats.DailyUsage, stats.DailyLimit,
-                expiry.ToString("yyyy-MM-dd"));
-        return usage;
     }
 }

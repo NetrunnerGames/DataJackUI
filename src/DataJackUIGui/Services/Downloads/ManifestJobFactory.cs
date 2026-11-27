@@ -16,8 +16,6 @@ namespace DataJackUIGui.Services.Downloads;
 /// </remarks>
 public class ManifestJobFactory(
     DataJackUIApiClient api,
-    HubcapService hubcap,
-    SettingsService settings,
     LuaInstaller installer,
     SteamLibraryService library,
     CoverCache covers,
@@ -52,8 +50,6 @@ public class ManifestJobFactory(
                 if (string.Equals(sourceName, "Ryuu", StringComparison.OrdinalIgnoreCase) ||
                     sourceName.StartsWith("Ryuu", StringComparison.OrdinalIgnoreCase))
                     return api.DownloadRyuuManifestAsync(appId.ToString(), gameName, progress, ct);
-                if (needsKey)
-                    return hubcap.DownloadManifestAsync(appId.ToString(), settings.HubcapApiKey ?? "", progress, ct);
                 if (string.Equals(sourceName, "Sushi", StringComparison.OrdinalIgnoreCase))
                     return api.DownloadPublicSushiManifestAsync(appId.ToString(), progress, ct);
                 return api.DownloadManifestAsync(appId.ToString(), sourceName, gameName, progress, ct);

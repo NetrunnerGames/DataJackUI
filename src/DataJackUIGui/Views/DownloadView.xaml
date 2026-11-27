@@ -1017,16 +1017,6 @@
                                             Cursor="Hand"
                                             Icon="{ui:SymbolIcon ArrowDownload24}"
                                             Visibility="{Binding CanDownload, Converter={StaticResource BoolToVis}}" />
-
-                                        <!--  Key-gated and not configured  -->
-                                        <TextBlock
-                                            Grid.Column="4"
-                                            VerticalAlignment="Center"
-                                            FontSize="11.5"
-                                            Foreground="#a78bfa"
-                                            Text="{x:Static res:Strings.Add_NeedsHubcapKey}"
-                                            ToolTip="{x:Static res:Strings.Add_NeedsHubcapKey_Tip}"
-                                            Visibility="{Binding IsLocked, Converter={StaticResource BoolToVis}}" />
                                     </Grid>
 
                                     <!--  Progress is owned by the shared download queue; this row is just a view onto it.  -->

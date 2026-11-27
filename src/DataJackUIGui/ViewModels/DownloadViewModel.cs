@@ -129,7 +129,6 @@ public partial class AddGameCardVm : ObservableObject
 public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
 {
     private readonly DataJackUIApiClient _api;
-    private readonly HubcapService _hubcap;
     private readonly SettingsService _settings;
     private readonly AuthService _auth;
     private readonly ToastService _toast;
@@ -544,7 +543,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         return false;
     }
 
-    public DownloadViewModel(DataJackUIApiClient api, HubcapService hubcap, SettingsService settings,
+    public DownloadViewModel(DataJackUIApiClient api, SettingsService settings,
         AuthService auth, ToastService toast, LuaInstaller installer,
         SteamAppListCache appList, SteamAppInfoCache appInfo, SteamDepotInfo depotInfo,
         HardwareAppIdService hardware, DropInstallViewModel drop,
@@ -552,7 +551,6 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         PaymentService payment, DenuvoService denuvo, DemoService demo)
     {
         _api = api;
-        _hubcap = hubcap;
         _settings = settings;
         _auth = auth;
         _toast = toast;
@@ -1001,13 +999,9 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         _triedFastFetchSources.Clear();
         var statuses = await _api.CheckSourcesAsync(Details!.AppId.ToString());
 
-        await AddHubcapSourceAsync(statuses, Details.AppId.ToString());
-
         Sources.Clear();
         foreach (var (name, status) in statuses.OrderByDescending(kv => SourceMeta.GetPriority(kv.Key)))
             Sources.Add(new SourceRowViewModel(this, name, status));
-
-        await ApplyHubcapStateAsync();
 
         var best = Sources
             .Where(s => s.CanDownload && !_triedFastFetchSources.Contains(s.Name))
@@ -1023,58 +1017,6 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         _triedFastFetchSources.Add(best.Name);
         _fastFetchSource = best.DisplayName;
         await DownloadFromSourceAsync(best);
-    }
-
-    /// <summary>The Hubcap source name as the website/source-meta keys it.</summary>
-    private const string HubcapSourceName = "Sadie (Morrenus)";
-
-    /// <summary>
-    /// Inject the Hubcap row into the source-status map. The manifest backend no longer returns it, so
-    /// availability comes from a direct Hubcap status check using the user's own key. With no key we still
-    /// surface the row (as "available") so it shows up locked with the "needs a key" hint.
-    /// </summary>
-    private async Task AddHubcapSourceAsync(Dictionary<string, string> statuses, string appid)
-    {
-        string? key = _settings.HubcapApiKey;
-        if (string.IsNullOrEmpty(key))
-        {
-            // No key → we genuinely can't check (the status endpoint needs the key). Mark it "unknown"
-            // so the row shows up locked with the "needs a key" hint and NO misleading availability badge.
-            statuses[HubcapSourceName] = "unknown";
-            return;
-        }
-
-        try
-        {
-            var status = await _hubcap.CheckStatusAsync(key, appid);
-            statuses[HubcapSourceName] = status?.ManifestFileExists == true ? "available" : "unavailable";
-        }
-        catch
-        {
-            statuses[HubcapSourceName] = "unknown";
-        }
-    }
-
-    private async Task ApplyHubcapStateAsync()
-    {
-        var keyRows = Sources.Where(s => s.NeedsKey).ToList();
-        if (keyRows.Count == 0) return;
-
-        // No key configured → lock the premium rows (the row shows the "needs Hubcap key" hint).
-        string? key = _settings.HubcapApiKey;
-        if (string.IsNullOrEmpty(key))
-        {
-            foreach (var row in keyRows) row.IsLocked = true;
-            return;
-        }
-
-        var stats = await _hubcap.GetStatsAsync(key);
-        foreach (var row in keyRows)
-        {
-            row.IsLocked = stats?.CanMakeRequests != true;
-            if (stats is not null)
-                row.StatsText = $"{stats.DailyUsage}/{stats.DailyLimit}";
-        }
     }
 
     /// <summary>
@@ -1120,10 +1062,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
     {
         if (Details is null) return null;
 
-        // Hubcap downloads use the user's OWN key and never touch lua.tools, so a guest with a key
-        // configured can download without signing in. Every other source still needs a lua.tools account.
-        bool hubcapWithKey = source.NeedsKey && !string.IsNullOrEmpty(_settings.HubcapApiKey);
-        if (!hubcapWithKey && await PromptSignInIfGuestAsync(Resources.Strings.Add_SignIn_Download)) return null;
+        if (await PromptSignInIfGuestAsync(Resources.Strings.Add_SignIn_Download)) return null;
 
         long appId = Details.AppId;
         string gameName = Details.Name;
@@ -1246,8 +1185,7 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
             _fastFetchSource = null;
         }
 
-        // Usage just changed: Hubcap against the key's own quota, everything else against the 25/day.
-        _ = needsKey ? ApplyHubcapStateAsync() : RefreshStandardUsageAsync();
+        _ = RefreshStandardUsageAsync();
     }
 
     // ── Install + overwrite confirm ─────────────────────────────────
