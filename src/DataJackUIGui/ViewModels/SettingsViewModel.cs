@@ -245,6 +245,10 @@ public partial class SettingsViewModel : ObservableObject
         _auth.AuthStateChanged += RefreshAccount;
         RefreshAccount();
         RefreshSteam();
+        if (_unlocker is not null)
+        {
+            _ = CheckIceBreakerUpdatesAsync();
+        }
         _autoUpdateApps = settings.AutoUpdateApps; // init from saved value (default ON) without triggering Save
         _fastFetch = settings.FastFetch;
         _donateKeys = settings.DonateKeys;
@@ -464,6 +468,10 @@ public partial class SettingsViewModel : ObservableObject
         {
             _settings.SteamPathOverride = dialog.FolderName;
             RefreshSteam();
+            if (_unlocker is not null)
+            {
+                _ = CheckIceBreakerUpdatesAsync();
+            }
         }
     }
 
@@ -472,6 +480,10 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settings.SteamPathOverride = null;
         RefreshSteam();
+        if (_unlocker is not null)
+        {
+            _ = CheckIceBreakerUpdatesAsync();
+        }
     }
 
     [RelayCommand]
@@ -608,6 +620,21 @@ public partial class SettingsViewModel : ObservableObject
     private async Task UpdateIceBreakerAsync()
     {
         if (IsUpdatingIceBreaker || _unlocker is null) return;
+
+        if (SteamService.IsSteamRunning())
+        {
+            bool closeSteam = await UiMessageBox.ShowConfirmAsync(
+                "Close Steam to Update IceBreaker",
+                "Steam is currently running and has version.dll loaded.\n\nDataJackUI needs to close Steam to update IceBreaker, then you can reopen Steam afterward.\n\nClose Steam and update now?",
+                "Close Steam & Update",
+                "Cancel");
+
+            if (!closeSteam) return;
+
+            IceBreakerStatusText = "Closing Steam…";
+            IceBreakerStatusColor = "#9ca3af";
+            await Task.Run(_steam.StopSteam);
+        }
 
         IsUpdatingIceBreaker = true;
         IceBreakerDownloadProgress = 0;
