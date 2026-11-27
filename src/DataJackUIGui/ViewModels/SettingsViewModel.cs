@@ -513,7 +513,7 @@ public partial class SettingsViewModel : ObservableObject
             {
                 IsDownloadingUpdate = true;
                 DownloadProgress = percent;
-                UpdateStatusText = $"Downloading updateâ€¦ {percent}%";
+                UpdateStatusText = $"Downloading update... {percent}%";
             });
 
             var info = await _updateService.CheckAndAutoUpdateAsync(progress);
@@ -567,7 +567,7 @@ public partial class SettingsViewModel : ObservableObject
         if (IsCheckingIceBreaker || IsUpdatingIceBreaker || _unlocker is null) return;
 
         IsCheckingIceBreaker = true;
-        IceBreakerStatusText = "Checking for IceBreaker updatesâ€¦";
+        IceBreakerStatusText = "Checking for IceBreaker updates...";
         IceBreakerStatusColor = "#9ca3af";
 
         try
@@ -631,14 +631,14 @@ public partial class SettingsViewModel : ObservableObject
 
             if (!closeSteam) return;
 
-            IceBreakerStatusText = "Closing Steam…";
+            IceBreakerStatusText = "Closing Steam...";
             IceBreakerStatusColor = "#9ca3af";
             await Task.Run(_steam.StopSteam);
         }
 
         IsUpdatingIceBreaker = true;
         IceBreakerDownloadProgress = 0;
-        IceBreakerStatusText = "Updating IceBreakerâ€¦";
+        IceBreakerStatusText = "Updating IceBreaker...";
         IceBreakerStatusColor = "#9ca3af";
 
         try
