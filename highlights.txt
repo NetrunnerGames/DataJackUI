@@ -1,1 +1,1 @@
-- Fixed corrupted ellipsis characters in Settings update status messages
+- Fixed non-Denuvo custom-DRM games being priced at 200 INR instead of 100 INR

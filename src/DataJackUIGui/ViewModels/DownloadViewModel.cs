@@ -530,16 +530,6 @@ public partial class DownloadViewModel : PagedListViewModel<AddGameCardVm>
         // 3. Check cached Steam appdetails JSON on disk
         if (_appInfo.CheckHasDenuvoFromDisk(appId)) return true;
 
-        // 4. Fallback: check DepotBox game listings if available
-        try
-        {
-            var listings = await _api.GetDenuvoListingsAsync();
-            if (listings?.Games is not null)
-            {
-                return listings.Games.Any(g => long.TryParse(g.AppId, out long id) && id == appId);
-            }
-        }
-        catch { }
         return false;
     }
 
