@@ -504,7 +504,7 @@ public partial class SettingsViewModel : ObservableObject
         IsCheckingForUpdates = true;
         IsDownloadingUpdate = false;
         DownloadProgress = 0;
-        UpdateStatusText = "Checking for DataJackUI updatesâ€¦";
+        UpdateStatusText = "Checking for DataJackUI updates...";
         UpdateStatusColor = "#9ca3af";
 
         try
