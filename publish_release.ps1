@@ -51,7 +51,7 @@ git tag -a "v$Version" -m "Release v$Version"
 git push origin main --tags
 
 # 4. GitHub Release & Asset Upload via gh cli
-Write-Host "`n2. Publishing GitHub Release v$Version & Uploading Velopack Assets via gh release..." -ForegroundColor Yellow
+Write-Host "`n2. Publishing GitHub Release v$Version & Uploading Release Assets via gh release..." -ForegroundColor Yellow
 $releaseTitle = "Release v$($Version): $Title"
 
 try {

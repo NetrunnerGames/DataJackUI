@@ -27,7 +27,7 @@ Write-Host "====================================================" -ForegroundCol
 Write-Host " Packaging Standard ZIP & Announcing v$Version" -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
 
-# 2. Publish application and package Velopack installer (if not already packaged by build_release.ps1)
+# 2. Publish application and package release artifacts (if not already packaged by build_release.ps1)
 $ReleasesDir = "Releases"
 if (-not (Test-Path $ReleasesDir)) { New-Item -ItemType Directory -Path $ReleasesDir | Out-Null }
 
@@ -116,7 +116,11 @@ Add-FormFile $content "file" $ZipName $fileBytes
 try {
     $response = $client.PostAsync($workerUrl, $content).GetAwaiter().GetResult()
     $resText = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-    Write-Host "Worker Response (HTTP $($response.StatusCode)): $resText" -ForegroundColor Green
+    if (-not $response.IsSuccessStatusCode) {
+        throw "Worker returned HTTP $([int]$response.StatusCode) ($($response.StatusCode)): $resText"
+    }
+    Write-Host "Worker Response (HTTP $([int]$response.StatusCode)): $resText" -ForegroundColor Green
 } catch {
     Write-Host "Announcement dispatch error: $_" -ForegroundColor Red
+    throw
 }

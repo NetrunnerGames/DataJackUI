@@ -1,0 +1,200 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      title:
+        description: 'Optional release title'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, Package & Release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Inno Setup 7
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          $candidates = @(
+            "C:\Program Files (x86)\Inno Setup 7\ISCC.exe",
+            "C:\Program Files\Inno Setup 7\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            $cmd = Get-Command iscc.exe -ErrorAction SilentlyContinue
+            if ($cmd) { $iscc = $cmd.Source }
+          }
+          if (-not $iscc) {
+            throw "Inno Setup 7 ISCC.exe not found after installation."
+          }
+          $banner = (& "$iscc" /? 2>&1 | Select-Object -First 1) -join ""
+          Write-Host "Found ISCC.exe at $iscc ($banner)"
+          if ($banner -notmatch 'Inno Setup 7') {
+            throw "Inno Setup 7 is required for WizardStyle=modern dynamic, found: $banner"
+          }
+          "ISCC_PATH=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Resolve Version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag" -and "${{ github.ref_name }}" -match '^v(.+)$') {
+            $ver = $Matches[1]
+          } else {
+            [xml]$csproj = Get-Content "src/DataJackUIGui/DataJackUIGui.csproj"
+            $ver = $csproj.Project.PropertyGroup.Version.Trim()
+          }
+          if ([string]::IsNullOrWhiteSpace($ver)) {
+            throw "Failed to resolve release version."
+          }
+          Write-Host "Resolved version: $ver"
+          "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "tag=v$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Run Tests
+        run: dotnet test -c Release
+
+      - name: Publish Framework-Dependent Application
+        run: dotnet publish src/DataJackUIGui/DataJackUIGui.csproj -c Release -r win-x64 --self-contained false -o bin/PublishFrameworkDependent
+
+      - name: Compile Inno Setup Installer
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "Releases")) { New-Item -ItemType Directory -Path "Releases" | Out-Null }
+          & "$env:ISCC_PATH" "/DMyAppVersion=${{ steps.version.outputs.version }}" "installer/DataJackUI.iss"
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path "Releases/DataJackUI-Inno-Setup.exe")) {
+            throw "Inno Setup compilation failed."
+          }
+
+      - name: Package Release ZIPs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Add-Type -AssemblyName "System.IO.Compression.FileSystem"
+
+          $publishDir = "bin/PublishFrameworkDependent"
+          $releasesDir = "Releases"
+
+          # 1. DataJackUI-Inno-Setup.zip
+          $innoZip = "$releasesDir/DataJackUI-Inno-Setup.zip"
+          if (Test-Path $innoZip) { Remove-Item -Force $innoZip }
+          $innoTemp = Join-Path $env:RUNNER_TEMP "inno_zip"
+          New-Item -ItemType Directory -Path $innoTemp -Force | Out-Null
+          Copy-Item "$releasesDir/DataJackUI-Inno-Setup.exe" "$innoTemp/DataJackUI-Inno-Setup.exe" -Force
+          [System.IO.Compression.ZipFile]::CreateFromDirectory($innoTemp, $innoZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+
+          # 2. DataJackUI-Update.zip
+          $updateZip = "$releasesDir/DataJackUI-Update.zip"
+          if (Test-Path $updateZip) { Remove-Item -Force $updateZip }
+          $updateTemp = Join-Path $env:RUNNER_TEMP "update_zip"
+          New-Item -ItemType Directory -Path $updateTemp -Force | Out-Null
+          Copy-Item "$publishDir/DataJackUI.*" $updateTemp -Force
+          if (Test-Path "$publishDir/Resources") {
+            Copy-Item "$publishDir/Resources" "$updateTemp/Resources" -Recurse -Force
+          }
+          if (Test-Path "$publishDir/public") {
+            Copy-Item "$publishDir/public" "$updateTemp/public" -Recurse -Force
+          }
+          [System.IO.Compression.ZipFile]::CreateFromDirectory($updateTemp, $updateZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+
+          # 3. DataJackUI-Portable.zip
+          $portableZip = "$releasesDir/DataJackUI-Portable.zip"
+          if (Test-Path $portableZip) { Remove-Item -Force $portableZip }
+          [System.IO.Compression.ZipFile]::CreateFromDirectory((Resolve-Path $publishDir), $portableZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+
+          Get-ChildItem $releasesDir | Select-Object Name, Length
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = "${{ steps.version.outputs.tag }}"
+          $customTitle = "${{ inputs.title }}"
+          $releaseTitle = if ([string]::IsNullOrWhiteSpace($customTitle)) { "Release $tag" } else { "Release ${tag}: $customTitle" }
+
+          $hasChangelog = (Test-Path "changelog.txt") -and -not [string]::IsNullOrWhiteSpace((Get-Content -Raw -Encoding utf8 "changelog.txt"))
+          $notesArgs = if ($hasChangelog) { @("--notes-file", "changelog.txt") } else { @("--generate-notes") }
+          $assets = @(
+            "Releases/DataJackUI-Inno-Setup.exe",
+            "Releases/DataJackUI-Inno-Setup.zip",
+            "Releases/DataJackUI-Update.zip",
+            "Releases/DataJackUI-Portable.zip"
+          )
+
+          & gh release create $tag @assets --title "$releaseTitle" --target "${{ github.sha }}" @notesArgs
+          if ($LASTEXITCODE -ne 0) {
+            throw "gh release create failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Dispatch Discord Announcement
+        env:
+          BOT_SECRET: ${{ secrets.BOT_SECRET }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Add-Type -AssemblyName "System.Net.Http"
+
+          $version = "${{ steps.version.outputs.version }}"
+          $tag = "${{ steps.version.outputs.tag }}"
+          $customTitle = "${{ inputs.title }}"
+          $announceTitle = if ([string]::IsNullOrWhiteSpace($customTitle)) { "DataJackUI $tag Released!" } else { "DataJackUI $tag — $customTitle" }
+
+          $changelogText = if (Test-Path "changelog.txt") { Get-Content -Raw -Encoding utf8 "changelog.txt" } else { "" }
+          $highlightsText = if (Test-Path "highlights.txt") { Get-Content -Raw -Encoding utf8 "highlights.txt" } else { "" }
+
+          function Add-FormField ($multiContent, $name, $value) {
+            if ([string]::IsNullOrWhiteSpace($value)) { return }
+            $sc = [System.Net.Http.StringContent]::new($value)
+            $sc.Headers.ContentDisposition = [System.Net.Http.Headers.ContentDispositionHeaderValue]::new("form-data")
+            $sc.Headers.ContentDisposition.Name = '"' + $name + '"'
+            $multiContent.Add($sc)
+          }
+
+          $client = [System.Net.Http.HttpClient]::new()
+          $client.Timeout = [TimeSpan]::FromMinutes(2)
+          if (-not [string]::IsNullOrWhiteSpace($env:BOT_SECRET)) {
+            $client.DefaultRequestHeaders.Add("X-Bot-Secret", $env:BOT_SECRET)
+          }
+
+          $content = [System.Net.Http.MultipartFormDataContent]::new("----DataJackUIBoundary$([Guid]::NewGuid().ToString('N'))")
+          Add-FormField $content "version" $version
+          Add-FormField $content "repo_name" "DataJackUI"
+          Add-FormField $content "repo_url" "https://github.com/NetrunnerGames/DataJackUI"
+          Add-FormField $content "title" $announceTitle
+          Add-FormField $content "release_url" "https://github.com/NetrunnerGames/DataJackUI/releases/tag/$tag"
+          Add-FormField $content "changelog" $changelogText
+          Add-FormField $content "highlights" $highlightsText
+
+          $zipPath = (Resolve-Path "Releases/DataJackUI-Inno-Setup.zip").Path
+          $fileBytes = [System.IO.File]::ReadAllBytes($zipPath)
+          $bc = [System.Net.Http.ByteArrayContent]::new($fileBytes)
+          $bc.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("application/zip")
+          $bc.Headers.ContentDisposition = [System.Net.Http.Headers.ContentDispositionHeaderValue]::new("form-data")
+          $bc.Headers.ContentDisposition.Name = '"file"'
+          $bc.Headers.ContentDisposition.FileName = '"DataJackUI-Inno-Setup.zip"'
+          $content.Add($bc)
+
+          $response = $client.PostAsync("https://bots.netrunnergames.workers.dev/api/announce", $content).GetAwaiter().GetResult()
+          $resText = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+          if (-not $response.IsSuccessStatusCode) {
+            throw "Discord announce worker returned HTTP $([int]$response.StatusCode) ($($response.StatusCode)): $resText"
+          }
+          Write-Host "Worker Response (HTTP $([int]$response.StatusCode)): $resText"

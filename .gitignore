@@ -10,10 +10,6 @@ TestResults/
 [D|d]ebug/
 [R|r]elease/
 
-# Dynamic release notes text files
-changelog.txt
-highlights.txt
-
 # WPF temporary project files (generated during builds)
 *_wpftmp.csproj
 *_wpftmp.*

@@ -1,6 +1,5 @@
-; DataJackUI Modern Inno Setup Script (Wrapping Velopack Bootstrap)
-; Provides the modern dynamic dark UI, EULA, directory selection, and custom tasks
-; while installing Velopack-managed files so that in-app 300KB delta updates work seamlessly.
+; DataJackUI Modern Inno Setup Script
+; Provides the modern dynamic dark UI, EULA, directory selection, and custom tasks.
 
 #define MyAppName "DataJackUI"
 #ifndef MyAppVersion
